@@ -22,6 +22,10 @@ You are one of several agents building AirSpice from GitHub issues. These rules 
 9. **No wall-clock time in simulation semantics.** Firmware and analog share one virtual clock. `Date.now()`/`performance.now()` in a co-simulation path is a correctness bug, not a style issue.
 10. **Determinism.** Same inputs → identical outputs, across runs and platforms. Sort your keys, define your orderings, seed your randomness. Nondeterminism discovered later costs 100x what it costs now.
 
+## Fixture/port separation (mechanically enforced)
+
+A pull request may touch `tests/golden_corpus/**` OR a port package (`packages/air-ts`, `sim-wasm`, `mpy-wasm`, `cosim`, `agent`, `ui`) — never both, unless the PR carries the `oracle-first` label and describes the intentional oracle change it implements. This is the mechanical form of ADR 0009: it makes "adjust the oracle until my port passes" impossible to do quietly. Guardrails CI (issue #42) enforces this and the other grep-able rules in this file; an enforced rule failing in CI is not an obstacle to route around — it is the review working.
+
 ## Scope discipline
 
 11. Implement the issue, not your improved version of it. Behavior changes, refactors, and "while I was here" fixes belong in separate issues — file them, don't ship them.
