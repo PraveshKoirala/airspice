@@ -1,0 +1,12 @@
+{
+  "type": "opamp",
+  "spice_subckt": "LM358",
+  "required_pins": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5"
+  ],
+  "spice_supported": true
+}

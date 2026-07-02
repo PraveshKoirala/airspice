@@ -1,0 +1,8 @@
+{
+  "type": "generic_load",
+  "required_pins": ["p", "n"],
+  "value_required": false,
+  "required_any": ["value", "current"],
+  "spice_supported": true
+}
+

@@ -1,0 +1,6 @@
+{
+  "type": "ldo",
+  "required_pins": ["in", "out", "gnd"],
+  "required_properties": ["vout", "iout_max", "v_dropout", "iq"],
+  "spice_supported": true
+}

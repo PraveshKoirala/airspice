@@ -1,0 +1,8 @@
+<system name="missing_ground" ir_version="0.1">
+  <metadata><title>Missing Ground</title></metadata>
+  <nets><net id="bat" role="power" nominal_voltage="3.7V"/></nets>
+  <components><component id="U_MCU" type="mcu" part="ESP32-C3"><pin name="3V3" net="bat"/></component></components>
+  <tests><test id="noop"><run duration="1ms"/></test></tests>
+  <simulation_profiles><profile id="analog_only"><backend type="ngspice"/><run test="noop"/></profile></simulation_profiles>
+</system>
+

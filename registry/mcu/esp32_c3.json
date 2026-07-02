@@ -1,0 +1,43 @@
+{
+  "part": "ESP32-C3",
+  "type": "mcu",
+  "renode_model": "ESP32C3",
+  "platformio": {
+    "platform": "espressif32",
+    "framework": "arduino",
+    "board": "esp32-c3-devkitm-1"
+  },
+  "cpu": { "model": "RiscV32", "address": "0x0" },
+  "memory": [
+    { "name": "sram", "address": "0x40378000", "size": "0x60000" }
+  ],
+  "power_pins": {
+    "3V3": "power",
+    "GND": "ground"
+  },
+  "pins": {
+    "GPIO0": ["GPIO", "ADC1_CH0", "GPIO_OUT"],
+    "GPIO1": ["GPIO", "ADC1_CH1", "GPIO_OUT"],
+    "GPIO2": ["GPIO", "ADC1_CH2", "GPIO_OUT"],
+    "GPIO3": ["GPIO", "ADC1_CH3", "GPIO_OUT"],
+    "GPIO4": ["GPIO", "ADC1_CH4", "GPIO_OUT"],
+    "GPIO5": ["GPIO", "ADC1_CH5", "GPIO_OUT"],
+    "GPIO8": ["GPIO", "I2C_SDA", "GPIO_OUT"],
+    "GPIO9": ["GPIO", "I2C_SCL", "GPIO_OUT"],
+    "TX": ["UART_TX"],
+    "RX": ["UART_RX"]
+  },
+  "peripherals": {
+    "ADC1": {
+      "resolution_bits": 12,
+      "vref": "3.3V"
+    },
+    "I2C0": {
+      "supported": true
+    },
+    "UART0": {
+      "supported": true
+    }
+  }
+}
+

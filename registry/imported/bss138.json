@@ -1,0 +1,10 @@
+{
+  "type": "mosfet",
+  "spice_model": "BSS138",
+  "required_pins": [
+    "D",
+    "G",
+    "S"
+  ],
+  "spice_supported": true
+}

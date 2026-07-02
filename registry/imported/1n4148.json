@@ -1,0 +1,9 @@
+{
+  "type": "diode",
+  "spice_model": "1N4148",
+  "required_pins": [
+    "a",
+    "c"
+  ],
+  "spice_supported": true
+}

@@ -1,0 +1,1 @@
+// Empty firmware to satisfy tools if needed, but we write XML first

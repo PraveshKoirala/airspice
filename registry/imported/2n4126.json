@@ -1,0 +1,10 @@
+{
+  "type": "bjt",
+  "spice_model": "2N4126",
+  "required_pins": [
+    "C",
+    "B",
+    "E"
+  ],
+  "spice_supported": true
+}

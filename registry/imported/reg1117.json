@@ -1,0 +1,10 @@
+{
+  "type": "ldo",
+  "spice_subckt": "REG1117",
+  "required_pins": [
+    "1",
+    "2",
+    "3"
+  ],
+  "spice_supported": true
+}

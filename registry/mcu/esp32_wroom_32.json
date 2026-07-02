@@ -1,0 +1,34 @@
+{
+  "part": "ESP32-WROOM-32",
+  "type": "mcu",
+  "platformio": {
+    "platform": "espressif32",
+    "framework": "arduino",
+    "board": "esp32dev"
+  },
+  "power_pins": {
+    "3V3": "power",
+    "GND": "ground"
+  },
+  "pins": {
+    "GPIO32": ["GPIO", "ADC1_CH4"],
+    "GPIO33": ["GPIO", "ADC1_CH5"],
+    "GPIO21": ["GPIO", "I2C_SDA"],
+    "GPIO22": ["GPIO", "I2C_SCL"],
+    "TX": ["UART_TX"],
+    "RX": ["UART_RX"]
+  },
+  "peripherals": {
+    "ADC1": {
+      "resolution_bits": 12,
+      "vref": "3.3V"
+    },
+    "I2C0": {
+      "supported": true
+    },
+    "UART0": {
+      "supported": true
+    }
+  }
+}
+

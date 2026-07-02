@@ -1,0 +1,7 @@
+{
+  "type": "voltage_source",
+  "required_pins": ["p", "n"],
+  "value_required": true,
+  "spice_supported": true
+}
+

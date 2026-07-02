@@ -1,0 +1,6 @@
+{
+  "type": "mosfet",
+  "required_pins": ["G", "D", "S"],
+  "value_required": false,
+  "spice_supported": true
+}

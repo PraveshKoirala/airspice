@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="system">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="metadata" minOccurs="1" maxOccurs="1" type="openSection"/>
+        <xs:element name="requirements" minOccurs="0" maxOccurs="1" type="openSection"/>
+        <xs:element name="nets" minOccurs="1" maxOccurs="1" type="netsType"/>
+        <xs:element name="power_domains" minOccurs="0" maxOccurs="1" type="powerDomainsType"/>
+        <xs:element name="components" minOccurs="1" maxOccurs="1" type="componentsType"/>
+        <xs:element name="interfaces" minOccurs="0" maxOccurs="1" type="openSection"/>
+        <xs:element name="analog" minOccurs="0" maxOccurs="1" type="openSection"/>
+        <xs:element name="digital" minOccurs="0" maxOccurs="1" type="openSection"/>
+        <xs:element name="firmware" minOccurs="0" maxOccurs="1" type="openSection"/>
+        <xs:element name="bridges" minOccurs="0" maxOccurs="1" type="openSection"/>
+        <xs:element name="tests" minOccurs="1" maxOccurs="1" type="openSection"/>
+        <xs:element name="simulation_profiles" minOccurs="1" maxOccurs="1" type="openSection"/>
+        <xs:element name="exports" minOccurs="0" maxOccurs="1" type="openSection"/>
+        <xs:element name="gui" minOccurs="0" maxOccurs="1" type="openSection"/>
+      </xs:sequence>
+      <xs:attribute name="name" type="xs:string" use="required"/>
+      <xs:attribute name="ir_version" type="xs:string" use="required" fixed="0.1"/>
+    </xs:complexType>
+    <xs:key name="netId"><xs:selector xpath="nets/net"/><xs:field xpath="@id"/></xs:key>
+    <xs:key name="componentId"><xs:selector xpath="components/component"/><xs:field xpath="@id"/></xs:key>
+    <xs:key name="testId"><xs:selector xpath="tests/test"/><xs:field xpath="@id"/></xs:key>
+    <xs:key name="profileId"><xs:selector xpath="simulation_profiles/profile"/><xs:field xpath="@id"/></xs:key>
+  </xs:element>
+
+  <xs:complexType name="openSection" mixed="true">
+    <xs:sequence>
+      <xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/>
+    </xs:sequence>
+    <xs:anyAttribute processContents="lax"/>
+  </xs:complexType>
+
+  <xs:complexType name="netsType">
+    <xs:sequence>
+      <xs:element name="net" minOccurs="1" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:attribute name="id" type="xs:string" use="required"/>
+          <xs:attribute name="role" type="xs:string" use="required"/>
+          <xs:attribute name="nominal_voltage" type="xs:string" use="optional"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="powerDomainsType">
+    <xs:sequence>
+      <xs:element name="domain" minOccurs="0" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:attribute name="id" type="xs:string" use="required"/>
+          <xs:attribute name="net" type="xs:string" use="required"/>
+          <xs:attribute name="nominal" type="xs:string" use="optional"/>
+          <xs:attribute name="source" type="xs:string" use="optional"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="componentsType">
+    <xs:sequence>
+      <xs:element name="component" minOccurs="1" maxOccurs="unbounded">
+        <xs:complexType mixed="true">
+          <xs:choice minOccurs="0" maxOccurs="unbounded">
+            <xs:element name="value" type="xs:string"/>
+            <xs:element name="pin">
+              <xs:complexType>
+                <xs:attribute name="name" type="xs:string" use="required"/>
+                <xs:attribute name="net" type="xs:string" use="required"/>
+                <xs:attribute name="function" type="xs:string" use="optional"/>
+              </xs:complexType>
+            </xs:element>
+            <xs:element name="property">
+              <xs:complexType>
+                <xs:attribute name="name" type="xs:string" use="required"/>
+                <xs:attribute name="value" type="xs:string" use="required"/>
+              </xs:complexType>
+            </xs:element>
+          </xs:choice>
+          <xs:attribute name="id" type="xs:string" use="required"/>
+          <xs:attribute name="type" type="xs:string" use="required"/>
+          <xs:attribute name="part" type="xs:string" use="optional"/>
+          <xs:attribute name="spice_model" type="xs:string" use="optional"/>
+          <xs:attribute name="spice_subckt" type="xs:string" use="optional"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+</xs:schema>

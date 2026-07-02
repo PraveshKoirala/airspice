@@ -1,0 +1,35 @@
+{
+  "part": "STM32F103",
+  "type": "mcu",
+  "renode_model": "STM32F103",
+  "platformio": {
+    "platform": "ststm32",
+    "framework": "arduino",
+    "board": "bluepill_f103c8"
+  },
+  "cpu": {
+    "model": "Cortex-M3",
+    "address": "0x0"
+  },
+  "memory": [
+    { "name": "flash", "address": "0x08000000", "size": "0x10000" },
+    { "name": "sram", "address": "0x20000000", "size": "0x5000" }
+  ],
+  "power_pins": {
+    "VDD": "power",
+    "VSS": "ground"
+  },
+  "pins": {
+    "PA0": ["GPIO", "ADC1_CH0"],
+    "PA1": ["GPIO", "ADC1_CH1"],
+    "PA9": ["UART1_TX"],
+    "PA10": ["UART1_RX"],
+    "PB6": ["I2C1_SCL"],
+    "PB7": ["I2C1_SDA"]
+  },
+  "peripherals": {
+    "ADC1": { "type": "STM32_ADC", "address": "0x40012400", "vref": "3.3V" },
+    "UART1": { "type": "STM32_UART", "address": "0x40013800" },
+    "I2C1": { "type": "STM32_I2C", "address": "0x40005400" }
+  }
+}

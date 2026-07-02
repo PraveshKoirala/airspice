@@ -1,0 +1,7 @@
+{
+  "type": "capacitor",
+  "required_pins": ["1", "2"],
+  "value_required": true,
+  "spice_supported": true
+}
+

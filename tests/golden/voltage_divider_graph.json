@@ -1,0 +1,124 @@
+{
+  "nodes": [
+    {
+      "id": "R_BOTTOM",
+      "type": "component",
+      "data": {
+        "label": "R_BOTTOM",
+        "type": "resistor",
+        "part": "",
+        "value": "10k",
+        "spice_model": "",
+        "pins": [
+          {
+            "name": "1",
+            "net": "vout",
+            "function": ""
+          },
+          {
+            "name": "2",
+            "net": "gnd",
+            "function": ""
+          }
+        ]
+      }
+    },
+    {
+      "id": "R_TOP",
+      "type": "component",
+      "data": {
+        "label": "R_TOP",
+        "type": "resistor",
+        "part": "",
+        "value": "10k",
+        "spice_model": "",
+        "pins": [
+          {
+            "name": "1",
+            "net": "vin",
+            "function": ""
+          },
+          {
+            "name": "2",
+            "net": "vout",
+            "function": ""
+          }
+        ]
+      }
+    },
+    {
+      "id": "net:gnd",
+      "type": "net",
+      "data": {
+        "label": "gnd",
+        "role": "ground"
+      }
+    },
+    {
+      "id": "net:vin",
+      "type": "net",
+      "data": {
+        "label": "vin",
+        "role": "power"
+      }
+    },
+    {
+      "id": "net:vout",
+      "type": "net",
+      "data": {
+        "label": "vout",
+        "role": "analog_signal"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "R_BOTTOM:1->vout",
+      "source": "R_BOTTOM",
+      "target": "net:vout",
+      "sourceHandle": "pin:1",
+      "targetHandle": "net",
+      "label": "1",
+      "data": {
+        "pin": "1",
+        "net": "vout"
+      }
+    },
+    {
+      "id": "R_BOTTOM:2->gnd",
+      "source": "R_BOTTOM",
+      "target": "net:gnd",
+      "sourceHandle": "pin:2",
+      "targetHandle": "net",
+      "label": "2",
+      "data": {
+        "pin": "2",
+        "net": "gnd"
+      }
+    },
+    {
+      "id": "R_TOP:1->vin",
+      "source": "R_TOP",
+      "target": "net:vin",
+      "sourceHandle": "pin:1",
+      "targetHandle": "net",
+      "label": "1",
+      "data": {
+        "pin": "1",
+        "net": "vin"
+      }
+    },
+    {
+      "id": "R_TOP:2->vout",
+      "source": "R_TOP",
+      "target": "net:vout",
+      "sourceHandle": "pin:2",
+      "targetHandle": "net",
+      "label": "2",
+      "data": {
+        "pin": "2",
+        "net": "vout"
+      }
+    }
+  ]
+}

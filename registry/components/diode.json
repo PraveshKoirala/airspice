@@ -1,0 +1,5 @@
+{
+  "type": "diode",
+  "required_pins": ["a", "c"],
+  "spice_supported": true
+}
