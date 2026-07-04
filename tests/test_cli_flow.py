@@ -15,8 +15,9 @@ _NO_TOOLS = {"AIR_NGSPICE": "", "AIR_RENODE": "", "AIR_PLATFORMIO": "", "AIR_PIO
 from air.cli import main
 from air.firmware import compile_firmware
 from air.graph import build_graph_data, compile_graph
-from air.parser import parse_file
-from air.simulator import simulate_analog
+from air.parser import parse_file, parse_string
+from air.simulator import NgspiceRun, simulate_analog
+import air.simulator as simulator
 from air.spice import compile_spice
 from air.templates import render_template
 from air.validation import has_errors, validate_ir, validate_tree
@@ -297,6 +298,117 @@ class CliFlowTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             rc = main(["ai-repair", str(FAILING / "bad_adc_divider.air.xml"), "--provider", "openai", "--out", str(Path(tmp) / "openai.patch.xml"), "--json"])
             self.assertEqual(rc, 1)
+
+
+class NgspiceHonestyTests(unittest.TestCase):
+    """Issue #55: a hard ngspice failure must surface, not silently pass as DC.
+
+    The legitimate builtin_dc_fallback (ngspice-not-installed) path must remain
+    an honest 'passed' per docs/simulation_spec.md; a non-zero ngspice exit must
+    become a failure carrying a structured NGSPICE_FAILED diagnostic.
+    """
+
+    def test_ngspice_missing_uses_fallback_and_is_honest(self) -> None:
+        # No ngspice binary reachable -> builtin DC fallback. This is legitimate
+        # (spec: DC fallback when ngspice is unavailable). It must still be a
+        # 'passed' report explicitly labelled builtin_dc_fallback, with NO
+        # NGSPICE_FAILED diagnostic (nothing failed -- ngspice was never run).
+        with mock.patch.dict(os.environ, _NO_TOOLS), \
+                mock.patch("air.tools.shutil.which", return_value=None):
+            run = simulator.run_ngspice(Path("nope.cir"), Path(tempfile.gettempdir()) / "x.log")
+            self.assertFalse(run.attempted)
+            self.assertFalse(run.failed)
+            with tempfile.TemporaryDirectory() as tmp:
+                ir, _ = parse_file(EXAMPLE)
+                result = simulate_analog(ir, "analog_only", Path(tmp))
+        self.assertEqual(result["status"], "passed")
+        report = result["reports"][0]
+        self.assertEqual(report["backend"], "builtin_dc_fallback")
+        codes = {d["code"] for d in report["diagnostics"]}
+        self.assertNotIn("NGSPICE_FAILED", codes)
+        # Both #55 and #58 behaviors coexist on the legitimate fallback: the
+        # report is an honest builtin_dc_fallback 'passed' AND carries #58's
+        # actionable NGSPICE_NOT_FOUND info diagnostic.
+        self.assertIn("NGSPICE_NOT_FOUND", codes)
+
+    def test_ngspice_nonzero_exit_surfaces_failure(self) -> None:
+        # ngspice ran and FAILED (exit 1) -> the report must reflect the failure,
+        # NOT a clean builtin-DC 'passed'. A structured NGSPICE_FAILED diagnostic
+        # must carry the exit code and the stderr tail identifying the cause.
+        def fake_run(netlist: Path, log_path: Path) -> NgspiceRun:
+            return NgspiceRun(
+                attempted=True,
+                returncode=1,
+                stdout="",
+                stderr="Error: unknown model 'bss138'\nno simulations run!\n",
+            )
+
+        with mock.patch.object(simulator, "run_ngspice", fake_run):
+            with tempfile.TemporaryDirectory() as tmp:
+                ir, _ = parse_file(EXAMPLE)
+                result = simulate_analog(ir, "analog_only", Path(tmp))
+        self.assertEqual(result["status"], "failed")
+        self.assertFalse(result["success"])
+        report = result["reports"][0]
+        self.assertEqual(report["backend"], "ngspice_failed")
+        ngspice_diags = [d for d in report["diagnostics"] if d["code"] == "NGSPICE_FAILED"]
+        self.assertEqual(len(ngspice_diags), 1)
+        self.assertEqual(ngspice_diags[0]["severity"], "error")
+        self.assertEqual(ngspice_diags[0]["observed"]["returncode"], 1)
+        self.assertIn("no simulations run", ngspice_diags[0]["observed"]["stderr_tail"])
+
+
+class UndefinedSpiceModelValidationTests(unittest.TestCase):
+    """Issue #55: a device line referencing a model/subckt the compiler cannot
+    define must fail validation (UNDEFINED_SPICE_MODEL), blocking compilation of
+    a netlist real ngspice cannot run."""
+
+    _BASE = (
+        '<system name="model_ref_check" ir_version="0.1">'
+        "<metadata><title>t</title></metadata>"
+        '<nets><net id="gnd" role="ground"/><net id="vin" role="power" nominal_voltage="5V"/>'
+        '<net id="d" role="analog_signal"/><net id="g" role="digital_signal"/></nets>'
+        "<components>{component}</components>"
+        '<tests><test id="noop"><run duration="1ms"/></test></tests>'
+        '<simulation_profiles><profile id="analog_only"><backend type="ngspice"/>'
+        '<run test="noop"/></profile></simulation_profiles>'
+        "</system>"
+    )
+
+    def _codes(self, component_xml: str) -> set[str]:
+        ir, tree = parse_string(self._BASE.format(component=component_xml))
+        diagnostics = validate_tree(tree) + validate_ir(ir)
+        return {d.code for d in diagnostics}
+
+    def test_undefined_model_on_mosfet_fails(self) -> None:
+        codes = self._codes(
+            '<component id="Q" type="mosfet" spice_model="BSS138">'
+            '<pin name="G" net="g"/><pin name="D" net="d"/><pin name="S" net="gnd"/></component>'
+        )
+        self.assertIn("UNDEFINED_SPICE_MODEL", codes)
+
+    def test_undefined_subckt_fails(self) -> None:
+        codes = self._codes(
+            '<component id="X" type="opamp" spice_subckt="LM358">'
+            '<pin name="1" net="vin"/><pin name="2" net="gnd"/><pin name="3" net="d"/></component>'
+        )
+        self.assertIn("UNDEFINED_SPICE_MODEL", codes)
+
+    def test_builtin_model_is_accepted(self) -> None:
+        # Generic NMOS is a defined builtin -> no UNDEFINED_SPICE_MODEL.
+        codes = self._codes(
+            '<component id="Q" type="mosfet" spice_model="NMOS">'
+            '<pin name="G" net="g"/><pin name="D" net="d"/><pin name="S" net="gnd"/></component>'
+        )
+        self.assertNotIn("UNDEFINED_SPICE_MODEL", codes)
+
+    def test_default_model_when_unset_is_accepted(self) -> None:
+        # No spice_model -> compiler uses the generic default (NMOS) -> accepted.
+        codes = self._codes(
+            '<component id="Q" type="mosfet">'
+            '<pin name="G" net="g"/><pin name="D" net="d"/><pin name="S" net="gnd"/></component>'
+        )
+        self.assertNotIn("UNDEFINED_SPICE_MODEL", codes)
 
 
 if __name__ == "__main__":

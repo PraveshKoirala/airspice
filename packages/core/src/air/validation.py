@@ -5,7 +5,15 @@ from xml.etree import ElementTree as ET
 from .diagnostics import Diagnostic, DiagnosticBuilder
 from .model import SystemIR
 from .registry import COMPONENT_SPECS, MCUS, PASSIVE_TYPES, SUPPORTED_SPICE_TYPES
+from .spice import BUILTIN_SPICE_MODELS, BUILTIN_SPICE_SUBCKTS
 from .units import parse_quantity
+
+
+# Component types whose device line carries a SPICE ``.model`` reference the
+# compiler must be able to back (see spice._component_line). For these, a
+# ``spice_model`` outside the builtin set means the emitted netlist references a
+# model with no definition -- ngspice cannot run it.
+_MODELLED_SPICE_TYPES = {"bjt", "mosfet", "diode"}
 
 
 def validate_tree(tree: ET.ElementTree) -> list[Diagnostic]:
@@ -58,6 +66,7 @@ def validate_ir(ir: SystemIR) -> list[Diagnostic]:
         if not component.type:
             diagnostics.append(builder.make("error", "semantic", "MISSING_COMPONENT_TYPE", f"Component {component.id} is missing a type.", [component.id]))
         diagnostics.extend(_validate_component_registry_rules(component, builder))
+        diagnostics.extend(_validate_spice_models(component, builder))
         for pin in component.pins.values():
             if pin.net not in ir.nets:
                 diagnostics.append(
@@ -251,6 +260,66 @@ def _validate_mcu(component, builder: DiagnosticBuilder) -> list[Diagnostic]:
                     expected={"supported": sorted(supported)},
                 )
             )
+    return diagnostics
+
+
+def _validate_spice_models(component, builder: DiagnosticBuilder) -> list[Diagnostic]:
+    """Reject device lines that would reference an undefined SPICE model/subckt.
+
+    The compiler defines only the generic builtin ``.model`` cards
+    (spice.BUILTIN_SPICE_MODELS) and emits no ``.subckt`` definitions. The
+    registry stores no per-part SPICE parameters, so a component that names a
+    part-level ``spice_model`` (e.g. ``BSS138``, ``1N5819``, ``2N7002``) or any
+    ``spice_subckt`` (e.g. ``LM358``, ``MCP73831``, ``BME280``) produces a
+    netlist real ngspice cannot run ("unknown model" / "unknown subckt", exit 1).
+
+    Making this a validation ERROR blocks compilation (service.compile_design /
+    the exporter), so those broken netlists are never emitted -- the design fails
+    validation honestly instead of compiling to something that silently can't
+    simulate (issue #55).
+    """
+    diagnostics: list[Diagnostic] = []
+    subckt = component.spice_subckt
+    if subckt and subckt.strip().upper() not in BUILTIN_SPICE_SUBCKTS:
+        diagnostics.append(
+            builder.make(
+                "error",
+                "compiler",
+                "UNDEFINED_SPICE_MODEL",
+                f"Component {component.id} references SPICE subcircuit '{subckt}' with no "
+                f"model source; the compiler emits no .subckt definition for it and ngspice "
+                f"cannot simulate the design.",
+                [component.id, subckt],
+                observed={"spice_subckt": subckt},
+                suggested_actions=[
+                    "Import a SPICE subcircuit that defines this part, or",
+                    "Model the part with supported primitives",
+                ],
+            )
+        )
+    model = component.spice_model
+    if (
+        model
+        and component.type in _MODELLED_SPICE_TYPES
+        and model.strip().upper() not in BUILTIN_SPICE_MODELS
+    ):
+        diagnostics.append(
+            builder.make(
+                "error",
+                "compiler",
+                "UNDEFINED_SPICE_MODEL",
+                f"Component {component.id} references SPICE model '{model}' with no model "
+                f"source; the compiler emits no .model card for it (only the generic "
+                f"{', '.join(sorted(BUILTIN_SPICE_MODELS))}) and ngspice cannot simulate the design.",
+                [component.id, model],
+                observed={"spice_model": model},
+                expected={"builtin_models": sorted(BUILTIN_SPICE_MODELS)},
+                suggested_actions=[
+                    "Import a SPICE .model that defines this part, or",
+                    f"Use a generic model ({', '.join(sorted(BUILTIN_SPICE_MODELS))})",
+                ],
+            )
+        )
     return diagnostics
 
 
