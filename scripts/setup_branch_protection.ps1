@@ -1,0 +1,166 @@
+<#
+.SYNOPSIS
+    Configure GitHub branch protection on `main` for AirSpice (issue #42, deliverable 4).
+
+.DESCRIPTION
+    Requires the foundation CI jobs as status checks on `main`, forbids force-pushes
+    and deletions, requires a pull request with at least one approving review, and
+    (where the plan/tier allows) dismisses stale approvals and blocks self-approval.
+
+    IMPORTANT (ORCHESTRATION.md amendment 2026-07-03): enabling required checks
+    before those checks exist and are green on `main` would jam every PR. This
+    script is therefore delivered fully working but is EXECUTED FOR REAL only at
+    the M0 gate ceremony by the maintainer/orchestrator. Until then, run it with
+    -DryRun to print the exact `gh api` calls and intended settings.
+
+    Requires: gh CLI authenticated with a token that has `repo` + admin rights on
+    the repository. `gh` must be on PATH (or invoke this script from a shell where
+    it is).
+
+.PARAMETER Repo
+    owner/name of the repository. Default: PraveshKoirala/airspice.
+
+.PARAMETER Branch
+    Branch to protect. Default: main.
+
+.PARAMETER Checks
+    Required status check contexts (job names). Default: guardrails, core-py, ui, parity.
+
+.PARAMETER DryRun
+    Print the exact gh api command and the JSON payload WITHOUT calling GitHub.
+    Nothing is changed. This is the mode used before the M0 gate.
+
+.PARAMETER ReadBack
+    After applying (or, with -DryRun, instead of applying) print the command that
+    reads the current protection settings back so they can be verified.
+
+.EXAMPLE
+    ./setup_branch_protection.ps1 -DryRun
+    Prints the API call and payload; makes no changes.
+
+.EXAMPLE
+    ./setup_branch_protection.ps1
+    Applies protection for real (M0 gate only).
+#>
+
+[CmdletBinding()]
+param(
+    [string]   $Repo    = "PraveshKoirala/airspice",
+    [string]   $Branch  = "main",
+    [string[]] $Checks  = @("guardrails", "core-py", "ui", "parity"),
+    [switch]   $DryRun,
+    [switch]   $ReadBack
+)
+
+$ErrorActionPreference = "Stop"
+
+# --- Locate gh --------------------------------------------------------------
+$gh = (Get-Command gh -ErrorAction SilentlyContinue).Source
+if (-not $gh) {
+    $fallback = "C:\Program Files\GitHub CLI\gh.exe"
+    if (Test-Path $fallback) { $gh = $fallback }
+}
+if (-not $gh) {
+    Write-Error "gh CLI not found on PATH. Install it or add it to PATH, then re-run."
+    exit 1
+}
+
+# --- Build the protection payload ------------------------------------------
+# Contexts required to be green before a PR can merge into $Branch.
+$requiredContexts = @($Checks)
+
+# Payload for: PUT /repos/{owner}/{repo}/branches/{branch}/protection
+# See https://docs.github.com/rest/branches/branch-protection
+$payload = [ordered]@{
+    required_status_checks = [ordered]@{
+        strict   = $true                # branches must be up to date before merging
+        contexts = $requiredContexts    # the job names that must pass
+    }
+    enforce_admins = $true              # admins are not exempt
+    required_pull_request_reviews = [ordered]@{
+        dismiss_stale_reviews           = $true   # new pushes invalidate old approvals
+        require_code_owner_reviews      = $false
+        required_approving_review_count = 1
+        # "no self-approval where possible": GitHub cannot approve your own PR via
+        # the review API, and the independent-verification protocol (ORCHESTRATION.md)
+        # supplies the approving review from a DIFFERENT agent. This flag ensures a
+        # human/second agent must actively approve.
+    }
+    restrictions            = $null      # no push allow-list; open to the org
+    required_linear_history = $true      # no merge commits sneaking history around
+    allow_force_pushes      = $false     # forbid force-push to main
+    allow_deletions         = $false     # forbid deleting main
+    required_conversation_resolution = $true
+    lock_branch             = $false
+    allow_fork_syncing      = $true
+}
+
+$payloadJson = $payload | ConvertTo-Json -Depth 6
+
+$apiPath = "repos/$Repo/branches/$Branch/protection"
+
+# The exact gh api call that applies the protection. The REST branch-protection
+# endpoint requires the preview accept header on some plans; include it.
+$applyArgsDisplay = @(
+    "api",
+    "--method", "PUT",
+    "-H", "Accept: application/vnd.github+json",
+    "/$apiPath",
+    "--input", "-"
+) -join " "
+
+$readbackArgsDisplay = @(
+    "api",
+    "-H", "Accept: application/vnd.github+json",
+    "/$apiPath"
+) -join " "
+
+function Show-Intent {
+    Write-Host "======================================================================"
+    Write-Host "AirSpice branch protection - intended settings"
+    Write-Host "======================================================================"
+    Write-Host "Repo   : $Repo"
+    Write-Host "Branch : $Branch"
+    Write-Host "Required status checks (must be green, strict/up-to-date):"
+    foreach ($c in $requiredContexts) { Write-Host "  - $c" }
+    Write-Host "Force pushes to '$Branch'   : DISABLED"
+    Write-Host "Branch deletion             : DISABLED"
+    Write-Host "Linear history required     : YES"
+    Write-Host "Enforce on admins           : YES"
+    Write-Host "Required approving reviews  : 1 (stale approvals dismissed on push)"
+    Write-Host "Conversation resolution     : REQUIRED"
+    Write-Host "----------------------------------------------------------------------"
+    Write-Host "Exact gh api call:"
+    Write-Host "  gh $applyArgsDisplay"
+    Write-Host "  (payload piped on stdin)"
+    Write-Host ""
+    Write-Host "Payload JSON:"
+    Write-Host $payloadJson
+    Write-Host "----------------------------------------------------------------------"
+    Write-Host "Read-back (verify) call:"
+    Write-Host "  gh $readbackArgsDisplay"
+    Write-Host "======================================================================"
+}
+
+if ($DryRun) {
+    Show-Intent
+    Write-Host ""
+    Write-Host "DRY RUN: no changes made. Re-run without -DryRun at the M0 gate to apply."
+    exit 0
+}
+
+# --- Apply for real (M0 gate only) -----------------------------------------
+Show-Intent
+Write-Host ""
+Write-Host "Applying branch protection for real..."
+$payloadJson | & $gh api --method PUT -H "Accept: application/vnd.github+json" "/$apiPath" --input -
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "gh api call failed with exit code $LASTEXITCODE."
+    exit $LASTEXITCODE
+}
+Write-Host "Applied. Reading back current protection settings:"
+& $gh api -H "Accept: application/vnd.github+json" "/$apiPath"
+
+if ($ReadBack) {
+    Write-Host "Read-back complete (see JSON above)."
+}

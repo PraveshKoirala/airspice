@@ -1,0 +1,82 @@
+name: guardrails
+
+# Mechanized AGENTS.md (issue #42). Deterministic, dependency-free, diff-aware.
+# Runs on every PR and on pushes to main. On PRs it checks the *changes* against
+# the merge base and reads the PR's labels + body from the event payload. On
+# push-to-main there is no PR context, so label/body-dependent behaviour is
+# skipped gracefully (whole-tree checks like the wall-clock ban still run).
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled, edited]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: guardrails-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guardrails:
+    name: guardrails
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout (full history for merge-base diff)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Self-test first: a guardrail that guards nothing because of a regex typo
+      # is worse than none. If the checker is broken, fail the job here.
+      - name: Guardrails checker self-test
+        run: python scripts/guardrails.py --self-test
+
+      # Compute the unified diff for the change under review.
+      #  - PR: diff the merge base of the base branch against HEAD.
+      #  - push to main: diff the pushed range (before..after); on the first
+      #    push or a force-push where 'before' is all-zeros, fall back to the
+      #    parent commit.
+      - name: Compute diff
+        id: diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA='${{ github.event.pull_request.base.sha }}'
+            HEAD_SHA='${{ github.event.pull_request.head.sha }}'
+            git fetch --no-tags --depth=1 origin "$BASE_SHA" || true
+            MERGE_BASE=$(git merge-base "$BASE_SHA" "$HEAD_SHA" || echo "$BASE_SHA")
+            echo "Diffing $MERGE_BASE..$HEAD_SHA"
+            git diff --no-color "$MERGE_BASE" "$HEAD_SHA" > guardrails.diff
+          else
+            BEFORE='${{ github.event.before }}'
+            AFTER='${{ github.sha }}'
+            if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+              BEFORE=$(git rev-parse "${AFTER}^" 2>/dev/null || git hash-object -t tree /dev/null)
+            fi
+            echo "Diffing $BEFORE..$AFTER"
+            git diff --no-color "$BEFORE" "$AFTER" > guardrails.diff
+          fi
+          echo "Diff size: $(wc -l < guardrails.diff) lines"
+
+      # Run the checker. On PRs pass the event payload (labels + body); on push
+      # there is no pull_request in the payload, so those inputs are empty and
+      # label/body-dependent rules (R1 separation, override) simply don't apply.
+      - name: Run guardrails
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/guardrails.py \
+            --diff-file guardrails.diff \
+            --event-path "$GITHUB_EVENT_PATH" \
+            --tree-root .
