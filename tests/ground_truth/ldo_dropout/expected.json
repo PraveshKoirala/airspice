@@ -1,0 +1,17 @@
+{
+  "circuit": "ldo_dropout",
+  "profile": "analog_only",
+  "test": "ldo_dropout",
+  "outcome": "pass",
+  "require_backend": "ngspice",
+  "checks": [
+    {
+      "net": "vout",
+      "nominal_v": 3.2,
+      "min_v": 3.168,
+      "max_v": 3.232,
+      "basis": "Vout=min(3.3, Vin-0.2)=min(3.3,3.2)=3.200V; dropout branch. Upper bound 3.232V<3.3V so a non-dropping regulator would fail."
+    }
+  ],
+  "issue": null
+}

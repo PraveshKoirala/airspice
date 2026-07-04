@@ -1,0 +1,56 @@
+<system name="gt_loaded_divider_thevenin" ir_version="0.1">
+  <metadata>
+    <title>Ground truth: loaded divider (Thevenin)</title>
+    <description>12V source, R1=R2=10k divider loaded by R_LOAD=10k. Output derived via Thevenin equivalent by hand.</description>
+    <author>issue-41</author>
+  </metadata>
+  <nets>
+    <net id="gnd" role="ground"/>
+    <net id="vin" role="power" nominal_voltage="12V"/>
+    <net id="vout" role="analog_signal"/>
+  </nets>
+  <components>
+    <component id="V_IN" type="voltage_source">
+      <value>12V</value>
+      <pin name="p" net="vin"/>
+      <pin name="n" net="gnd"/>
+    </component>
+    <component id="R1" type="resistor">
+      <value>10k</value>
+      <pin name="1" net="vin"/>
+      <pin name="2" net="vout"/>
+    </component>
+    <component id="R2" type="resistor">
+      <value>10k</value>
+      <pin name="1" net="vout"/>
+      <pin name="2" net="gnd"/>
+    </component>
+    <component id="R_LOAD" type="resistor">
+      <value>10k</value>
+      <pin name="1" net="vout"/>
+      <pin name="2" net="gnd"/>
+    </component>
+  </components>
+  <analog>
+    <subsystem id="loaded_divider">
+      <uses component="V_IN"/>
+      <uses component="R1"/>
+      <uses component="R2"/>
+      <uses component="R_LOAD"/>
+      <probe id="probe_vout" net="vout" quantity="voltage"/>
+    </subsystem>
+  </analog>
+  <tests>
+    <test id="loaded_divider">
+      <run duration="1ms"/>
+      <assert_voltage net="vout" min="3.96V" max="4.04V"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="analog_only" default="true">
+      <backend type="ngspice"/>
+      <include subsystem="loaded_divider"/>
+      <run test="loaded_divider"/>
+    </profile>
+  </simulation_profiles>
+</system>

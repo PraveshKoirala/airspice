@@ -1,0 +1,17 @@
+{
+  "circuit": "inverting_opamp_gain",
+  "profile": "analog_only",
+  "test": "inv_gain",
+  "outcome": "expected_fail",
+  "failure_mode": "undefined_model",
+  "issue": 55,
+  "would_pass_checks": [
+    {
+      "net": "vout",
+      "nominal_v": -2.2,
+      "min_v": -2.31,
+      "max_v": -2.09,
+      "basis": "Ideal inverting gain = -Rf/Rin = -22k/10k = -2.20; Vout=-2.20*1V=-2.200V. Blocked: no op-amp primitive; spice_subckt=OPAMP_IDEAL is undefined (bug #55)."
+    }
+  ]
+}

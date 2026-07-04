@@ -1,0 +1,17 @@
+{
+  "circuit": "diode_forward_drop",
+  "profile": "analog_only",
+  "test": "diode_fwd",
+  "outcome": "pass",
+  "require_backend": "ngspice",
+  "checks": [
+    {
+      "net": "anode",
+      "nominal_v": 0.655,
+      "min_v": 0.60,
+      "max_v": 0.71,
+      "basis": "Shockley: Vf = N*Vt*ln(I/IS) = 1*0.025864*ln(1e-3/1e-14) = 0.025864*25.328 = 0.655V. Window +/-55mV covers IS/temperature model spread and excludes LED(~2V)/Schottky(~0.3V)."
+    }
+  ],
+  "issue": null
+}

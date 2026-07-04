@@ -1,0 +1,17 @@
+{
+  "circuit": "current_source_resistor",
+  "profile": "analog_only",
+  "test": "ohms_law",
+  "outcome": "pass",
+  "require_backend": "ngspice",
+  "checks": [
+    {
+      "net": "vnode",
+      "nominal_v": 4.4,
+      "min_v": 4.356,
+      "max_v": 4.444,
+      "basis": "Ohm's law V=I*R=2mA*2.2k=4.400V exact; source direction verified (I p n injects into pin n)"
+    }
+  ],
+  "issue": null
+}

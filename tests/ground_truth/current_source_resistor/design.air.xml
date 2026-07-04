@@ -1,0 +1,43 @@
+<system name="gt_current_source_resistor" ir_version="0.1">
+  <metadata>
+    <title>Ground truth: current source into resistor (Ohm's law)</title>
+    <description>Ideal 2mA current source forced through a 2.2k resistor to ground. Node voltage V = I*R by Ohm's law. Current-source direction convention (I p n injects into pin n) verified and documented in derivation.md.</description>
+    <author>issue-41</author>
+  </metadata>
+  <nets>
+    <net id="gnd" role="ground"/>
+    <net id="vnode" role="analog_signal"/>
+  </nets>
+  <components>
+    <component id="I_SRC" type="current_source">
+      <value>2mA</value>
+      <pin name="p" net="gnd"/>
+      <pin name="n" net="vnode"/>
+    </component>
+    <component id="R_L" type="resistor">
+      <value>2.2k</value>
+      <pin name="1" net="vnode"/>
+      <pin name="2" net="gnd"/>
+    </component>
+  </components>
+  <analog>
+    <subsystem id="ohms_law">
+      <uses component="I_SRC"/>
+      <uses component="R_L"/>
+      <probe id="probe_vnode" net="vnode" quantity="voltage"/>
+    </subsystem>
+  </analog>
+  <tests>
+    <test id="ohms_law">
+      <run duration="1ms"/>
+      <assert_voltage net="vnode" min="4.356V" max="4.444V"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="analog_only" default="true">
+      <backend type="ngspice"/>
+      <include subsystem="ohms_law"/>
+      <run test="ohms_law"/>
+    </profile>
+  </simulation_profiles>
+</system>

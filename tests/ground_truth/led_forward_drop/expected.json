@@ -1,0 +1,17 @@
+{
+  "circuit": "led_forward_drop",
+  "profile": "analog_only",
+  "test": "led_fwd",
+  "outcome": "expected_fail",
+  "failure_mode": "undefined_model",
+  "issue": 55,
+  "would_pass_checks": [
+    {
+      "net": "anode",
+      "nominal_v": 2.0,
+      "min_v": 1.8,
+      "max_v": 2.2,
+      "basis": "Red LED datasheet Vf at 10mA = 1.8-2.2V. Blocked: spice_model=LED_RED has no .model card (bug #55), ngspice cannot run, oracle downgrades to DC fallback."
+    }
+  ]
+}
