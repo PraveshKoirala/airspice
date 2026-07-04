@@ -357,6 +357,42 @@ class NgspiceHonestyTests(unittest.TestCase):
         self.assertEqual(ngspice_diags[0]["observed"]["returncode"], 1)
         self.assertIn("no simulations run", ngspice_diags[0]["observed"]["stderr_tail"])
 
+    def test_assertion_on_unmeasurable_net_reports_no_measurement(self) -> None:
+        # An assertion on a net the DC fallback cannot solve (a capacitor-only
+        # node) must surface ASSERT_NO_MEASUREMENT and fail the test -- never a
+        # silent pass on a missing number. Hermetic: ngspice resolution is
+        # patched to None so the DC-fallback path runs identically in CI.
+        # (Coverage note: the only fixture exercising ASSERT_NO_MEASUREMENT was
+        # feedback_loop's report, removed when #55 made that design fail
+        # validation; this test covers the emit path directly.)
+        xml = (
+            '<system name="no_measurement_check" ir_version="0.1">'
+            "<metadata><title>t</title></metadata>"
+            '<nets><net id="gnd" role="ground"/><net id="vin" role="power" nominal_voltage="5V"/>'
+            '<net id="floaty" role="analog_signal"/></nets>'
+            "<components>"
+            '<component id="V1" type="voltage_source"><value>5V</value>'
+            '<pin name="p" net="vin"/><pin name="n" net="gnd"/></component>'
+            '<component id="C1" type="capacitor"><value>1uF</value>'
+            '<pin name="1" net="floaty"/><pin name="2" net="gnd"/></component>'
+            "</components>"
+            '<tests><test id="t"><run duration="1ms"/>'
+            '<assert_voltage net="floaty" min="1V" max="5V"/></test></tests>'
+            '<simulation_profiles><profile id="analog_only"><backend type="ngspice"/>'
+            '<run test="t"/></profile></simulation_profiles>'
+            "</system>"
+        )
+        ir, _ = parse_string(xml)
+        with mock.patch("air.tools.ngspice_path", return_value=None):
+            with tempfile.TemporaryDirectory() as tmp:
+                result = simulate_analog(ir, "analog_only", Path(tmp))
+        self.assertEqual(result["status"], "failed")
+        report = result["reports"][0]
+        no_measurement = [d for d in report["diagnostics"] if d["code"] == "ASSERT_NO_MEASUREMENT"]
+        self.assertEqual(len(no_measurement), 1)
+        self.assertEqual(no_measurement[0]["severity"], "error")
+        self.assertIn("floaty", no_measurement[0]["message"])
+
 
 class UndefinedSpiceModelValidationTests(unittest.TestCase):
     """Issue #55: a device line referencing a model/subckt the compiler cannot
