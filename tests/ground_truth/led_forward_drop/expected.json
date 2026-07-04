@@ -3,15 +3,17 @@
   "profile": "analog_only",
   "test": "led_fwd",
   "outcome": "expected_fail",
-  "failure_mode": "undefined_model",
+  "failure_mode": "validation_blocked",
+  "diagnostic_code": "UNDEFINED_SPICE_MODEL",
   "issue": 55,
+  "fix_path_issue": 60,
   "would_pass_checks": [
     {
       "net": "anode",
       "nominal_v": 2.0,
       "min_v": 1.8,
       "max_v": 2.2,
-      "basis": "Red LED datasheet Vf at 10mA = 1.8-2.2V. Blocked: spice_model=LED_RED has no .model card (bug #55), ngspice cannot run, oracle downgrades to DC fallback."
+      "basis": "Red LED datasheet Vf at 10mA = 1.8-2.2V. Blocked: spice_model=LED_RED has no model source, so validation rejects the design with UNDEFINED_SPICE_MODEL (#55 fixed oracle-first; formerly the netlist compiled, ngspice exited non-zero, and the oracle silently downgraded to a DC-fallback 'passed'). Flips to outcome=pass when #60 supplies a real .model card."
     }
   ]
 }

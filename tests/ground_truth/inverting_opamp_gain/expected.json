@@ -3,15 +3,17 @@
   "profile": "analog_only",
   "test": "inv_gain",
   "outcome": "expected_fail",
-  "failure_mode": "undefined_model",
+  "failure_mode": "validation_blocked",
+  "diagnostic_code": "UNDEFINED_SPICE_MODEL",
   "issue": 55,
+  "fix_path_issue": 60,
   "would_pass_checks": [
     {
       "net": "vout",
       "nominal_v": -2.2,
       "min_v": -2.31,
       "max_v": -2.09,
-      "basis": "Ideal inverting gain = -Rf/Rin = -22k/10k = -2.20; Vout=-2.20*1V=-2.200V. Blocked: no op-amp primitive; spice_subckt=OPAMP_IDEAL is undefined (bug #55)."
+      "basis": "Ideal inverting gain = -Rf/Rin = -22k/10k = -2.20; Vout=-2.20*1V=-2.200V. Blocked: no op-amp primitive; spice_subckt=OPAMP_IDEAL has no model source, so validation rejects the design with UNDEFINED_SPICE_MODEL (#55 fixed oracle-first). Flips to outcome=pass when #60 supplies a real op-amp .subckt."
     }
   ]
 }
