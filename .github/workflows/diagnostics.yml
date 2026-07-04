@@ -1,0 +1,65 @@
+name: diagnostics-registry
+
+# Enforces the diagnostics registry (issue #44) in BOTH directions:
+#   1. every diagnostic code in the golden corpus / test expectations has a
+#      registry entry (registry/diagnostics.json);
+#   2. every ACTIVE registry entry is exercised by at least one test/fixture
+#      (dead codes fail; the `pending` section is exempt until its codes land).
+#
+# The checker is dependency-free stdlib, so this job is fast and needs no
+# ngspice/node. It runs the checker's own --self-test first (a checker that
+# guards nothing because of a bug is worse than none), then the real check.
+#
+# Path filters keep it to the surfaces that can change the code<->registry
+# relationship: the registry itself, the checker, the diagnostics sources, the
+# corpus, the tests that name codes, the spec, and this workflow. Note: this is a
+# NEW workflow; ci.yml is untouched (its required core-py/ui jobs are unrelated).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "registry/diagnostics.json"
+      - "scripts/check_diagnostics.py"
+      - "packages/core/src/air/**"
+      - "tests/**"
+      - "docs/diagnostics_spec.md"
+      - ".github/workflows/diagnostics.yml"
+  pull_request:
+    paths:
+      - "registry/diagnostics.json"
+      - "scripts/check_diagnostics.py"
+      - "packages/core/src/air/**"
+      - "tests/**"
+      - "docs/diagnostics_spec.md"
+      - ".github/workflows/diagnostics.yml"
+
+concurrency:
+  group: diagnostics-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostics-registry:
+    name: diagnostics registry (bidirectional check)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Self-test first: prove the checker has teeth (unregistered code fails
+      # check 1, orphan is flagged by check 2, pending section is exempt).
+      - name: Registry checker self-test
+        run: python scripts/check_diagnostics.py --self-test
+
+      # The real bidirectional check against the committed registry, corpus, and
+      # tests.
+      - name: Check diagnostics registry (both directions)
+        run: python scripts/check_diagnostics.py
