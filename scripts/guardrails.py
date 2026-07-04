@@ -129,6 +129,26 @@ OVERRIDE_SECTION_RE = re.compile(
     r"^#{1,6}\s*guardrails[\s_-]*override\b", re.IGNORECASE | re.MULTILINE
 )
 
+# The guardrails machinery's OWN definition/documentation files. These files
+# necessarily contain the very token strings (`|| true`, `.skip`, `test.todo`,
+# example secret shapes, ...) that the token-scanning rules (R2, R5) hunt for --
+# as string literals, regexes, and prose describing the patterns, never as
+# executable test/CI weakening. A checker that cannot describe the patterns it
+# bans is unusable, so these specific files are exempt from the *line-token*
+# scans only (R2, R5). The structural/path rules (R1, R3, R4) still apply to
+# them. This allowlist is deliberately narrow and explicit; widening it is a
+# guardrail change and, per AGENTS.md, requires a justification on issue #42.
+SELF_DEFINITION_PATHS = frozenset({
+    "scripts/guardrails.py",
+    ".github/workflows/guardrails.yml",
+    ".github/pull_request_template.md",
+    "docs/DEVELOPMENT.md",
+})
+
+
+def _is_self_definition(path: str) -> bool:
+    return path in SELF_DEFINITION_PATHS
+
 
 # --------------------------------------------------------------------------- #
 # Data model.
@@ -278,6 +298,10 @@ def rule_test_weakening(change: Change) -> list[Violation]:
     """R2: flag test-weakening tokens introduced in ADDED lines."""
     out: list[Violation] = []
     for al in change.added_lines:
+        # The guardrails' own definition files legitimately contain these token
+        # strings as data/prose; exempt them from the line-token scan.
+        if _is_self_definition(al.path):
+            continue
         text = al.text
         loc = f"{al.path}:{al.lineno}"
         stripped = text.strip()
@@ -402,6 +426,9 @@ def rule_secret_hygiene(change: Change) -> list[Violation]:
     """R5: obvious API-key/secret patterns in ADDED lines."""
     out: list[Violation] = []
     for al in change.added_lines:
+        # The guardrails' own files contain example key shapes as test data.
+        if _is_self_definition(al.path):
+            continue
         for name, rex in SECRET_PATTERNS:
             m = rex.search(al.text)
             if m:
@@ -784,6 +811,15 @@ def run_self_tests() -> int:
         "packages/core/src/x.ts", ["const readOnly = config.only_flag;"]))
     st.check("R2 clean (unrelated 'only' identifier) passes",
              rule_test_weakening(ch) == [])
+    # Self-definition exemption: the same token in the checker's OWN file is NOT
+    # flagged (it is data/prose there), but the identical token in ANY other
+    # file still fires -- proving the allowlist is narrow, not a blanket hole.
+    ch = _change_from_diff(_diff_for("scripts/guardrails.py", ['    run: x || true']))
+    st.check("R2 self-exempt (guardrails.py '|| true' not flagged) passes",
+             rule_test_weakening(ch) == [], detail=f"got {rule_test_weakening(ch)}")
+    ch = _change_from_diff(_diff_for("scripts/other.py", ['    run: x || true']))
+    st.check("R2 non-exempt (other.py '|| true' still fires)",
+             len(rule_test_weakening(ch)) == 1, detail=f"got {rule_test_weakening(ch)}")
 
     # ---- R3 wall-clock ban (whole-tree, needs a filesystem) ------------- #
     with tempfile.TemporaryDirectory() as td:
@@ -869,6 +905,14 @@ def run_self_tests() -> int:
     ch = _change_from_diff(_diff_for(
         "packages/agent/src/x.ts", ['const name = "hello world";']))
     st.check("R5 clean (ordinary string) passes", rule_secret_hygiene(ch) == [])
+    # Self-definition exemption: example key shapes in the checker's own file
+    # are not flagged; the identical shape elsewhere still fires.
+    ch = _change_from_diff(_diff_for("scripts/guardrails.py", ['sk-' + 'A' * 40]))
+    st.check("R5 self-exempt (guardrails.py example key not flagged) passes",
+             rule_secret_hygiene(ch) == [], detail=f"got {rule_secret_hygiene(ch)}")
+    ch = _change_from_diff(_diff_for("packages/agent/src/y.ts", ['sk-' + 'A' * 40]))
+    st.check("R5 non-exempt (other file same key still fires)",
+             len(rule_secret_hygiene(ch)) == 1)
 
     # ---- Override path --------------------------------------------------- #
     # A violation waived by the guardrails-override label + a justification.

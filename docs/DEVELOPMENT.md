@@ -26,6 +26,17 @@ R1, R2, R5 are **diff-aware** (they inspect the `+` lines / touched paths of the
 change). R3 is **whole-tree** (a pre-existing violation is still caught). R4 is
 diff-aware for the reference but reads the design-name list from the corpus.
 
+**Self-definition exemption.** The guardrails' own files
+(`scripts/guardrails.py`, `.github/workflows/guardrails.yml`,
+`.github/pull_request_template.md`, `docs/DEVELOPMENT.md`) necessarily contain
+the very token strings the token-scanning rules (R2, R5) hunt for -- as regexes,
+string literals, and prose describing the patterns. Those four files are exempt
+from the R2/R5 **line-token** scans only; the structural/path rules (R1, R3, R4)
+still apply to them, and the identical token in any other file still fires (a
+self-test asserts both halves). The allowlist is deliberately narrow;
+`SELF_DEFINITION_PATHS` in `scripts/guardrails.py` is the single source of truth,
+and widening it is a guardrail change requiring a justification on issue #42.
+
 ### Running the checker locally
 
 ```
