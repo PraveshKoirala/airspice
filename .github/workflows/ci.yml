@@ -1,0 +1,130 @@
+name: CI
+
+# Runs on every push to main and every pull request. Two required jobs:
+#   core-py  -- full pytest suite with the real ngspice engine (apt-installed)
+#   ui       -- npm ci + lint + build, with dist/ artifact and gzipped size
+#
+# Maintainer note: after this lands, mark BOTH `core-py` and `ui` as required
+# status checks in the branch-protection settings for `main` so no PR can merge
+# without them green.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Newer pushes to the same ref cancel in-flight runs.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  core-py:
+    name: core-py (pytest + ngspice)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      # The real analog engine. With ngspice on PATH the simulation tests
+      # exercise the ngspice backend instead of the built-in DC fallback.
+      - name: Install ngspice
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ngspice
+
+      # Editable install of the core package + the test/runtime deps actually
+      # imported by the suite and product code:
+      #   pytest         -- test runner
+      #   fastapi, httpx -- air.api + FastAPI TestClient (test_api_app_imports)
+      #   uvicorn        -- imported by air.cli `serve` (air[api] extra)
+      #   python-dotenv  -- imported by scripts/tandem*.py and several test modules
+      - name: Install package and test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e . pytest fastapi httpx uvicorn python-dotenv
+
+      # Editable install wires the `air` package, but PYTHONPATH is set
+      # explicitly per the src layout so imports resolve regardless.
+      - name: Run full pytest suite
+        env:
+          PYTHONPATH: packages/core/src
+        run: |
+          python -m pytest tests/ -v
+
+      # Report the skip count (and which tests skipped) in the job summary.
+      # Renode/PlatformIO/live-LLM tests self-skip via their env-gated
+      # skipUnless markers (AIR_RUN_TANDEM / AIR_RUN_BUILD / AIR_RUN_E2E +
+      # GEMINI_API_KEY); none of those tools/keys exist in CI.
+      - name: Report skipped tests in job summary
+        if: always()
+        env:
+          PYTHONPATH: packages/core/src
+        run: |
+          {
+            echo "## core-py test summary"
+            echo ""
+            echo '```'
+            python -m pytest tests/ -q -rs --no-header 2>&1 | tail -n 40
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  ui:
+    name: ui (lint + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/ui
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: packages/ui/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      # `npm run build` == `tsc -b && vite build`; fails on any TS or build error.
+      - name: Build
+        run: npm run build
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-dist
+          path: packages/ui/dist
+          if-no-files-found: error
+
+      # Total gzipped JS size -> job summary. Baseline for the M6 performance budget.
+      - name: Report gzipped JS bundle size
+        run: |
+          {
+            echo "## ui bundle size (gzipped JS)"
+            echo ""
+            echo "| file | raw | gzip |"
+            echo "|---|---|---|"
+            total=0
+            while IFS= read -r f; do
+              raw=$(stat -c%s "$f")
+              gz=$(gzip -c "$f" | wc -c)
+              total=$((total + gz))
+              printf '| %s | %s B | %s B |\n' "${f#dist/}" "$raw" "$gz"
+            done < <(find dist -name '*.js' -type f | sort)
+            echo ""
+            echo "**Total gzipped JS: ${total} B ($(awk "BEGIN{printf \"%.1f\", ${total}/1024}") KiB)**"
+          } >> "$GITHUB_STEP_SUMMARY"
