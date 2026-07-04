@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { Send, Sparkles, User, Bot, Loader2 } from 'lucide-react';
+import type { ApiError } from '../types/api';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -42,14 +43,26 @@ const ChatRepl: React.FC<ChatReplProps> = ({ onCommand }) => {
         role: 'assistant', 
         content: String(response)
       }]);
-    } catch (error: any) {
-      setMessages(prev => [...prev, { role: 'assistant', content: `Sorry, I encountered an error: ${error.message}` }]);
+    } catch (error) {
+      const apiError = error as ApiError;
+      setMessages(prev => [...prev, { role: 'assistant', content: `Sorry, I encountered an error: ${apiError.message}` }]);
     } finally {
       setIsLoading(false);
     }
   };
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // The overflow decision depends on the rendered textarea's scrollHeight, so
+  // reading the ref during render violates react-hooks/refs. Measure after
+  // commit (before paint) and apply the style through the same imperative
+  // channel handleInput/handleSubmit already use (issue #50 scope ruling).
+  useLayoutEffect(() => {
+    const el = textareaRef.current;
+    if (el) {
+      el.style.overflowY = input.split('\n').length > 5 || el.scrollHeight > 200 ? 'auto' : 'hidden';
+    }
+  }, [input]);
 
   const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const target = e.target;
@@ -96,10 +109,7 @@ const ChatRepl: React.FC<ChatReplProps> = ({ onCommand }) => {
           placeholder="Ask AI to 'Add a resistor' or 'Fix the battery divider'..."
           disabled={isLoading}
           rows={1}
-          style={{ 
-            resize: 'none', 
-            overflowY: input.split('\n').length > 5 || (textareaRef.current && textareaRef.current.scrollHeight > 200) ? 'auto' : 'hidden'
-          }}
+          style={{ resize: 'none' }}
         />
         <button type="submit" disabled={isLoading || !input.trim()}>
           <Send size={16} />

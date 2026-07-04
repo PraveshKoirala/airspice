@@ -10,6 +10,7 @@ import Graph from './components/Graph';
 import ResultPanel from './components/ResultPanel';
 import ChatRepl from './components/ChatRepl';
 import Landing from './pages/Landing';
+import type { ApiError, ChatHistoryEntry, Diagnostic, ValidationResult } from './types/api';
 import './App.css';
 
 interface LogEntry {
@@ -176,9 +177,9 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [simulation, setSimulation] = useState<SimulationReport | null>(null);
   const [waveforms, setWaveforms] = useState<WaveformData[]>([]);
-  const [validation, setValidation] = useState<any | null>(null);
+  const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [isBusy, setIsBusy] = useState(false);
-  const [chatHistory, setChatHistory] = useState<any[]>([]);
+  const [chatHistory, setChatHistory] = useState<ChatHistoryEntry[]>([]);
 
   const artifacts = useMemo(() => {
     const paths = new Set<string>();
@@ -224,8 +225,9 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
       }
       setDesignPath(design);
       return { design, profile: response.data.profile || 'analog_only' };
-    } catch (error: any) {
-      addLog(`Save failed: ${error.response?.data?.detail || error.message}`, 'error');
+    } catch (error) {
+      const apiError = error as ApiError;
+      addLog(`Save failed: ${apiError.response?.data?.detail || apiError.message}`, 'error');
       return null;
     }
   };
@@ -245,11 +247,12 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
       if (response.data.success) {
         addLog('Validation passed.', 'success');
       } else {
-        diagnostics.forEach((diagnostic: any) => addLog(`${diagnostic.code}: ${diagnostic.message}`, 'error'));
+        diagnostics.forEach((diagnostic: Diagnostic) => addLog(`${diagnostic.code}: ${diagnostic.message}`, 'error'));
       }
       setActiveTab('validation');
-    } catch (error: any) {
-      addLog(`Validation failed: ${error.response?.data?.detail || error.message}`, 'error');
+    } catch (error) {
+      const apiError = error as ApiError;
+      addLog(`Validation failed: ${apiError.response?.data?.detail || apiError.message}`, 'error');
     } finally {
       setIsBusy(false);
     }
@@ -273,8 +276,9 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
       await loadWaveforms();
       addLog(`Simulation ${response.data.status}.`, response.data.status === 'passed' ? 'success' : 'warning');
       setActiveTab('simulation');
-    } catch (error: any) {
-      addLog(`Simulation failed: ${error.response?.data?.detail || error.message}`, 'error');
+    } catch (error) {
+      const apiError = error as ApiError;
+      addLog(`Simulation failed: ${apiError.response?.data?.detail || apiError.message}`, 'error');
     } finally {
       setIsBusy(false);
     }
@@ -289,9 +293,10 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
         return detail.data as WaveformData;
       }));
       setWaveforms(loaded.filter((waveform) => waveform.success));
-    } catch (error: any) {
+    } catch (error) {
+      const apiError = error as ApiError;
       setWaveforms([]);
-      addLog(`Waveform load failed: ${error.response?.data?.detail || error.message}`, 'warning');
+      addLog(`Waveform load failed: ${apiError.response?.data?.detail || apiError.message}`, 'warning');
     }
   };
 
@@ -312,8 +317,9 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
       });
       addLog(response.data.success ? 'Repair patch generated and validated.' : 'Repair did not produce a valid patch.', response.data.success ? 'success' : 'warning');
       setActiveTab('repair');
-    } catch (error: any) {
-      addLog(`Repair failed: ${error.response?.data?.detail || error.message}`, 'error');
+    } catch (error) {
+      const apiError = error as ApiError;
+      addLog(`Repair failed: ${apiError.response?.data?.detail || apiError.message}`, 'error');
     } finally {
       setIsBusy(false);
     }
@@ -355,7 +361,7 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
         attempts++;
         addLog(`AI XML attempt ${attempts} failed validation. Requesting fix...`, 'warning');
         
-        const errorCtx = normalized.data.diagnostics?.map((d: any) => `${d.code}: ${d.message}`).join('\n') || normalized.data.error;
+        const errorCtx = normalized.data.diagnostics?.map((d: Diagnostic) => `${d.code}: ${d.message}`).join('\n') || normalized.data.error;
         const retryResp = await axios.post(`${API_BASE}/agent/chat`, {
           message: `The XML you just generated failed AIR validation with these errors:\n${errorCtx}\n\nPlease fix the XML and provide only the corrected <system> block.`,
           history: chatHistory,
@@ -545,7 +551,7 @@ function formatTime(value: number) {
   return `${value.toFixed(3)}s`;
 }
 
-function DiagnosticsPanel({ validation }: { validation: any | null }) {
+function DiagnosticsPanel({ validation }: { validation: ValidationResult | null }) {
   const diagnostics = validation?.diagnostics || [];
   if (!validation) {
     return <EmptyState icon={<FileCode size={20} />} title="No validation results" text="Run validation to inspect schema, electrical, pin, and simulation readiness diagnostics." />;
@@ -560,7 +566,7 @@ function DiagnosticsPanel({ validation }: { validation: any | null }) {
         </div>
       </div>
       <div className="diagnostic-list">
-        {diagnostics.length === 0 ? <p>No diagnostics.</p> : diagnostics.map((diagnostic: any, index: number) => (
+        {diagnostics.length === 0 ? <p>No diagnostics.</p> : diagnostics.map((diagnostic: Diagnostic, index: number) => (
           <div className={`diagnostic ${diagnostic.severity}`} key={`${diagnostic.code}-${index}`}>
             <strong>{diagnostic.code}</strong>
             <span>{diagnostic.message}</span>
