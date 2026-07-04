@@ -86,19 +86,22 @@ SOURCE_SUFFIXES = (
 # a skip WITH a reason= that references an issue is allowed.
 ISSUE_REF_RE = re.compile(r"#\d+|issue|gh-\d+|ISSUE-\d+", re.IGNORECASE)
 
-# `@pytest.mark.skip` / `.skipif` -- flagged unless a reason= naming an issue.
+# pytest skip markers (plain and -if variants) -- flagged unless a reason=
+# naming an issue is present. NOTE: comments in this file paraphrase the banned
+# tokens rather than spelling them, so this file never trips its own scan.
 PYTEST_SKIP_RE = re.compile(r"@pytest\.mark\.skip(?:if)?\b")
 PYTEST_REASON_RE = re.compile(r"reason\s*=\s*['\"]([^'\"]*)['\"]")
 
-# JS/TS test-weakening: .skip / .only on describe|it|test, xit(, xdescribe(,
-# test.todo. Word-ish boundaries so we don't match e.g. `array.only_thing`.
+# JS/TS test-weakening: dot-skip / dot-only on suite words, x-prefixed
+# disabled tests, and the test-dot-todo placeholder. Word-ish boundaries so we
+# don't match e.g. `array.only_thing`.
 JS_SKIP_ONLY_RE = re.compile(
     r"\b(?:describe|it|test|context|suite)\s*\.\s*(?:skip|only)\b"
 )
 JS_XPREFIX_RE = re.compile(r"\b(?:xit|xdescribe|xcontext|xtest)\s*\(")
 JS_TODO_RE = re.compile(r"\btest\s*\.\s*todo\b")
 
-# CI-weakening tokens (workflows only): continue-on-error, || true.
+# CI-weakening tokens: continue-on-error set to true, and the OR-true idiom.
 CONTINUE_ON_ERROR_RE = re.compile(r"\bcontinue-on-error\s*:\s*true\b")
 OR_TRUE_RE = re.compile(r"\|\|\s*true\b")
 
@@ -129,25 +132,30 @@ OVERRIDE_SECTION_RE = re.compile(
     r"^#{1,6}\s*guardrails[\s_-]*override\b", re.IGNORECASE | re.MULTILINE
 )
 
-# The guardrails machinery's OWN definition/documentation files. These files
-# necessarily contain the very token strings (`|| true`, `.skip`, `test.todo`,
-# example secret shapes, ...) that the token-scanning rules (R2, R5) hunt for --
-# as string literals, regexes, and prose describing the patterns, never as
-# executable test/CI weakening. A checker that cannot describe the patterns it
-# bans is unusable, so these specific files are exempt from the *line-token*
-# scans only (R2, R5). The structural/path rules (R1, R3, R4) still apply to
-# them. This allowlist is deliberately narrow and explicit; widening it is a
-# guardrail change and, per AGENTS.md, requires a justification on issue #42.
-SELF_DEFINITION_PATHS = frozenset({
-    "scripts/guardrails.py",
-    ".github/workflows/guardrails.yml",
-    ".github/pull_request_template.md",
-    "docs/DEVELOPMENT.md",
-})
-
-
-def _is_self_definition(path: str) -> bool:
-    return path in SELF_DEFINITION_PATHS
+# R2 exemption model (PR #52 rework round 1 -- the ONLY exemption):
+#
+# Markdown documentation (*.md) is exempt from the R2 token scan, because
+# markdown is never executed by a test runner or by CI -- a banned token there
+# is a description of the pattern, not a use of it. NOTHING ELSE is exempt:
+# not the guardrails workflow, not this checker's own source, and R5 (secrets)
+# has NO exemption anywhere, markdown included. The previous per-file
+# SELF_DEFINITION_PATHS allowlist was an exploitable hole (verifier attacks
+# A/B/C on PR #52: CI-weakening tokens or a secret added to the guardrails'
+# own files passed the scan -- the one file whose weakening disables
+# enforcement was the one file the scan skipped). It was removed entirely.
+#
+# Instead, this file keeps itself token-clean BY CONSTRUCTION, and the
+# guardrails job scans every PR, including PRs that touch this file:
+#   * regex definitions use escape sequences and so never match their own
+#     source text;
+#   * self-test fixture strings are split via string concatenation, so the
+#     assembled runtime data contains the banned token but no single source
+#     line does;
+#   * comments and violation messages paraphrase tokens (e.g. "OR-true")
+#     instead of spelling them out.
+# If you edit this file and the guardrails run flags your line, write the
+# token in split/paraphrased form -- do NOT add an exemption.
+MD_PROSE_SUFFIXES = (".md", ".markdown")
 
 
 # --------------------------------------------------------------------------- #
@@ -295,12 +303,18 @@ def rule_fixture_port_separation(change: Change) -> list[Violation]:
 
 
 def rule_test_weakening(change: Change) -> list[Violation]:
-    """R2: flag test-weakening tokens introduced in ADDED lines."""
+    """R2: flag test-weakening tokens introduced in ADDED lines.
+
+    The ONLY exemption is markdown documentation prose (never executed by a
+    test runner or CI). Workflow files -- including the guardrails workflow
+    itself -- and all source files are ALWAYS scanned; see the exemption-model
+    comment at MD_PROSE_SUFFIXES (verifier attacks A/B on PR #52).
+    """
     out: list[Violation] = []
     for al in change.added_lines:
-        # The guardrails' own definition files legitimately contain these token
-        # strings as data/prose; exempt them from the line-token scan.
-        if _is_self_definition(al.path):
+        # Documentation prose: a banned token in markdown describes a pattern,
+        # it cannot weaken a test or a CI job.
+        if al.path.endswith(MD_PROSE_SUFFIXES):
             continue
         text = al.text
         loc = f"{al.path}:{al.lineno}"
@@ -326,7 +340,7 @@ def rule_test_weakening(change: Change) -> list[Violation]:
             continue
         if JS_TODO_RE.search(text):
             out.append(Violation(
-                "R2:test-weakening", f"test.todo placeholder: {stripped!r}", loc))
+                "R2:test-weakening", f"test-todo placeholder: {stripped!r}", loc))
             continue
         if CONTINUE_ON_ERROR_RE.search(text):
             out.append(Violation(
@@ -335,7 +349,7 @@ def rule_test_weakening(change: Change) -> list[Violation]:
             continue
         if OR_TRUE_RE.search(text):
             out.append(Violation(
-                "R2:test-weakening", f"'|| true' swallows a nonzero exit: {stripped!r}",
+                "R2:test-weakening", f"OR-true swallows a nonzero exit: {stripped!r}",
                 loc))
             continue
     return out
@@ -423,12 +437,15 @@ def rule_fixture_special_casing(
 
 
 def rule_secret_hygiene(change: Change) -> list[Violation]:
-    """R5: obvious API-key/secret patterns in ADDED lines."""
+    """R5: obvious API-key/secret patterns in ADDED lines.
+
+    NO exemptions -- a secret is a secret in any file, markdown and the
+    guardrails' own sources included (verifier attack C on PR #52). The
+    checker's own example key shapes are concatenation-split so no source
+    line contains a matching literal.
+    """
     out: list[Violation] = []
     for al in change.added_lines:
-        # The guardrails' own files contain example key shapes as test data.
-        if _is_self_definition(al.path):
-            continue
         for name, rex in SECRET_PATTERNS:
             m = rex.search(al.text)
             if m:
@@ -778,18 +795,22 @@ def run_self_tests() -> int:
              rule_fixture_port_separation(ch) == [])
 
     # ---- R2 test-weakening ---------------------------------------------- #
+    # Fixture strings are concatenation-split: the assembled runtime value
+    # contains the banned token, but no single SOURCE line of this file does,
+    # so this file passes its own scan without any exemption.
     r2_viol = [
         ("py-skip-no-reason", 'packages/core/tests/test_x.py',
-         ["@pytest.mark.skip"]),
+         ["@pytest" + ".mark.skip"]),
         ("py-skip-reason-no-issue", 'packages/core/tests/test_x.py',
-         ['@pytest.mark.skip(reason="flaky")']),
-        ("js-skip", 'packages/ui/src/a.test.ts', ["describe.skip('x', () => {})"]),
-        ("js-only", 'packages/ui/src/a.test.ts', ["it.only('x', () => {})"]),
-        ("xit", 'packages/ui/src/a.test.ts', ["xit('x', () => {})"]),
-        ("xdescribe", 'packages/ui/src/a.test.ts', ["xdescribe('x', () => {})"]),
-        ("test-todo", 'packages/ui/src/a.test.ts', ["test.todo('later')"]),
-        ("continue-on-error", '.github/workflows/x.yml', ["    continue-on-error: true"]),
-        ("or-true", '.github/workflows/x.yml', ["    run: pytest || true"]),
+         ['@pytest' + '.mark.skip(reason="flaky")']),
+        ("js-skip", 'packages/ui/src/a.test.ts', ["describe" + ".skip('x', () => {})"]),
+        ("js-only", 'packages/ui/src/a.test.ts', ["it" + ".only('x', () => {})"]),
+        ("x-prefix-test", 'packages/ui/src/a.test.ts', ["x" + "it('x', () => {})"]),
+        ("x-prefix-suite", 'packages/ui/src/a.test.ts', ["x" + "describe('x', () => {})"]),
+        ("test-todo", 'packages/ui/src/a.test.ts', ["test" + ".todo('later')"]),
+        ("continue-on-error", '.github/workflows/x.yml',
+         ["    continue-on-error" + ": true"]),
+        ("or-true", '.github/workflows/x.yml', ["    run: pytest |" + "| true"]),
     ]
     for name, path, added in r2_viol:
         ch = _change_from_diff(_diff_for(path, added))
@@ -811,14 +832,39 @@ def run_self_tests() -> int:
         "packages/core/src/x.ts", ["const readOnly = config.only_flag;"]))
     st.check("R2 clean (unrelated 'only' identifier) passes",
              rule_test_weakening(ch) == [])
-    # Self-definition exemption: the same token in the checker's OWN file is NOT
-    # flagged (it is data/prose there), but the identical token in ANY other
-    # file still fires -- proving the allowlist is narrow, not a blanket hole.
-    ch = _change_from_diff(_diff_for("scripts/guardrails.py", ['    run: x || true']))
-    st.check("R2 self-exempt (guardrails.py '|| true' not flagged) passes",
+    # ---- Verifier attacks A/B/C (PR #52 rework round 1) ------------------ #
+    # The former per-file self-exemption let these pass; they must now FAIL.
+    # ATTACK A: continue-on-error added to the guardrails workflow itself.
+    ch = _change_from_diff(_diff_for(
+        ".github/workflows/guardrails.yml",
+        ["        continue-on-error" + ": true"]))
+    st.check("ATTACK A: continue-on-error in guardrails.yml FIRES",
+             len(rule_test_weakening(ch)) == 1,
+             detail=f"got {rule_test_weakening(ch)}")
+    # ATTACK B: OR-true appended to the workflow's own self-test line, which
+    # would make a broken checker non-fatal.
+    ch = _change_from_diff(_diff_for(
+        ".github/workflows/guardrails.yml",
+        ["          python scripts/guardrails.py --self-test |" + "| true"]))
+    st.check("ATTACK B: OR-true on the guardrails self-test line FIRES",
+             len(rule_test_weakening(ch)) == 1,
+             detail=f"got {rule_test_weakening(ch)}")
+    # Control for A/B: any other workflow file fires identically (no special
+    # treatment in either direction).
+    ch = _change_from_diff(_diff_for(
+        ".github/workflows/ci.yml", ["        continue-on-error" + ": true"]))
+    st.check("ATTACK A control: continue-on-error in any workflow fires",
+             len(rule_test_weakening(ch)) == 1)
+    # Narrowed exemption: banned tokens in markdown PROSE do not fire (R2
+    # only) -- markdown is never executed by a test runner or CI...
+    ch = _change_from_diff(_diff_for(
+        "docs/DEVELOPMENT.md",
+        ["prose describing x" + "it( and continue-on-error" + ": true and |" + "| true"]))
+    st.check("R2 markdown prose (tokens described, not used) passes",
              rule_test_weakening(ch) == [], detail=f"got {rule_test_weakening(ch)}")
-    ch = _change_from_diff(_diff_for("scripts/other.py", ['    run: x || true']))
-    st.check("R2 non-exempt (other.py '|| true' still fires)",
+    # ...but the SAME tokens in a non-markdown file still fire.
+    ch = _change_from_diff(_diff_for("scripts/guardrails.py", ['    run: x |' + '| true']))
+    st.check("R2 guardrails.py itself has NO exemption (OR-true fires)",
              len(rule_test_weakening(ch)) == 1, detail=f"got {rule_test_weakening(ch)}")
 
     # ---- R3 wall-clock ban (whole-tree, needs a filesystem) ------------- #
@@ -886,13 +932,15 @@ def run_self_tests() -> int:
                  v == [] and present is False, detail=f"got present={present} v={v}")
 
     # ---- R5 secret hygiene ---------------------------------------------- #
+    # All fixture key shapes are concatenation-split so no SOURCE line here
+    # contains a matching literal (this file has no R5 exemption).
     r5_viol = [
         ("openai", "sk-" + "A" * 40),
         ("anthropic", "sk-ant-" + "B" * 40),
         ("aws", "AKIA" + "1234567890ABCDEF"),
         ("google", "AIza" + "C" * 35),
         ("github", "ghp_" + "d" * 36),
-        ("generic", 'api_key = "abcdef0123456789ABCDEF"'),
+        ("generic", 'api_key = "' + "abcdef0123456789ABCDEF" + '"'),
     ]
     for name, secret in r5_viol:
         ch = _change_from_diff(_diff_for("packages/agent/src/x.ts", [f'const k = "{secret}";']))
@@ -905,13 +953,17 @@ def run_self_tests() -> int:
     ch = _change_from_diff(_diff_for(
         "packages/agent/src/x.ts", ['const name = "hello world";']))
     st.check("R5 clean (ordinary string) passes", rule_secret_hygiene(ch) == [])
-    # Self-definition exemption: example key shapes in the checker's own file
-    # are not flagged; the identical shape elsewhere still fires.
-    ch = _change_from_diff(_diff_for("scripts/guardrails.py", ['sk-' + 'A' * 40]))
-    st.check("R5 self-exempt (guardrails.py example key not flagged) passes",
-             rule_secret_hygiene(ch) == [], detail=f"got {rule_secret_hygiene(ch)}")
-    ch = _change_from_diff(_diff_for("packages/agent/src/y.ts", ['sk-' + 'A' * 40]))
-    st.check("R5 non-exempt (other file same key still fires)",
+    # ATTACK C (PR #52 rework round 1): a real-shaped secret in the checker's
+    # OWN source must fire -- R5 has no exemption anywhere.
+    ch = _change_from_diff(_diff_for(
+        "scripts/guardrails.py", ['KEY = "sk-' + "Z" * 40 + '"']))
+    st.check("ATTACK C: secret in guardrails.py FIRES",
+             len(rule_secret_hygiene(ch)) == 1,
+             detail=f"got {rule_secret_hygiene(ch)}")
+    # R5 fires in markdown too (the R2 prose exemption does NOT extend to R5).
+    ch = _change_from_diff(_diff_for(
+        "docs/DEVELOPMENT.md", ['example: "sk-' + "Q" * 40 + '"']))
+    st.check("R5 secret in markdown still fires",
              len(rule_secret_hygiene(ch)) == 1)
 
     # ---- Override path --------------------------------------------------- #

@@ -4,8 +4,12 @@
 
 .DESCRIPTION
     Requires the foundation CI jobs as status checks on `main`, forbids force-pushes
-    and deletions, requires a pull request with at least one approving review, and
-    (where the plan/tier allows) dismisses stale approvals and blocks self-approval.
+    and deletions, and requires a pull request before merging with ZERO required
+    approving reviews: this repository operates single-account, so a formal GitHub
+    review can never come from an independent account -- requiring one would only
+    institutionalize self-approval. Independent verification happens via
+    orchestrated verifier agents posting verdicts as PR comments (ORCHESTRATION.md);
+    protection = required status checks + no force-push + orchestration discipline.
 
     IMPORTANT (ORCHESTRATION.md amendment 2026-07-03): enabling required checks
     before those checks exist and are green on `main` would jam every PR. This
@@ -80,11 +84,15 @@ $payload = [ordered]@{
     required_pull_request_reviews = [ordered]@{
         dismiss_stale_reviews           = $true   # new pushes invalidate old approvals
         require_code_owner_reviews      = $false
-        required_approving_review_count = 1
-        # "no self-approval where possible": GitHub cannot approve your own PR via
-        # the review API, and the independent-verification protocol (ORCHESTRATION.md)
-        # supplies the approving review from a DIFFERENT agent. This flag ensures a
-        # human/second agent must actively approve.
+        required_approving_review_count = 0
+        # 0, NOT 1 (orchestrator amendment, issue #42 rework round 1): this
+        # repository operates single-account, so a formal GitHub approving review
+        # can never come from an independent account -- requiring one would only
+        # institutionalize self-approval. Independent verification happens via
+        # orchestrated verifier agents posting verdicts as PR comments
+        # (ORCHESTRATION.md protocol). Keeping this block non-null still REQUIRES
+        # a pull request before merging (no direct pushes to main); protection =
+        # required status checks + no force-push + orchestration discipline.
     }
     restrictions            = $null      # no push allow-list; open to the org
     required_linear_history = $true      # no merge commits sneaking history around
@@ -127,7 +135,10 @@ function Show-Intent {
     Write-Host "Branch deletion             : DISABLED"
     Write-Host "Linear history required     : YES"
     Write-Host "Enforce on admins           : YES"
-    Write-Host "Required approving reviews  : 1 (stale approvals dismissed on push)"
+    Write-Host "Required approving reviews  : 0 (single-account repo; independent"
+    Write-Host "                              verification = orchestrated verifier"
+    Write-Host "                              agents posting PR comments; PR still"
+    Write-Host "                              required before merge)"
     Write-Host "Conversation resolution     : REQUIRED"
     Write-Host "----------------------------------------------------------------------"
     Write-Host "Exact gh api call:"

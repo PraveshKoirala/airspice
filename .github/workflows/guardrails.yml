@@ -55,8 +55,9 @@ jobs:
             BASE_SHA='${{ github.event.pull_request.base.sha }}'
             HEAD_SHA='${{ github.event.pull_request.head.sha }}'
             # checkout used fetch-depth:0 so full history is present; a targeted
-            # fetch is a best-effort refresh. Guard it with `if` (not `|| true`,
-            # which R2 bans) so a failure here does not abort under `set -e`.
+            # fetch is a best-effort refresh. Guard it with `if` (not the
+            # R2-banned OR-true idiom) so a failure does not abort under set -e.
+            # NOTE: this workflow file has NO exemption from the R2 scan.
             if ! git fetch --no-tags --depth=1 origin "$BASE_SHA"; then
               echo "note: targeted fetch of base sha failed; using existing history"
             fi

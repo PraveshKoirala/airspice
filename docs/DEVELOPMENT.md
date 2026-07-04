@@ -26,22 +26,39 @@ R1, R2, R5 are **diff-aware** (they inspect the `+` lines / touched paths of the
 change). R3 is **whole-tree** (a pre-existing violation is still caught). R4 is
 diff-aware for the reference but reads the design-name list from the corpus.
 
-**Self-definition exemption.** The guardrails' own files
-(`scripts/guardrails.py`, `.github/workflows/guardrails.yml`,
-`.github/pull_request_template.md`, `docs/DEVELOPMENT.md`) necessarily contain
-the very token strings the token-scanning rules (R2, R5) hunt for -- as regexes,
-string literals, and prose describing the patterns. Those four files are exempt
-from the R2/R5 **line-token** scans only; the structural/path rules (R1, R3, R4)
-still apply to them, and the identical token in any other file still fires (a
-self-test asserts both halves). The allowlist is deliberately narrow;
-`SELF_DEFINITION_PATHS` in `scripts/guardrails.py` is the single source of truth,
-and widening it is a guardrail change requiring a justification on issue #42.
+**Exemption model (narrow by construction).** The ONLY exemption anywhere in
+the checker: markdown documentation (`*.md`) is exempt from the **R2** token
+scan, because markdown is never executed by a test runner or CI -- a banned
+token there describes a pattern, it cannot weaken anything. Nothing else is
+exempt: workflow files (including `guardrails.yml` itself), the checker's own
+source, and every other file are always scanned, and **R5 (secrets) has no
+exemption at all** -- a real-shaped secret fires in any file, markdown and
+`guardrails.py` included. `scripts/guardrails.py` keeps itself scannable by
+construction: its regexes use escape sequences (which never match their own
+source text), its self-test fixtures are concatenation-split, and its comments
+paraphrase tokens instead of spelling them. If a guardrails run flags a line
+you are adding to the checker, write the token in split/paraphrased form --
+do not add an exemption.
+
+**Closed hole (PR #52 rework round 1, disclosed).** An earlier revision
+exempted the four guardrails definition files from the R2/R5 line-token scans
+wholesale (`SELF_DEFINITION_PATHS`). The independent verifier proved this was
+an exploitable neutering vector, not just a false-positive tradeoff: a diff
+adding `continue-on-error: true` or an OR-true suffix to
+`.github/workflows/guardrails.yml` -- which makes the guardrails job report
+success even when the checker exits 1 -- passed the scan (attacks A and B), and
+a real-shaped secret in `scripts/guardrails.py` also passed (attack C). The
+one file whose weakening disables all enforcement was the one file the scan
+skipped. The blanket exemption was removed; all three attacks are now
+permanent self-tests that must FAIL the checker, and CI-weakening tokens fire
+in every workflow file with no exception.
 
 ### Running the checker locally
 
 ```
-# Self-tests (one violating + one clean synthetic diff per rule, plus the
-# override path and corpus present/absent states):
+# Self-tests (one violating + one clean synthetic diff per rule, the override
+# path, corpus present/absent states, and the three PR #52 attack reproducers
+# that must always FAIL the checker):
 python scripts/guardrails.py --self-test
 
 # Check your current branch against main:
@@ -89,9 +106,15 @@ run only in dry-run mode to show exactly what it will do.
 - Branch deletion: **disabled**.
 - Linear history: **required**.
 - Enforce on admins: **yes**.
-- Required approving reviews: **1**, with stale approvals dismissed on new
-  pushes. The independent-verification protocol supplies the approval from a
-  different agent than the implementer (no self-approval).
+- Pull request required before merging, with **0 required approving reviews**
+  (orchestrator amendment, issue #42 rework round 1): this repository operates
+  single-account, so a formal GitHub review can never come from an independent
+  account -- requiring one would only institutionalize self-approval.
+  Independent verification instead happens through orchestrated verifier
+  agents posting verdicts as PR comments (see ORCHESTRATION.md); merge
+  protection = required status checks + no force-push + orchestration
+  discipline. Stale-review dismissal stays on so any review that IS posted is
+  invalidated by new pushes.
 - Conversation resolution: **required**.
 
 ### Dry-run (before M0)
