@@ -38,7 +38,7 @@ ground-truth evidence — see #55).
 | `zener_clamp` | clamp V | **5.1 V (want)** | Zener BV | **expected-fail #55** |
 | `inverting_opamp_gain` | Vout | **−2.200 V (want)** | −Rf/Rin·Vin | **expected-fail #55** |
 
-10 passing + 4 documented expected-failures = 14 circuits.
+9 passing + 5 documented expected-failures = 14 circuits.
 
 ## Findings (oracle disagreements → filed issues)
 
