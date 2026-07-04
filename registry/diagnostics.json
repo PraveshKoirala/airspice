@@ -511,6 +511,18 @@
       "grandfathered": true
     },
     {
+      "code": "UNDEFINED_SPICE_MODEL",
+      "namespace": "compiler",
+      "owner": "validation",
+      "severity": "error",
+      "message_template": "Component {component_id} references SPICE model '{model}' with no model source; the compiler emits no .model card for it (only the generic {builtin_models}) and ngspice cannot simulate the design.",
+      "parameters": ["component_id", "model", "builtin_models"],
+      "remediation": "Import a SPICE .model that defines this part, or / Use a generic model ({builtin_models})",
+      "source": "packages/core/src/air/validation.py:_validate_spice_models",
+      "grandfathered": true,
+      "notes": "One code, two current message spellings (issue #55, PR #61): an undefined spice_model uses the template above; an undefined spice_subckt emits \"Component {component_id} references SPICE subcircuit '{subckt}' with no model source; the compiler emits no .subckt definition for it and ngspice cannot simulate the design.\" Both are the same code."
+    },
+    {
       "code": "NGSPICE_NOT_FOUND",
       "namespace": "analog",
       "owner": "simulator",
@@ -519,6 +531,17 @@
       "parameters": ["url"],
       "remediation": "Install ngspice (see docs/DEVELOPMENT.md environment table) / Set AIR_NGSPICE=/path/to/ngspice in your .env if it is installed outside PATH",
       "source": "packages/core/src/air/simulator.py:_ngspice_missing_diagnostic",
+      "grandfathered": true
+    },
+    {
+      "code": "NGSPICE_FAILED",
+      "namespace": "simulation",
+      "owner": "simulator",
+      "severity": "error",
+      "message_template": "ngspice exited with code {returncode} for test {test_id}; the transient did not run.",
+      "parameters": ["returncode", "test_id"],
+      "remediation": "Inspect the generated netlist for undefined models/subcircuits / Ensure every device line references a defined .model/.subckt / Check the ngspice log for the failing line",
+      "source": "packages/core/src/air/simulator.py:_ngspice_failure_diagnostic",
       "grandfathered": true
     },
     {
@@ -600,34 +623,8 @@
     }
   ],
   "pending": {
-    "_pending_note": "Codes NOT YET on main. They are being added by issue #55 (oracle-first) in PR #61 and are recorded here, with their PR-#55 spellings, so whichever of #44/#55 lands second does not break the other's CI enforcement. The registry checker EXEMPTS this section from the dead-code / orphan check (check 2) until those codes land on main; check 1 (corpus/test codes must be registered) still consults these entries so a corpus that gains them stays green. When #55 merges, move these into the 'diagnostics' array (as grandfathered) and delete them here. See PR body '#55 race disposition'.",
-    "_pending_source_pr": 61,
-    "_pending_issue": 55,
-    "entries": [
-      {
-        "code": "UNDEFINED_SPICE_MODEL",
-        "namespace": "compiler",
-        "owner": "validation",
-        "severity": "error",
-        "message_template": "Component {component_id} references SPICE model '{model}' with no model source; the compiler emits no .model card for it (only the generic {builtin_models}) and ngspice cannot simulate the design.",
-        "parameters": ["component_id", "model", "builtin_models"],
-        "remediation": "Import a SPICE .model that defines this part, or / Use a generic model ({builtin_models})",
-        "source": "packages/core/src/air/validation.py:_validate_spice_models",
-        "grandfathered": false,
-        "notes": "PR #61 emits this code for both an undefined spice_model (message above) AND an undefined spice_subckt, whose message is: \"Component {component_id} references SPICE subcircuit '{subckt}' with no model source; the compiler emits no .subckt definition for it and ngspice cannot simulate the design.\" Same code, two message spellings, per PR #61."
-      },
-      {
-        "code": "NGSPICE_FAILED",
-        "namespace": "simulation",
-        "owner": "simulator",
-        "severity": "error",
-        "message_template": "ngspice exited with code {returncode} for test {test_id}; the transient did not run.",
-        "parameters": ["returncode", "test_id"],
-        "remediation": "Inspect the generated netlist for undefined models/subcircuits / Ensure every device line references a defined .model/.subckt / Check the ngspice log for the failing line",
-        "source": "packages/core/src/air/simulator.py:_ngspice_failure_diagnostic",
-        "grandfathered": false
-      }
-    ]
+    "_pending_note": "Codes NOT YET on main, in flight in another open PR (see docs/diagnostics_spec.md 'Coordinating in-flight codes'). The registry checker EXEMPTS this section from the dead-code / orphan check (check 2) until the codes land on main; check 1 (corpus/test codes must be registered) still consults these entries. When the source PR merges, move its entries into the 'diagnostics' array and delete them here. Currently empty: the #55/#44 race entries (UNDEFINED_SPICE_MODEL, NGSPICE_FAILED) moved to active when PR #61 rebased onto the registry.",
+    "entries": []
   }
 }
 

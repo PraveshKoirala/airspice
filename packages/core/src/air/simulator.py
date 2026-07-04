@@ -22,6 +22,33 @@ class SignalStats:
     unit: str
 
 
+@dataclass(frozen=True)
+class NgspiceRun:
+    """Outcome of an ngspice invocation.
+
+    ``attempted`` distinguishes the two very different reasons ngspice did not
+    credit its numbers to the report:
+
+    - ``attempted is False`` -> no ngspice binary was reachable. This is the
+      legitimate ngspice-not-installed case: the engine falls back to the
+      deterministic builtin DC solver (see docs/simulation_spec.md). Nothing
+      failed; the report is honestly labelled ``builtin_dc_fallback``.
+    - ``attempted is True`` with ``returncode != 0`` -> ngspice ran and FAILED
+      (e.g. a device line references a ``.model``/``.subckt`` the netlist never
+      defines). This is a hard simulation failure and MUST surface as such; it
+      must never be silently downgraded to a clean ``passed`` DC report.
+    """
+
+    attempted: bool
+    returncode: int = 0
+    stdout: str = ""
+    stderr: str = ""
+
+    @property
+    def failed(self) -> bool:
+        return self.attempted and self.returncode != 0
+
+
 def simulate_analog(ir: SystemIR, profile_id: str, out_dir: Path) -> dict[str, object]:
     profile = ir.simulation_profiles.get(profile_id)
     if profile is None:
@@ -53,14 +80,15 @@ def simulate_analog(ir: SystemIR, profile_id: str, out_dir: Path) -> dict[str, o
     status = "passed"
     for test_id in profile.tests:
         test = ir.tests[test_id]
-        
+        builder = DiagnosticBuilder()
+
         # Merge extra probes with assertion-based probes for cleanup and stats
         assertion_nets = {a.get("net", "") for a in test.assertions if a.get("op") == "assert_voltage" and a.get("net")}
         all_probe_nets = sorted(assertion_nets | extra_probe_nets)
-        
+
         _clear_test_waveforms_explicit(out_dir / "waveforms", test, all_probe_nets)
         compile_result = compile_spice(ir, out_dir, test, extra_probes=list(extra_probe_nets))
-        ran_ngspice = run_ngspice(out_dir / "spice" / "main.cir", out_dir / "reports" / f"{test.id}.ngspice.log")
+        ngspice_run = run_ngspice(out_dir / "spice" / "main.cir", out_dir / "reports" / f"{test.id}.ngspice.log")
         measured = _measure_dc(ir, test)
         stats = _stats_from_measurements(measured)
         waveform_stats = _read_ngspice_waveforms_explicit(out_dir / "waveforms", test, all_probe_nets)
@@ -70,7 +98,15 @@ def simulate_analog(ir: SystemIR, profile_id: str, out_dir: Path) -> dict[str, o
         # Only credit ngspice when its transient actually produced readable data;
         # a clean exit with no waveforms still means the numbers came from the
         # builtin DC solver, so the backend label must say so.
-        used_ngspice = ran_ngspice and bool(waveform_stats)
+        used_ngspice = ngspice_run.attempted and ngspice_run.returncode == 0 and bool(waveform_stats)
+        # A non-zero ngspice exit is a HARD failure: the transient never ran. It
+        # must NOT be silently downgraded to a clean builtin-DC "passed" report
+        # (issue #55). The failure is recorded as a structured diagnostic and the
+        # backend label reflects that ngspice failed. The builtin DC fallback path
+        # stays reserved for ngspice-not-installed (its documented purpose).
+        sim_diagnostics: list[Diagnostic] = []
+        if ngspice_run.failed:
+            sim_diagnostics.append(_ngspice_failure_diagnostic(builder, test.id, ngspice_run))
         if used_ngspice:
             # ngspice wrote whitespace-delimited wrdata; normalize each probe CSV
             # into the canonical comma+header form the UI/readback consume.
@@ -79,8 +115,16 @@ def simulate_analog(ir: SystemIR, profile_id: str, out_dir: Path) -> dict[str, o
                 samples = _read_samples(wave_path)
                 if samples:
                     _write_canonical_waveform(wave_path, net, samples)
-        diagnostics = _evaluate_assertions(test, measured, stats)
-        if diagnostics:
+        assertion_diagnostics = _evaluate_assertions(test, measured, stats)
+        diagnostics = sim_diagnostics + assertion_diagnostics
+        if ngspice_run.failed:
+            backend = "ngspice_failed"
+        elif used_ngspice:
+            backend = "ngspice"
+        else:
+            backend = "builtin_dc_fallback"
+        test_status = "failed" if diagnostics else "passed"
+        if test_status == "failed":
             status = "failed"
         report_diagnostics = diagnostics + compile_result.diagnostics
         if ngspice_missing and not used_ngspice:
@@ -89,8 +133,8 @@ def simulate_analog(ir: SystemIR, profile_id: str, out_dir: Path) -> dict[str, o
         report = {
             "profile": profile_id,
             "test": test.id,
-            "status": "failed" if diagnostics else "passed",
-            "backend": "ngspice" if used_ngspice else "builtin_dc_fallback",
+            "status": test_status,
+            "backend": backend,
             "measurements": {name: format_quantity(value, _unit_for_signal(name)) for name, value in measured.items()},
             "measurement_stats": _serialize_stats(stats),
             "diagnostics": [d.to_dict() for d in report_diagnostics],
@@ -99,7 +143,10 @@ def simulate_analog(ir: SystemIR, profile_id: str, out_dir: Path) -> dict[str, o
         report_path = out_dir / "reports" / f"{test.id}.json"
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-        if not used_ngspice:
+        # Only fill the builtin-DC waveform CSVs when we are legitimately on the
+        # fallback (ngspice not installed). A hard ngspice failure does NOT get
+        # papered over with synthetic flat waveforms.
+        if backend == "builtin_dc_fallback":
             _write_waveforms(out_dir / "waveforms", test, measured, nets=all_probe_nets)
         reports.append(report)
     return {"success": status == "passed", "profile": profile_id, "status": status, "reports": reports}
@@ -178,16 +225,62 @@ def _ngspice_missing_diagnostic(builder: DiagnosticBuilder, test_id: str) -> Dia
     )
 
 
-def run_ngspice(netlist: Path, log_path: Path) -> bool:
+def run_ngspice(netlist: Path, log_path: Path) -> NgspiceRun:
+    """Run ngspice in batch mode, returning a structured outcome.
+
+    Returns ``NgspiceRun(attempted=False)`` when no ngspice binary is reachable
+    (the legitimate fallback trigger). When ngspice runs, the real exit code and
+    captured stdout/stderr are returned so the caller can tell a clean run from a
+    hard failure instead of collapsing both into a single boolean.
+    """
     from .tools import ngspice_path
 
     ngspice = ngspice_path()
     if not ngspice:
-        return False
+        return NgspiceRun(attempted=False)
     log_path.parent.mkdir(parents=True, exist_ok=True)
     result = subprocess.run([ngspice, "-b", netlist.name], capture_output=True, text=True, cwd=netlist.parent)
     log_path.write_text(result.stdout + result.stderr, encoding="utf-8")
-    return result.returncode == 0
+    return NgspiceRun(attempted=True, returncode=result.returncode, stdout=result.stdout, stderr=result.stderr)
+
+
+def _ngspice_failure_diagnostic(builder: DiagnosticBuilder, test_id: str, run: NgspiceRun) -> Diagnostic:
+    """Build the structured diagnostic for a hard ngspice failure.
+
+    Carries the exit code and the tail of ngspice's output (which names the
+    cause, e.g. ``unknown model`` / ``no simulations run``) so the report is a
+    truthful record of a simulation that did not run, not a silent DC pass.
+    """
+    tail = _ngspice_output_tail(run)
+    return builder.make(
+        "error",
+        "simulation",
+        "NGSPICE_FAILED",
+        f"ngspice exited with code {run.returncode} for test {test_id}; the transient did not run.",
+        [test_id],
+        observed={"returncode": run.returncode, "stderr_tail": tail},
+        suggested_actions=[
+            "Inspect the generated netlist for undefined models/subcircuits",
+            "Ensure every device line references a defined .model/.subckt",
+            "Check the ngspice log for the failing line",
+        ],
+    )
+
+
+def _ngspice_output_tail(run: NgspiceRun, max_lines: int = 12, max_chars: int = 800) -> str:
+    """Return a trimmed tail of ngspice's combined output identifying the cause.
+
+    ngspice writes the operative error (``unknown model``, ``unknown subckt``,
+    ``no simulations run``) at the end of its output. We keep the last few
+    non-empty lines, deterministically, so the diagnostic pinpoints the cause
+    without embedding the version banner or the full solver trace.
+    """
+    combined = (run.stdout or "") + (run.stderr or "")
+    lines = [line.rstrip() for line in combined.splitlines() if line.strip()]
+    tail = "\n".join(lines[-max_lines:])
+    if len(tail) > max_chars:
+        tail = tail[-max_chars:]
+    return tail
 
 
 def _measure_dc(ir: SystemIR, test: Test) -> dict[str, float]:

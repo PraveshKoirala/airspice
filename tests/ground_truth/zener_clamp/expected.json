@@ -3,15 +3,17 @@
   "profile": "analog_only",
   "test": "zener_clamp",
   "outcome": "expected_fail",
-  "failure_mode": "undefined_model",
+  "failure_mode": "validation_blocked",
+  "diagnostic_code": "UNDEFINED_SPICE_MODEL",
   "issue": 55,
+  "fix_path_issue": 60,
   "would_pass_checks": [
     {
       "net": "clamp",
       "nominal_v": 5.1,
       "min_v": 4.9,
       "max_v": 5.3,
-      "basis": "Zener holds V(clamp)~BV=5.1V (+Zzt*Iz). Blocked: spice_model=ZENER_5V1 has no .model card (bug #55); generic D has BV=inf so no breakdown even without the name error."
+      "basis": "Zener holds V(clamp)~BV=5.1V (+Zzt*Iz). Blocked: spice_model=ZENER_5V1 has no model source, so validation rejects the design with UNDEFINED_SPICE_MODEL (#55 fixed oracle-first). Even with the name error gone, the generic D has BV=inf so no breakdown; a real Zener .model via #60 is required to flip this to outcome=pass."
     }
   ]
 }

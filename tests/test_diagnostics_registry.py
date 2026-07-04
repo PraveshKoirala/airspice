@@ -98,11 +98,15 @@ class RegistryIntegrityTests(unittest.TestCase):
         pending_codes = {e["code"] for e in pending["entries"]}
         self.assertTrue(active_codes.isdisjoint(pending_codes), "a code is both active and pending")
 
-    def test_pending_records_the_55_codes(self) -> None:
-        # Coordination guard: the two codes PR #61 (issue #55) is adding must be
-        # present in the pending section so neither PR breaks the other's CI.
-        pending_codes = {e["code"] for e in (self.data["pending"]["entries"])}
-        self.assertEqual(pending_codes, {"UNDEFINED_SPICE_MODEL", "NGSPICE_FAILED"})
+    def test_55_codes_moved_from_pending_to_active(self) -> None:
+        # Coordination guard, post-race: the two #55 codes were parked in
+        # `pending` while PR #61 was in flight; per the protocol in
+        # docs/diagnostics_spec.md, the second-landing PR (#61) moved them into
+        # the active array and emptied `pending`. Assert the post-move state.
+        active_codes = {e["code"] for e in self.active}
+        self.assertIn("UNDEFINED_SPICE_MODEL", active_codes)
+        self.assertIn("NGSPICE_FAILED", active_codes)
+        self.assertEqual(self.data["pending"]["entries"], [])
 
 
 class RegistryLoaderTests(unittest.TestCase):
@@ -111,8 +115,10 @@ class RegistryLoaderTests(unittest.TestCase):
     def test_loads_active_registry(self) -> None:
         reg = registry_loader.load_registry()
         self.assertIn("ADC_INPUT_EXCEEDS_VREF", reg)
-        # Pending codes are NOT in the active registry (not emitted here yet).
-        self.assertNotIn("NGSPICE_FAILED", reg)
+        # The #55 codes moved from pending to active when PR #61 landed second
+        # (per docs/diagnostics_spec.md), so the loader now serves them.
+        self.assertIn("NGSPICE_FAILED", reg)
+        self.assertIn("UNDEFINED_SPICE_MODEL", reg)
 
     def test_severity_for_reads_from_registry(self) -> None:
         self.assertEqual(registry_loader.severity_for("MISSING_GROUND"), "error")

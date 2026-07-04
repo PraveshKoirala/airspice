@@ -30,8 +30,12 @@ For ``outcome == "pass"`` one or more of::
 
 For ``outcome == "expected_fail"``::
 
-    failure_mode:  "undefined_model"  (bug #55: ngspice cannot run the netlist,
-                                        oracle downgrades to builtin_dc_fallback)
+    failure_mode:  "validation_blocked" (#55 fixed oracle-first: a component
+                                        referencing a SPICE model/subckt with no
+                                        model source now fails VALIDATION with
+                                        ``diagnostic_code`` before any netlist is
+                                        compiled or simulated; #60 tracks the
+                                        model-source path to outcome=pass)
                    "no_ac_analysis"   (compiler emits only .tran, so a
                                         frequency-domain check is unverifiable)
                    "wrong_stimulus"   (ngspice runs, but the compiler emits a
@@ -39,6 +43,10 @@ For ``outcome == "expected_fail"``::
                                         duty-cycle defect #59)
     issue:         the linked issue (55 for the #55-class, 59 for the PWM defect,
                    or another gap issue)
+    diagnostic_code (validation_blocked only): the exact validation error code
+                   that must block the design, e.g. UNDEFINED_SPICE_MODEL
+    fix_path_issue (validation_blocked only): the issue that, when implemented,
+                   supplies a real model source and flips the circuit to pass
     would_pass_checks / dc_settle_check / oracle_actual_window
                    documentation of the true physics and, for the run-but-wrong
                    modes, the (defective) value the oracle actually produces.
@@ -130,9 +138,22 @@ def test_ground_truth_circuit(circuit_dir: Path, require_ngspice: str, tmp_path:
     expected = _load_expected(circuit_dir)
     design = circuit_dir / "design.air.xml"
     ir, tree = parse_file(design)
-
-    # The design must be schema/semantically valid (no shortcuts hiding errors).
     diagnostics = validate_tree(tree) + validate_ir(ir)
+
+    outcome = expected["outcome"]
+
+    # validation_blocked circuits never reach compilation/simulation: the whole
+    # point (#55, fixed oracle-first) is that validation now honestly rejects a
+    # design whose SPICE model/subckt has no model source, where the old oracle
+    # compiled a netlist ngspice exited non-zero on and silently downgraded to a
+    # DC-fallback "passed". The product pipeline (service.compile_design) is
+    # blocked the same way, so the harness must not simulate either.
+    if outcome == "expected_fail" and expected["failure_mode"] == "validation_blocked":
+        _assert_validation_blocked(circuit_dir.name, expected, diagnostics)
+        return
+
+    # Every other design must be schema/semantically valid (no shortcuts hiding
+    # errors).
     assert not has_errors(diagnostics), (
         f"{circuit_dir.name}: design has validation errors: "
         f"{[d.code for d in diagnostics if d.severity == 'error']}"
@@ -143,13 +164,36 @@ def test_ground_truth_circuit(circuit_dir: Path, require_ngspice: str, tmp_path:
     report = _report_for(result, expected["test"])
     backend = report["backend"]
 
-    outcome = expected["outcome"]
     if outcome == "pass":
         _assert_pass(circuit_dir.name, expected, report, backend, out_dir)
     elif outcome == "expected_fail":
         _assert_expected_fail(circuit_dir.name, expected, report, backend, out_dir)
     else:
         raise AssertionError(f"{circuit_dir.name}: unknown outcome {outcome!r}")
+
+
+def _assert_validation_blocked(name: str, expected: dict, diagnostics: list) -> None:
+    """Assert the design is blocked at validation with the exact expected code.
+
+    #55 (fixed oracle-first in PR #61): a component referencing a SPICE
+    model/subckt with no model source fails validation with
+    UNDEFINED_SPICE_MODEL, so no netlist is compiled and nothing is simulated —
+    the honest replacement for the old silent DC-fallback downgrade. The circuit
+    stays an expected-fail documenting the true physics in would_pass_checks;
+    when a real model source exists (issue #60) validation stops rejecting it
+    and the circuit must flip to outcome=pass.
+    """
+    code = expected["diagnostic_code"]
+    issue = expected.get("issue")
+    fix_path = expected.get("fix_path_issue")
+    error_codes = [d.code for d in diagnostics if d.severity == "error"]
+    assert code in error_codes, (
+        f"{name}: expected validation to block this design with {code!r} "
+        f"(cause: issue #{issue}; path to pass: issue #{fix_path}), but the "
+        f"validation error codes were {error_codes}. If validation no longer "
+        f"rejects it, a real model source may now exist — flip this circuit to "
+        f"outcome=pass using its would_pass_checks window."
+    )
 
 
 def _assert_pass(name: str, expected: dict, report: dict, backend: str, out_dir: Path) -> None:
@@ -195,20 +239,12 @@ def _assert_expected_fail(name: str, expected: dict, report: dict, backend: str,
     mode = expected["failure_mode"]
     issue = expected.get("issue")
 
-    if mode == "undefined_model":
-        # Bug #55: the netlist references an undefined model/subckt, so real
-        # ngspice cannot run it and the oracle downgrades to the DC fallback.
-        # The AUDIT finding is precisely that the oracle produces NO real result
-        # here — so we assert the backend is NOT the real one. If a future fix
-        # makes ngspice actually simulate this, the assertion below flips and the
-        # 'would_pass_checks' window becomes the acceptance test.
-        assert backend != "ngspice", (
-            f"{name}: expected the oracle to FAIL to run this circuit with real "
-            f"ngspice (undefined model, issue #{issue}), but it reported "
-            f"backend={backend!r}. If #{issue} is fixed, convert this circuit to "
-            f"outcome=pass using its would_pass_checks window."
-        )
-    elif mode == "no_ac_analysis":
+    # NOTE: the former "undefined_model" mode (backend != ngspice after a silent
+    # DC-fallback downgrade) no longer exists: #55 was fixed oracle-first, and
+    # such designs are now rejected at validation ("validation_blocked" above,
+    # handled before simulation). An expected.json still naming
+    # "undefined_model" falls through to the unknown-mode failure below.
+    if mode == "no_ac_analysis":
         # The compiler emits only .tran with a DC source, so the circuit DC-settles
         # instead of showing a frequency response. ngspice DOES run (backend real),
         # but the frequency-domain answer is absent. We confirm both: it settles to

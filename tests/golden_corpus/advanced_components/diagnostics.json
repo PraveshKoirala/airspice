@@ -1,10 +1,56 @@
 {
   "diagnostics": [
     {
+      "code": "UNDEFINED_SPICE_MODEL",
+      "domain": "compiler",
+      "expected": {
+        "builtin_models": [
+          "D",
+          "NMOS",
+          "NPN",
+          "PMOS",
+          "PNP"
+        ]
+      },
+      "id": "diag_00001",
+      "message": "Component Q_SW references SPICE model 'MY_NMOS' with no model source; the compiler emits no .model card for it (only the generic D, NMOS, NPN, PMOS, PNP) and ngspice cannot simulate the design.",
+      "observed": {
+        "spice_model": "MY_NMOS"
+      },
+      "related_elements": [
+        "Q_SW",
+        "MY_NMOS"
+      ],
+      "severity": "error",
+      "suggested_actions": [
+        "Import a SPICE .model that defines this part, or",
+        "Use a generic model (D, NMOS, NPN, PMOS, PNP)"
+      ]
+    },
+    {
+      "code": "UNDEFINED_SPICE_MODEL",
+      "domain": "compiler",
+      "expected": {},
+      "id": "diag_00002",
+      "message": "Component X_CUSTOM references SPICE subcircuit 'LM358' with no model source; the compiler emits no .subckt definition for it and ngspice cannot simulate the design.",
+      "observed": {
+        "spice_subckt": "LM358"
+      },
+      "related_elements": [
+        "X_CUSTOM",
+        "LM358"
+      ],
+      "severity": "error",
+      "suggested_actions": [
+        "Import a SPICE subcircuit that defines this part, or",
+        "Model the part with supported primitives"
+      ]
+    },
+    {
       "code": "UNSUPPORTED_SPICE_TYPE",
       "domain": "compiler",
       "expected": {},
-      "id": "diag_00001",
+      "id": "diag_00003",
       "message": "Component X_CUSTOM type opamp is not supported by the v0.1 SPICE compiler.",
       "observed": {},
       "related_elements": [
@@ -14,5 +60,5 @@
       "suggested_actions": []
     }
   ],
-  "success": true
+  "success": false
 }

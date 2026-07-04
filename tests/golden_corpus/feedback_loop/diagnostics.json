@@ -1,4 +1,32 @@
 {
-  "diagnostics": [],
-  "success": true
+  "diagnostics": [
+    {
+      "code": "UNDEFINED_SPICE_MODEL",
+      "domain": "compiler",
+      "expected": {
+        "builtin_models": [
+          "D",
+          "NMOS",
+          "NPN",
+          "PMOS",
+          "PNP"
+        ]
+      },
+      "id": "diag_00001",
+      "message": "Component Q_SW references SPICE model 'BSS138' with no model source; the compiler emits no .model card for it (only the generic D, NMOS, NPN, PMOS, PNP) and ngspice cannot simulate the design.",
+      "observed": {
+        "spice_model": "BSS138"
+      },
+      "related_elements": [
+        "Q_SW",
+        "BSS138"
+      ],
+      "severity": "error",
+      "suggested_actions": [
+        "Import a SPICE .model that defines this part, or",
+        "Use a generic model (D, NMOS, NPN, PMOS, PNP)"
+      ]
+    }
+  ],
+  "success": false
 }

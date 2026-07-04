@@ -1,4 +1,59 @@
 {
-  "diagnostics": [],
-  "success": true
+  "diagnostics": [
+    {
+      "code": "UNDEFINED_SPICE_MODEL",
+      "domain": "compiler",
+      "expected": {
+        "builtin_models": [
+          "D",
+          "NMOS",
+          "NPN",
+          "PMOS",
+          "PNP"
+        ]
+      },
+      "id": "diag_00001",
+      "message": "Component D_SCHOTTKY references SPICE model '1N5819' with no model source; the compiler emits no .model card for it (only the generic D, NMOS, NPN, PMOS, PNP) and ngspice cannot simulate the design.",
+      "observed": {
+        "spice_model": "1N5819"
+      },
+      "related_elements": [
+        "D_SCHOTTKY",
+        "1N5819"
+      ],
+      "severity": "error",
+      "suggested_actions": [
+        "Import a SPICE .model that defines this part, or",
+        "Use a generic model (D, NMOS, NPN, PMOS, PNP)"
+      ]
+    },
+    {
+      "code": "UNDEFINED_SPICE_MODEL",
+      "domain": "compiler",
+      "expected": {
+        "builtin_models": [
+          "D",
+          "NMOS",
+          "NPN",
+          "PMOS",
+          "PNP"
+        ]
+      },
+      "id": "diag_00002",
+      "message": "Component Q_LOAD_SW references SPICE model '2N7002' with no model source; the compiler emits no .model card for it (only the generic D, NMOS, NPN, PMOS, PNP) and ngspice cannot simulate the design.",
+      "observed": {
+        "spice_model": "2N7002"
+      },
+      "related_elements": [
+        "Q_LOAD_SW",
+        "2N7002"
+      ],
+      "severity": "error",
+      "suggested_actions": [
+        "Import a SPICE .model that defines this part, or",
+        "Use a generic model (D, NMOS, NPN, PMOS, PNP)"
+      ]
+    }
+  ],
+  "success": false
 }

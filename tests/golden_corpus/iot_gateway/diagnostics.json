@@ -1,10 +1,29 @@
 {
   "diagnostics": [
     {
-      "code": "UNSUPPORTED_SPICE_TYPE",
+      "code": "UNDEFINED_SPICE_MODEL",
       "domain": "compiler",
       "expected": {},
       "id": "diag_00001",
+      "message": "Component X_CHARGER references SPICE subcircuit 'MCP73831' with no model source; the compiler emits no .subckt definition for it and ngspice cannot simulate the design.",
+      "observed": {
+        "spice_subckt": "MCP73831"
+      },
+      "related_elements": [
+        "X_CHARGER",
+        "MCP73831"
+      ],
+      "severity": "error",
+      "suggested_actions": [
+        "Import a SPICE subcircuit that defines this part, or",
+        "Model the part with supported primitives"
+      ]
+    },
+    {
+      "code": "UNSUPPORTED_SPICE_TYPE",
+      "domain": "compiler",
+      "expected": {},
+      "id": "diag_00002",
       "message": "Component X_CHARGER type power_manager is not supported by the v0.1 SPICE compiler.",
       "observed": {},
       "related_elements": [
@@ -14,10 +33,56 @@
       "suggested_actions": []
     },
     {
+      "code": "UNDEFINED_SPICE_MODEL",
+      "domain": "compiler",
+      "expected": {
+        "builtin_models": [
+          "D",
+          "NMOS",
+          "NPN",
+          "PMOS",
+          "PNP"
+        ]
+      },
+      "id": "diag_00003",
+      "message": "Component Q_RADIO_GATE references SPICE model 'BSS138' with no model source; the compiler emits no .model card for it (only the generic D, NMOS, NPN, PMOS, PNP) and ngspice cannot simulate the design.",
+      "observed": {
+        "spice_model": "BSS138"
+      },
+      "related_elements": [
+        "Q_RADIO_GATE",
+        "BSS138"
+      ],
+      "severity": "error",
+      "suggested_actions": [
+        "Import a SPICE .model that defines this part, or",
+        "Use a generic model (D, NMOS, NPN, PMOS, PNP)"
+      ]
+    },
+    {
+      "code": "UNDEFINED_SPICE_MODEL",
+      "domain": "compiler",
+      "expected": {},
+      "id": "diag_00004",
+      "message": "Component X_SENSOR references SPICE subcircuit 'BME280' with no model source; the compiler emits no .subckt definition for it and ngspice cannot simulate the design.",
+      "observed": {
+        "spice_subckt": "BME280"
+      },
+      "related_elements": [
+        "X_SENSOR",
+        "BME280"
+      ],
+      "severity": "error",
+      "suggested_actions": [
+        "Import a SPICE subcircuit that defines this part, or",
+        "Model the part with supported primitives"
+      ]
+    },
+    {
       "code": "UNSUPPORTED_SPICE_TYPE",
       "domain": "compiler",
       "expected": {},
-      "id": "diag_00002",
+      "id": "diag_00005",
       "message": "Component X_SENSOR type sensor is not supported by the v0.1 SPICE compiler.",
       "observed": {},
       "related_elements": [
@@ -27,10 +92,64 @@
       "suggested_actions": []
     },
     {
+      "code": "UNDEFINED_SPICE_MODEL",
+      "domain": "compiler",
+      "expected": {
+        "builtin_models": [
+          "D",
+          "NMOS",
+          "NPN",
+          "PMOS",
+          "PNP"
+        ]
+      },
+      "id": "diag_00006",
+      "message": "Component Q_SDA_SHIFT references SPICE model 'BSS138' with no model source; the compiler emits no .model card for it (only the generic D, NMOS, NPN, PMOS, PNP) and ngspice cannot simulate the design.",
+      "observed": {
+        "spice_model": "BSS138"
+      },
+      "related_elements": [
+        "Q_SDA_SHIFT",
+        "BSS138"
+      ],
+      "severity": "error",
+      "suggested_actions": [
+        "Import a SPICE .model that defines this part, or",
+        "Use a generic model (D, NMOS, NPN, PMOS, PNP)"
+      ]
+    },
+    {
+      "code": "UNDEFINED_SPICE_MODEL",
+      "domain": "compiler",
+      "expected": {
+        "builtin_models": [
+          "D",
+          "NMOS",
+          "NPN",
+          "PMOS",
+          "PNP"
+        ]
+      },
+      "id": "diag_00007",
+      "message": "Component Q_SCL_SHIFT references SPICE model 'BSS138' with no model source; the compiler emits no .model card for it (only the generic D, NMOS, NPN, PMOS, PNP) and ngspice cannot simulate the design.",
+      "observed": {
+        "spice_model": "BSS138"
+      },
+      "related_elements": [
+        "Q_SCL_SHIFT",
+        "BSS138"
+      ],
+      "severity": "error",
+      "suggested_actions": [
+        "Import a SPICE .model that defines this part, or",
+        "Use a generic model (D, NMOS, NPN, PMOS, PNP)"
+      ]
+    },
+    {
       "code": "I2C_PULLUP_TOO_WEAK",
       "domain": "interface",
       "expected": {},
-      "id": "diag_00003",
+      "id": "diag_00008",
       "message": "I2C pullup 4.7k may be too weak for 400kHz.",
       "observed": {},
       "related_elements": [
@@ -43,7 +162,7 @@
       "code": "I2C_PULLUP_TOO_WEAK",
       "domain": "interface",
       "expected": {},
-      "id": "diag_00004",
+      "id": "diag_00009",
       "message": "I2C pullup 4.7k may be too weak for 400kHz.",
       "observed": {},
       "related_elements": [
@@ -53,5 +172,5 @@
       "suggested_actions": []
     }
   ],
-  "success": true
+  "success": false
 }

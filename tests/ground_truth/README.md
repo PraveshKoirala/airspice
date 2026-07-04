@@ -34,9 +34,9 @@ ground-truth evidence — see #55).
 | `rc_step_response` | V@τ,2τ,5τ | 2.086 / 2.853 / 3.278 V | 3.3·(1−e^−t/τ) | pass |
 | `pwm_rc_average` | filtered avg | **1.650 V (want)** | D·Vstep, D=0.5 | **expected-fail #59** |
 | `rc_lowpass_fc` | −3 dB @ fc | **0.7071 V (want)** | 1/√2 at fc=995 Hz | **expected-fail #62** |
-| `led_forward_drop` | red LED Vf | **1.8–2.2 V (want)** | LED datasheet | **expected-fail #55** |
-| `zener_clamp` | clamp V | **5.1 V (want)** | Zener BV | **expected-fail #55** |
-| `inverting_opamp_gain` | Vout | **−2.200 V (want)** | −Rf/Rin·Vin | **expected-fail #55** |
+| `led_forward_drop` | red LED Vf | **1.8–2.2 V (want)** | LED datasheet | **expected-fail: validation-blocked `UNDEFINED_SPICE_MODEL` (#55 fixed; pass via #60)** |
+| `zener_clamp` | clamp V | **5.1 V (want)** | Zener BV | **expected-fail: validation-blocked `UNDEFINED_SPICE_MODEL` (#55 fixed; pass via #60)** |
+| `inverting_opamp_gain` | Vout | **−2.200 V (want)** | −Rf/Rin·Vin | **expected-fail: validation-blocked `UNDEFINED_SPICE_MODEL` (#55 fixed; pass via #60)** |
 
 9 passing + 5 documented expected-failures = 14 circuits.
 
@@ -49,8 +49,12 @@ ground-truth evidence — see #55).
 - **#62** — the compiler emits only `.tran` with DC sources, never `.ac`, so
   frequency-domain checks (RC −3 dB at fc, roll-off) are unverifiable. Caught by
   `rc_lowpass_fc`.
-- **#55** (pre-existing) — SPICE compiler emits netlists referencing undefined
-  models/subckts; ngspice exits non-zero and the simulator silently downgrades to
-  the DC fallback reporting a hollow `passed`. Blocks any circuit needing a
-  part-specific model: LED, Zener, op-amp. Captured as the three `#55`
-  expected-failures, which become acceptance tests once #55 is fixed.
+- **#55** (fixed oracle-first in PR #61) — the SPICE compiler used to emit
+  netlists referencing undefined models/subckts; ngspice exited non-zero and the
+  simulator silently downgraded to the DC fallback reporting a hollow `passed`.
+  Now such designs are rejected at **validation** with `UNDEFINED_SPICE_MODEL`
+  (no netlist, no simulation), and a real ngspice non-zero exit surfaces as a
+  `NGSPICE_FAILED` diagnostic with backend `ngspice_failed`. Still blocks any
+  circuit needing a part-specific model: LED, Zener, op-amp — captured as the
+  three validation-blocked expected-failures above. They flip to `pass` when
+  **#60** supplies real `.model`/`.subckt` sources for those parts.
