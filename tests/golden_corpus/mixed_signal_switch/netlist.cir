@@ -6,7 +6,7 @@
 .model PNP PNP(Bf=100)
 .model D D
 V_LOAD_LOW load_low 0 DC 3.7V
-V_STIM_U_MCU_GPIO2 gate_drive 0 PULSE(0 3.3 0 1u 1u 5ms 10ms)
+V_STIM_U_MCU_GPIO2 gate_drive 0 PULSE(0 3.3 0 1us 1us 4.999ms 10ms)
 I_L_LOAD v_bat load_low DC 100mA
 M_Q_SWITCH load_low gate_drive 0 0 NMOS
 V_V_3V3 3v3 0 DC 3.3V
