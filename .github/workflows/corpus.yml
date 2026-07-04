@@ -9,11 +9,13 @@ name: Golden corpus
 #                 dir and diffs against the committed corpus, then runs the mutation
 #                 self-test. This is the "reproducible + not silently edited" gate.
 #
-#   corpus-generate (workflow_dispatch only): regenerates the corpus with the pinned
-#                 ngspice and uploads tests/golden_corpus as an artifact. Used to
-#                 produce the committed corpus from CI's ngspice when the maintainer's
-#                 local ngspice differs from the pin (per issue #4's ngspice-pin
-#                 strategy comment).
+#   corpus-generate (currently runs on EVERY push/PR/dispatch -- a bootstrap
+#                 necessity while this workflow is not yet on main; issue #54
+#                 tracks restricting it to workflow_dispatch only after landing):
+#                 regenerates the corpus with the runner's apt ngspice and uploads
+#                 tests/golden_corpus as an artifact. Used to produce the committed
+#                 corpus from CI's ngspice when the maintainer's local ngspice
+#                 differs from the pin (per issue #4's ngspice-pin strategy comment).
 
 on:
   push:
