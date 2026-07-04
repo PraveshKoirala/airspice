@@ -1,0 +1,42 @@
+{
+  "empty_elements": {
+    "xml": "<system><digital/><gui/></system>",
+    "canonical": "<?xml version=\"1.0\" ?>\n<system>\n  <digital/>\n  <gui/>\n</system>\n"
+  },
+  "attr_sort_section_reorder": {
+    "xml": "<system name=\"s\" ir_version=\"0.1\"><exports><export target=\"spice\" enabled=\"true\"/></exports><nets><net id=\"z\" role=\"power\"/><net id=\"a\" role=\"ground\"/></nets><metadata><title>T</title></metadata></system>",
+    "canonical": "<?xml version=\"1.0\" ?>\n<system ir_version=\"0.1\" name=\"s\">\n  <metadata>\n    <title>T</title>\n  </metadata>\n  <nets>\n    <net id=\"a\" role=\"ground\"/>\n    <net id=\"z\" role=\"power\"/>\n  </nets>\n  <exports>\n    <export enabled=\"true\" target=\"spice\"/>\n  </exports>\n</system>\n"
+  },
+  "comment_dropped": {
+    "xml": "<system><!-- gone --><metadata><title>X</title></metadata></system>",
+    "canonical": "<?xml version=\"1.0\" ?>\n<system>\n  <metadata>\n    <title>X</title>\n  </metadata>\n</system>\n"
+  },
+  "text_entities": {
+    "xml": "<system><metadata><title>a &lt; b &amp; c &gt; d</title></metadata></system>",
+    "canonical": "<?xml version=\"1.0\" ?>\n<system>\n  <metadata>\n    <title>a &lt; b &amp; c &gt; d</title>\n  </metadata>\n</system>\n"
+  },
+  "attr_entities": {
+    "xml": "<system><a v=\"x&lt;y&amp;z&gt;w&quot;q\"/></system>",
+    "canonical": "<?xml version=\"1.0\" ?>\n<system>\n  <a v=\"x&lt;y&amp;z&gt;w&quot;q\"/>\n</system>\n"
+  },
+  "unicode_text": {
+    "xml": "<system><metadata><title>café → µ</title></metadata></system>",
+    "canonical": "<?xml version=\"1.0\" ?>\n<system>\n  <metadata>\n    <title>café → µ</title>\n  </metadata>\n</system>\n"
+  },
+  "numeric_ref": {
+    "xml": "<system><metadata><title>&#65;&#x42;</title></metadata></system>",
+    "canonical": "<?xml version=\"1.0\" ?>\n<system>\n  <metadata>\n    <title>AB</title>\n  </metadata>\n</system>\n"
+  },
+  "unknown_section": {
+    "xml": "<system><custom_block foo=\"1\"/><metadata><title>T</title></metadata></system>",
+    "canonical": "<?xml version=\"1.0\" ?>\n<system>\n  <metadata>\n    <title>T</title>\n  </metadata>\n  <custom_block foo=\"1\"/>\n</system>\n"
+  },
+  "ws_only_text": {
+    "xml": "<system><metadata><title>   </title></metadata></system>",
+    "canonical": "<?xml version=\"1.0\" ?>\n<system>\n  <metadata>\n    <title>   </title>\n  </metadata>\n</system>\n"
+  },
+  "quote_in_attr": {
+    "xml": "<system><a v=\"it&apos;s &quot;ok&quot;\"/></system>",
+    "canonical": "<?xml version=\"1.0\" ?>\n<system>\n  <a v=\"it's &quot;ok&quot;\"/>\n</system>\n"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "name": "air-ts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TypeScript port of the AIR engine core: XML parser, typed model, and canonicalizer (issue #7). Browser/Worker/Node-safe, zero DOM dependency. Verified byte-for-byte against the Python oracle's golden corpus.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -b && tsc -p tsconfig.test.json"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^5.9.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "typescript": "~5.6.3",
+    "vitest": "^2.1.8"
+  }
+}
