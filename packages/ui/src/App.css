@@ -240,12 +240,6 @@ body {
   position: relative;
 }
 
-.tscircuit-view {
-  width: 100%;
-  height: 100%;
-  background: white;
-}
-
 .editor-container,
 .graph-container,
 .schematic-canvas {
