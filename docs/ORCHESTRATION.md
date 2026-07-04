@@ -41,6 +41,8 @@ A wave opens when the listed condition is met. Issues within a wave may run in p
 | **M8 GATE** | — | cross-domain repair demo (both directions) · determinism harness green |
 | FINAL | #46 out-of-the-box gate (suite builds incrementally from #29 onward; final activation here) | all planned steps active |
 
+**Amendment 2026-07-03 (wave 0/1 reorder):** #2's `ui` job cannot go green until the unresolvable `@tscircuit/3d-viewer` peer-dependency conflict is removed (issue #47) — that removal is #3's scope. Therefore #3 joins the critical path immediately (implement + verify + merge before #2 completes); #4 and #42 may begin implementation in parallel but their PRs merge only after #2 is green on `main`. Merge order: #3 → #2 (rebased) → #4/#42. Branch-protection *enablement* (from #42) is deferred to the M0 gate ceremony so required checks exist before they are required.
+
 Concurrency rules: max 3 issues `in-progress` before the M1 gate, max 5 after. Two agents never work the same package concurrently (check open PRs' touched paths before dispatch). Parallel agents work in isolated clones/worktrees.
 
 ## Per-issue lifecycle
