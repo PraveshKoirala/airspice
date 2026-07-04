@@ -26,6 +26,17 @@ ngspice CSV output is parsed when available. If ngspice is not installed, the
 deterministic fallback supports voltage sources, resistor dividers, ideal LDO
 outputs, generic load currents, and current/load-step setup values.
 
+## PWM stimulus duty semantics
+
+A firmware task's periodic `write_gpio high` + `delay ton` compiles to a SPICE
+`PULSE(0 A 0 TR TF PW PER)`. Because that trapezoid is high across `PW+(TR+TF)/2`,
+the plateau is emitted **ramp-area-compensated** as `PW = ton − (TR+TF)/2` (with
+`TR = TF = 1 µs`), so the effective duty equals the intended `ton/period` at any
+frequency (issue #59). Degenerate cases are guarded: `ton ≤ 0` → `DC 0`,
+`ton ≥ period` → `DC A`, and a sub-edge `ton ≤ 1 µs` collapses the plateau
+(`PW = 0`) and shrinks the edges to `ton` so the triangle area still preserves the
+duty.
+
 ## Backend / failure semantics
 
 A report's `backend` field records how the numbers were produced, and the three

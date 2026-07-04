@@ -5,10 +5,17 @@ from pathlib import Path
 from .artifacts import Artifact, CompileResult
 from .diagnostics import DiagnosticBuilder
 from .model import Component, SystemIR, Test
-from .units import spice_value
+from .units import format_quantity, parse_quantity, spice_value
 
 
 GROUND_NAMES = {"gnd", "0"}
+
+# Fixed rise/fall time for the firmware -> SPICE PWM ``PULSE`` stimulus, in
+# seconds. Kept small and constant (1 us) so a digital GPIO edge is effectively
+# instantaneous relative to any analog time constant the PWM drives, matching the
+# ground-truth derivations (tests/ground_truth/{pwm_rc_average,rc_step_response})
+# which assume 1 us edges.
+PWM_EDGE_S = 1e-6
 
 # The generic device models the compiler emits a ``.model`` card for in every
 # netlist (see BUILTIN_MODEL_CARDS below). A component ``spice_model`` is only
@@ -182,20 +189,80 @@ def _mcu_stimulus_lines(ir: SystemIR) -> list[str]:
                     continue
 
                 if task.period and value == "high":
-                    # Simple PULSE translation for periodic high-low
-                    period = spice_value(task.period)
-                    # Find subsequent delay
+                    # Periodic high-low -> a SPICE PULSE. The firmware ON-time
+                    # ``ton`` (the ``delay`` following ``write_gpio high``) is the
+                    # INTENDED high-time; ``_pwm_pulse(ton, period)`` compensates
+                    # the ramp area so the emitted trapezoid's true duty is
+                    # ton/period (see #59 / _pwm_pulse for the arithmetic).
                     op_idx = task.operations.index(op)
                     ton = "1ms"
                     for next_op in task.operations[op_idx+1:]:
                         if next_op["op"] == "delay":
-                            ton = spice_value(next_op.get("duration", "1ms"))
+                            ton = next_op.get("duration", "1ms")
                             break
-                    lines.append(f"V_STIM_{mcu.id}_{pin_name} {_spice_net(pin.net)} 0 PULSE(0 3.3 0 1u 1u {ton} {period})")
+                    stim = _pwm_pulse(ton, task.period)
+                    lines.append(f"V_STIM_{mcu.id}_{pin_name} {_spice_net(pin.net)} 0 {stim}")
                 elif not task.period:
                     v = "3.3" if value == "high" else "0"
                     lines.append(f"V_STIM_{mcu.id}_{pin_name} {_spice_net(pin.net)} 0 DC {v}")
     return lines
+
+
+def _pwm_pulse(ton: str, period: str, amplitude: str = "3.3") -> str:
+    """Build the SPICE ``PULSE`` card for a firmware PWM with the intended duty.
+
+    ``ton`` is the firmware ON-time (the ``delay`` after ``write_gpio high``) and
+    the intended high-time; ``period`` is the task period. The intended duty is
+    ``D = ton / period`` and, filtered, the wanted average is ``D * amplitude``.
+
+    A SPICE ``PULSE(0 A 0 TR TF PW PER)`` is a trapezoid: it ramps 0->A over TR,
+    holds A for PW, ramps A->0 over TF. Its one-period time-average is::
+
+        V_avg = A * (PW + (TR + TF) / 2) / PER
+
+    The pre-#59 emission set ``PW = ton`` with fixed ``TR = TF = 1us``, so the
+    high-area was ``ton + (TR+TF)/2`` -> an effective duty ``ton/period + 1us/period``
+    (a 50%-intended 100 kHz PWM averaged to 60%). We instead compensate the ramp
+    area so the true high-area equals ``ton``: pick ``PW`` such that
+    ``PW + (TR + TF) / 2 == ton``, i.e.::
+
+        PW = ton - (TR + TF) / 2 = ton - PWM_EDGE_S      (with TR = TF = PWM_EDGE_S)
+
+    Then ``V_avg = A * ton / period = D * A`` exactly, independent of frequency.
+
+    Degenerate cases (guarded so ngspice never sees a non-positive/zero-period
+    plateau):
+
+    * ``ton <= 0`` (0% duty) -> a flat DC low; no pulse.
+    * ``ton >= period`` (>=100% duty) -> a flat DC high; no pulse.
+    * ``0 < ton <= PWM_EDGE_S`` (duty so small the ON-time is within one edge's
+      compensation, e.g. a sub-2us on-time): fixed 1us edges cannot represent it,
+      so shrink the edges to ``TR = TF = ton`` with ``PW = 0`` -- a pure triangle
+      whose high-area ``(TR + TF) / 2 = ton`` still gives duty ``ton/period``.
+    """
+    ton_s = parse_quantity(ton, "s")
+    period_s = parse_quantity(period, "s")
+
+    # 0% / 100% duty -> a constant rail; a PULSE would be a needless (and, for
+    # PW<=0, invalid) card.
+    if ton_s <= 0:
+        return "DC 0"
+    if period_s > 0 and ton_s >= period_s:
+        return f"DC {amplitude}"
+
+    edge_s = PWM_EDGE_S
+    if ton_s <= edge_s:
+        # Sub-edge on-time: collapse the plateau and shrink the edges so the
+        # triangle area (TR+TF)/2 == ton (duty preserved) and PW stays > 0-safe.
+        edge_s = ton_s
+        pw_s = 0.0
+    else:
+        pw_s = ton_s - edge_s
+
+    tr = format_quantity(edge_s, "s")
+    pw = format_quantity(pw_s, "s")
+    per = spice_value(period)
+    return f"PULSE(0 {amplitude} 0 {tr} {tr} {pw} {per})"
 
 
 def _ldo_line(component: Component) -> str:
