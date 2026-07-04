@@ -4,6 +4,200 @@ Practical setup and process notes for working in the AirSpice repository.
 See [AGENTS.md](../AGENTS.md) for the rules of engagement and
 [ORCHESTRATION.md](ORCHESTRATION.md) for the swarm execution model.
 
+This guide takes you from a fresh clone to a running app and a passing test suite
+with one documented command block per platform. It covers the **Python reference
+engine** (`packages/core`) and the **server-coupled React UI** (`packages/ui`) —
+the *oracle*, not the shipped product (see [NORTH_STAR.md](NORTH_STAR.md) and the
+top-level [README](../README.md) for that distinction).
+
+> The engine degrades gracefully: with only Python and Node installed (no ngspice,
+> Renode, or PlatformIO), the app starts and every non-simulation feature works.
+> Analog simulation falls back to a built-in DC solver and tells you what to
+> install. See [Environment variables](#environment-variables) and
+> [Graceful degradation](#graceful-degradation).
+
+## Prerequisites
+
+| Tool | Version | Required? | Install |
+|---|---|---|---|
+| Python | 3.12+ | yes | [python.org/downloads](https://www.python.org/downloads/) · macOS `brew install python@3.12` · Debian/Ubuntu `sudo apt-get install python3.12 python3.12-venv` |
+| Node.js | 22+ | yes (for the UI) | [nodejs.org](https://nodejs.org/en/download) · macOS `brew install node@22` · Linux [nodesource](https://github.com/nodesource/distributions) or [nvm](https://github.com/nvm-sh/nvm) |
+| ngspice | any | optional | [ngspice.sourceforge.io/download.html](https://ngspice.sourceforge.io/download.html) · macOS `brew install ngspice` · Debian/Ubuntu `sudo apt-get install ngspice` |
+| Renode | 1.16+ | optional | [renode.io/#downloads](https://renode.io/#downloads) |
+| PlatformIO | any | optional | `pip install platformio` ([docs](https://docs.platformio.org/en/latest/core/installation/index.html)) |
+
+The three optional tools power simulation, firmware co-simulation, and firmware
+builds respectively. You can do everything else without them.
+
+## Setup
+
+Run these from the repository root.
+
+### Python engine
+
+```bash
+# 1. Create and activate a virtual environment
+python -m venv .venv
+# macOS/Linux:
+source .venv/bin/activate
+# Windows (PowerShell):
+#   .venv\Scripts\Activate.ps1
+
+# 2. Editable install with the dev extra (pulls in pytest, fastapi, httpx,
+#    uvicorn, python-dotenv — everything the suite and the API/CLI need)
+pip install -e ".[dev]"
+```
+
+> The repository root `pyproject.toml` **is** the `air` core package (its sources
+> live under `packages/core/src` via `package-dir`). Install from the root — there
+> is no separate `pyproject.toml` under `packages/core`. `pip install -e ".[dev]"`
+> is sufficient; you do not need to install anything by hand.
+
+### Frontend
+
+```bash
+cd packages/ui
+npm ci
+cd ../..
+```
+
+### Environment file (optional)
+
+```bash
+cp .env.example .env   # then edit if you have tool paths or an API key
+```
+
+Everything works with **no** `.env` at all. Only add one when you need an LLM key
+or a tool that lives outside your `PATH` (see the table below).
+
+## Running
+
+### Option A — one command (recommended)
+
+Convenience scripts live in the root `package.json`. Install its single dev
+dependency (`concurrently`) once, then start the backend API and the Vite dev
+server together:
+
+```bash
+npm install          # installs `concurrently` at the repo root
+npm run dev          # runs `air serve` (API on :8000) + Vite UI concurrently
+```
+
+`npm run dev` relies on the `air` console script, which the editable install
+(`pip install -e ".[dev]"`) puts on your `PATH`. Activate the virtualenv in the
+same shell first.
+
+### Option B — two terminals (no root npm install)
+
+```bash
+# Terminal 1 — backend API
+#   the console script:
+air serve --host 127.0.0.1 --port 8000
+#   or, without the editable install, run the module (set the src layout on the path):
+#     PYTHONPATH=packages/core/src python -m air.cli serve --host 127.0.0.1 --port 8000
+#   PowerShell: $env:PYTHONPATH = "packages/core/src"; python -m air.cli serve
+
+# Terminal 2 — frontend
+cd packages/ui
+npm run dev
+```
+
+### Other root scripts
+
+```bash
+npm run test:py      # python -m pytest tests/
+npm run build:ui     # production build of the UI (tsc -b && vite build)
+```
+
+## Testing
+
+```bash
+# Full Python suite (from the repo root, virtualenv active)
+python -m pytest tests/
+
+# or via the convenience script
+npm run test:py
+```
+
+Tests requiring optional tools/keys (Renode, PlatformIO, live-LLM) **self-skip**
+with a reason via env-gated markers (`AIR_RUN_TANDEM` / `AIR_RUN_BUILD` /
+`AIR_RUN_E2E` + `GEMINI_API_KEY`) — they never fail cryptically. Analog
+simulation tests run against ngspice when it is present and against the built-in
+DC fallback when it is not; both are green.
+
+If you have not run the editable install, prefix pytest with the src layout:
+`PYTHONPATH=packages/core/src python -m pytest tests/` (PowerShell:
+`$env:PYTHONPATH = "packages/core/src"`).
+
+## Linting
+
+```bash
+cd packages/ui
+npm run lint         # eslint
+npm run build        # tsc -b && vite build — also a type check
+```
+
+There is no separate Python linter gate in CI; `pytest` is the Python gate.
+
+## Environment variables
+
+Every variable is **optional**. The engine resolves each external tool by
+checking its `AIR_*` override first, then `PATH` (see
+[`air/tools.py`](../packages/core/src/air/tools.py)). Set an override only when a
+binary lives outside `PATH`.
+
+| Variable | Read by | What it configures | What happens when it is missing |
+|---|---|---|---|
+| `GEMINI_API_KEY` | AI generate/repair commands | Google Gemini provider credential | AI commands with `--provider gemini` fail with a clear "no API key" error. The default `mock` provider and every non-AI feature keep working. Never commit a real key — `.env` is gitignored. |
+| `AIR_NGSPICE` | `air/tools.py` → `ngspice_path()` | Absolute path to the `ngspice` binary | `simulate`/`check` fall back to the built-in DC solver and attach an `NGSPICE_NOT_FOUND` info diagnostic ("ngspice not found — install from …"). No traceback; simulation still returns results. |
+| `AIR_RENODE` | `air/tools.py` → `renode_path()` | Absolute path to the `renode` binary | Renode-backed co-simulation (`run-renode`, mixed-signal) is unavailable; analog and DC features are unaffected. |
+| `AIR_PLATFORMIO` | `air/tools.py` → `platformio_path()` | Absolute path to the `platformio` binary | `build-firmware` is unavailable; design, validation, compile, and analog simulation are unaffected. |
+| `AIR_PIO` | `air/tools.py` → `platformio_path()` | Fallback path to the `pio` binary (alias of PlatformIO) | Same as `AIR_PLATFORMIO`; either variable satisfies PlatformIO resolution. |
+
+See [`.env.example`](../.env.example) for a copy-paste starting point.
+
+## Graceful degradation
+
+The engine never crashes because an optional tool is absent — a missing tool
+produces an **actionable diagnostic**, not a stack trace:
+
+- **Missing ngspice** — `air simulate design.air.xml` (or `check`) still runs. The
+  analog numbers come from the built-in DC solver, the report's `backend` reads
+  `builtin_dc_fallback`, and each report carries an `NGSPICE_NOT_FOUND` info
+  diagnostic pointing at the install link. Install ngspice or set `AIR_NGSPICE` to
+  get real transient simulation.
+- **Missing Renode / PlatformIO** — the commands that need them are unavailable;
+  nothing else is affected.
+
+To see it yourself with no tools installed:
+
+```bash
+air simulate examples/esp32_battery_sensor/design.air.xml --profile analog_only --json
+# -> "backend": "builtin_dc_fallback" and an NGSPICE_NOT_FOUND diagnostic
+```
+
+The missing-ngspice path is covered by a hermetic regression test
+(`tests/test_cli_flow.py::CliFlowTests::test_missing_ngspice_reports_actionable_diagnostic_not_traceback`)
+that forces the missing path regardless of the host, so it passes in CI where
+ngspice **is** installed.
+
+## CI alignment
+
+CI ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) runs two required
+jobs on every PR:
+
+- **core-py** — Python 3.12, installs ngspice via `apt`, then installs the package
+  and test deps and runs the full `pytest` suite. CI installs those deps
+  explicitly (`pip install -e . pytest fastapi httpx uvicorn python-dotenv`); the
+  `[dev]` extra in `pyproject.toml` mirrors that exact list, so
+  `pip install -e ".[dev]"` reproduces the CI environment locally. Keep the two in
+  sync when either changes.
+- **ui** — Node 22, `npm ci` + `npm run lint` + `npm run build` in `packages/ui`,
+  using `packages/ui/package-lock.json` as its cache key. The root `package.json`
+  added for convenience scripts does not affect this job.
+
+A third required job, **guardrails**, is documented below.
+
 ## Guardrails CI (mechanized AGENTS.md)
 
 `AGENTS.md` is prose; prose does not gate merges. The `guardrails` job

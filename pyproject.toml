@@ -6,7 +6,18 @@ requires-python = ">=3.10"
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0"]
+# `pip install -e ".[dev]"` must be sufficient to run the full pytest suite and
+# the API/CLI locally. This list mirrors what CI installs (see .github/workflows/
+# ci.yml, "Install package and test dependencies"): pytest (runner), fastapi +
+# httpx (air.api + FastAPI TestClient), uvicorn (air.cli `serve`), python-dotenv
+# (loads .env in the CLI and several tests). Keep the two in sync.
+dev = [
+    "pytest>=8.0",
+    "fastapi>=0.115",
+    "httpx>=0.27",
+    "uvicorn>=0.30",
+    "python-dotenv>=1.0",
+]
 api = ["fastapi>=0.115", "uvicorn>=0.30"]
 ai = ["openai>=1.0"]
 

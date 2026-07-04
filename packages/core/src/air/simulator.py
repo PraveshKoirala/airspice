@@ -37,6 +37,18 @@ def simulate_analog(ir: SystemIR, profile_id: str, out_dir: Path) -> dict[str, o
             for probe in subsystems[sub_id].probes:
                 extra_probe_nets.add(probe.net)
 
+    # Graceful degradation for the ngspice-MISSING path only: if a profile asks
+    # for the ngspice backend but no ngspice binary is resolvable (not on PATH and
+    # AIR_NGSPICE unset/invalid), the transient can't run and the numbers below
+    # come from the built-in DC solver. Surface that as an actionable info
+    # diagnostic on every report instead of silently degrading. This does NOT
+    # change measurements, does NOT flip status, and does NOT touch how a *present*
+    # ngspice's nonzero exit is handled (that failure path is owned elsewhere).
+    from .tools import ngspice_path
+
+    ngspice_missing = ngspice_path() is None
+    missing_diag_builder = DiagnosticBuilder()
+
     reports = []
     status = "passed"
     for test_id in profile.tests:
@@ -70,6 +82,9 @@ def simulate_analog(ir: SystemIR, profile_id: str, out_dir: Path) -> dict[str, o
         diagnostics = _evaluate_assertions(test, measured, stats)
         if diagnostics:
             status = "failed"
+        report_diagnostics = diagnostics + compile_result.diagnostics
+        if ngspice_missing and not used_ngspice:
+            report_diagnostics = report_diagnostics + [_ngspice_missing_diagnostic(missing_diag_builder, test.id)]
         waveform_artifacts = [str(out_dir / "waveforms" / f"{test.id}_{net}.csv") for net in all_probe_nets]
         report = {
             "profile": profile_id,
@@ -78,7 +93,7 @@ def simulate_analog(ir: SystemIR, profile_id: str, out_dir: Path) -> dict[str, o
             "backend": "ngspice" if used_ngspice else "builtin_dc_fallback",
             "measurements": {name: format_quantity(value, _unit_for_signal(name)) for name, value in measured.items()},
             "measurement_stats": _serialize_stats(stats),
-            "diagnostics": [d.to_dict() for d in diagnostics + compile_result.diagnostics],
+            "diagnostics": [d.to_dict() for d in report_diagnostics],
             "artifacts": [artifact.path for artifact in compile_result.artifacts] + waveform_artifacts,
         }
         report_path = out_dir / "reports" / f"{test.id}.json"
@@ -135,6 +150,32 @@ def prepare_renode_feedback(ir: SystemIR, test: Test, out_dir: Path) -> list[str
                     commands.append(f"emulation Sleep \"{time:.6f}\"")
                     commands.append(f"sysbus.adc FeedSample {raw} {channel}")
     return commands
+
+
+_NGSPICE_INSTALL_URL = "https://ngspice.sourceforge.io/download.html"
+
+
+def _ngspice_missing_diagnostic(builder: DiagnosticBuilder, test_id: str) -> Diagnostic:
+    """Actionable diagnostic for the ngspice-not-installed case.
+
+    Emitted (as info, never error) when a profile requests the ngspice backend
+    but no ngspice binary is resolvable. The measurements in the report come from
+    the built-in DC solver, so the operator needs to know the real transient
+    engine never ran and how to install it.
+    """
+    return builder.make(
+        "info",
+        "analog",
+        "NGSPICE_NOT_FOUND",
+        "ngspice not found - analog results came from the built-in DC solver, "
+        "not a real transient simulation. Install ngspice and/or set AIR_NGSPICE "
+        f"to its path. Download: {_NGSPICE_INSTALL_URL}",
+        [test_id],
+        suggested_actions=[
+            "Install ngspice (see docs/DEVELOPMENT.md environment table)",
+            "Set AIR_NGSPICE=/path/to/ngspice in your .env if it is installed outside PATH",
+        ],
+    )
 
 
 def run_ngspice(netlist: Path, log_path: Path) -> bool:
