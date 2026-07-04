@@ -7,3 +7,14 @@ tests/golden_corpus/** text eol=lf
 # Corpus artifacts are generated, deterministic reference data -- keep them out of
 # language stats and mark them as generated so review tooling collapses them.
 tests/golden_corpus/** linguist-generated=true
+
+# Guarantee LF line endings for files executed on Linux CI, so the bash `run:`
+# blocks in workflows and the Python checker never carry a stray CR (\r) that
+# would break shell execution or comparisons on ubuntu-latest.
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.py    text eol=lf
+*.sh    text eol=lf
+
+# PowerShell scripts run on Windows; keep CRLF for them.
+*.ps1   text eol=crlf
