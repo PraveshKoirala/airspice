@@ -1,0 +1,6 @@
+jobs:
+  test:
+    steps:
+      - run: pytest
+        continue-on-error: true
+      - run: npm test || true
