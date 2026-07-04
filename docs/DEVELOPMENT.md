@@ -198,6 +198,39 @@ jobs on every PR:
 
 A third required job, **guardrails**, is documented below.
 
+### Golden corpus workflow
+
+[`.github/workflows/corpus.yml`](../.github/workflows/corpus.yml) guards the frozen
+oracle fixtures in `tests/golden_corpus/`. It has two jobs:
+
+- **corpus-check** — runs on every push to `main` / PR that touches the corpus,
+  `scripts/export_golden.py`, `packages/core/src/air/**`, or the workflow file. It
+  regenerates into a temp dir, diffs byte-exact against the committed corpus, and
+  runs the mutation self-test. This is the per-PR reproducibility gate.
+- **corpus-generate** — `workflow_dispatch` **only** (issue #54). Regenerates the
+  corpus with CI's apt ngspice and uploads it as the `golden-corpus` artifact. It
+  ran on every push/PR as a bootstrap crutch while the workflow was not yet on
+  `main`; now that it is, restricting it keeps a single live corpus source per PR.
+
+Note that `tests/golden_corpus/README.md` and `ENGINE_VERSIONS` are themselves
+exporter output (baked into `export_golden.py`), so never hand-edit anything under
+that directory — corpus-check diffs it byte-exact and would fail.
+
+**Oracle-first regeneration recipe.** When an `oracle-first` PR intentionally changes
+the oracle and must re-pin the corpus to CI's ngspice, do not regenerate locally;
+dispatch the generate job against your pushed branch (`--ref <branch>` works because
+the workflow file lives on `main`, while the run checks out and regenerates *your*
+branch's code):
+
+```
+git push -u origin <your-branch>
+gh workflow run corpus.yml --ref <your-branch>
+gh run list --workflow corpus.yml --branch <your-branch>   # grab the run id
+gh run watch <run-id>
+gh run download <run-id> -n golden-corpus -D tests/golden_corpus
+python scripts/export_golden.py --check                     # confirm it reproduces, then commit
+```
+
 ## Guardrails CI (mechanized AGENTS.md)
 
 `AGENTS.md` is prose; prose does not gate merges. The `guardrails` job
