@@ -215,10 +215,29 @@ explainable and reproducible.
 | R3 | Wall-clock ban | `Date.now`, `performance.now`, `setTimeout`, `setInterval` anywhere under `packages/{mpy-wasm,cosim}/src` (whole-tree) fail. Only `*.progress.ts` files are exempt. |
 | R4 | Fixture special-casing | Golden-corpus design names (read from the corpus itself) referenced in product source outside `tests/`, `bench/`, `examples/` fail. Degrades gracefully: when the corpus is absent the check is skipped and passes, activating automatically once the corpus lands. |
 | R5 | Secret hygiene | Obvious API-key/secret patterns in any added line fail. The offending value is redacted in the message. |
+| R6 | Guardrails self-protection | Any PR whose diff **touches** `.github/workflows/guardrails.yml` or `scripts/guardrails.py` fails unless it carries the `guardrails-override` label **and** a `## Guardrails override` justification section. Path-based and deletion-aware — a diff that only *removes* rules or the self-test step still fires it (issue #56). |
 
 R1, R2, R5 are **diff-aware** (they inspect the `+` lines / touched paths of the
 change). R3 is **whole-tree** (a pre-existing violation is still caught). R4 is
-diff-aware for the reference but reads the design-name list from the corpus.
+diff-aware for the reference but reads the design-name list from the corpus. R6
+is **path-based**: it keys off the touched-file list (not the `+` lines), so
+unlike R2/R5 it sees deletions.
+
+**R6 self-protection (issue #56).** R2/R5 scan only ADDED lines, so a PR could
+*delete* rules or the self-test step from `scripts/guardrails.py` /
+`.github/workflows/guardrails.yml` without adding any banned token, and the
+checker would pass it — residual risk 1 from PR #52 round-2 verification. R6
+closes that deletion blind spot: it reports a violation whenever the diff
+touches either enforcement-layer path (add, modify, rename, or pure deletion),
+and that violation can only be cleared through the visible override — the
+`guardrails-override` label **plus** the `## Guardrails override` section, which
+here is **mandatory rather than optional**. It reuses the general override
+machinery centrally (a label-without-section still fails, exactly as everywhere
+else), so there is no half-open path. R6 is **path-based, not token-based**: it
+takes no content exemption for its own definition or for the guardrails paths —
+doing so would recreate the `SELF_DEFINITION_PATHS` self-exemption hole PR #52
+removed. (This PR, which itself edits `scripts/guardrails.py`, therefore carries
+the override label and section as a live demonstration of the recursion.)
 
 **Exemption model (narrow by construction).** The ONLY exemption anywhere in
 the checker: markdown documentation (`*.md`) is exempt from the **R2** token
@@ -251,8 +270,9 @@ in every workflow file with no exception.
 
 ```
 # Self-tests (one violating + one clean synthetic diff per rule, the override
-# path, corpus present/absent states, and the three PR #52 attack reproducers
-# that must always FAIL the checker):
+# path, corpus present/absent states, the three PR #52 attack reproducers, and
+# the R6 deletion-attack reproducer — all of which must always FAIL the
+# checker):
 python scripts/guardrails.py --self-test
 
 # Check your current branch against main:
