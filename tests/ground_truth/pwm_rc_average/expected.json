@@ -2,17 +2,24 @@
   "circuit": "pwm_rc_average",
   "profile": "analog_only",
   "test": "pwm_avg",
-  "outcome": "pass",
-  "require_backend": "ngspice",
-  "mean_checks": [
+  "outcome": "expected_fail",
+  "failure_mode": "wrong_stimulus",
+  "issue": 59,
+  "mean_net": "avg",
+  "from_t_s": 0.005,
+  "oracle_actual_window": {
+    "min_v": 1.95,
+    "max_v": 2.01,
+    "basis": "Emitted PULSE(0 3.3 0 1u 1u 5us 10us) trapezoid average = 3.3*(5us+1us)/10us = 1.980V (effective 60% duty). Documents oracle bug #59; NOT the correct answer."
+  },
+  "would_pass_checks": [
     {
       "net": "avg",
       "from_t_s": 0.005,
       "nominal_v": 1.65,
       "min_v": 1.55,
       "max_v": 1.75,
-      "basis": "V_avg = D*Vstep = 0.5*3.3 = 1.650V; averaged over t>5ms (>5tau, tau=1ms). Window +/-0.10V excludes 0V, 3.3V and duty errors."
+      "basis": "Correct: V_avg = D*Vstep = (ton/period)*3.3 = 0.5*3.3 = 1.650V. Blocked by #59 (compiler emits 60% effective duty). Runner asserts the mean is NOT in this window."
     }
-  ],
-  "issue": null
+  ]
 }

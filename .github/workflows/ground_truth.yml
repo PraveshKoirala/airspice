@@ -1,0 +1,87 @@
+name: ground-truth
+
+# Oracle ground-truth validation (issue #41).
+#
+# Runs the hand-derived analytic circuits in tests/ground_truth/ through the
+# Python oracle with REAL ngspice and asserts the expectations. This is the
+# independent audit that the oracle matches physics, not just that ports match
+# the oracle (that is what the golden-corpus parity job does).
+#
+# Two trigger surfaces:
+#   * path-filtered on PRs/pushes that touch the oracle surface the issue names
+#     (spice.py, simulator.py, registry/, tools.py, and this suite itself), plus
+#   * always-on for the issue #41 PR branch and pushes to main, so this PR
+#     carries its own green evidence.
+#
+# Maintainer note (M0 gate): after this lands, mark `ground-truth` as a REQUIRED
+# status check for PRs touching packages/core/src/air/spice.py, simulator.py, or
+# registry/ in the branch-protection settings for `main`. The path filters below
+# schedule the run; branch protection is what makes it blocking.
+
+on:
+  push:
+    branches: [main, "issue/41-ground-truth"]
+  pull_request:
+    paths:
+      - "packages/core/src/air/spice.py"
+      - "packages/core/src/air/simulator.py"
+      - "packages/core/src/air/tools.py"
+      - "registry/**"
+      - "tests/ground_truth/**"
+      - "tests/test_ground_truth.py"
+      - ".github/workflows/ground_truth.yml"
+
+concurrency:
+  group: ground-truth-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ground-truth:
+    name: ground-truth (hand-derived physics + real ngspice)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      # The authoritative check runs against the distro ngspice (apt), NOT a
+      # pinned build: the expected values are derived from physics, so they must
+      # hold on whatever ngspice CI provides. The runner hard-fails if ngspice is
+      # absent or if any circuit's report shows the DC fallback instead of a real
+      # ngspice run (issue #55), so a missing/degraded simulator cannot pass green.
+      - name: Install ngspice
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ngspice
+          ngspice --version | head -n 3
+
+      - name: Install package and test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e . pytest
+
+      - name: Run oracle ground-truth validation
+        env:
+          PYTHONPATH: packages/core/src
+        run: |
+          python -m pytest tests/test_ground_truth.py -v
+
+      - name: Report ground-truth summary
+        if: always()
+        env:
+          PYTHONPATH: packages/core/src
+        run: |
+          {
+            echo "## ground-truth summary"
+            echo ""
+            echo '```'
+            python -m pytest tests/test_ground_truth.py -q --no-header 2>&1 | tail -n 40
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -4,7 +4,7 @@
   "test": "lpf_fc",
   "outcome": "expected_fail",
   "failure_mode": "no_ac_analysis",
-  "issue": "NEW_AC_GAP",
+  "issue": 62,
   "dc_settle_check": {
     "net": "vout",
     "nominal_v": 1.0,

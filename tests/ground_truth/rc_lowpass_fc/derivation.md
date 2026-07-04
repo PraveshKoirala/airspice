@@ -42,12 +42,11 @@ emittable and ngspice DOES run — it just runs the wrong analysis (DC transient
 instead of an AC sweep) for the question being asked.
 
 ## Disposition
-**Expected failure** due to a missing-analysis gap in the compiler. A NEW
-oracle-gap issue is filed ("SPICE compiler emits no .ac analysis, so
-frequency-domain checks (RC low-pass −3 dB at fc, filter rolloff) are
-unverifiable"). The runner records this as an expected-failure referencing that
-issue. When `.ac` support lands, the [0.697, 0.717] V window becomes the
-acceptance test.
+**Expected failure** due to a missing-analysis gap in the compiler, filed as
+oracle issue **#62** ("SPICE compiler emits no .ac analysis; frequency-domain
+checks unverifiable"). The runner records this as an expected-failure referencing
+#62. When `.ac` support lands, the [0.697, 0.717] V window becomes the acceptance
+test.
 
 Note on the runner's mechanical check: because ngspice DOES run this netlist
 (all components emittable), the report will carry `backend: ngspice` with
