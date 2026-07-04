@@ -1,0 +1,141 @@
+{
+  "edges": [
+    {
+      "data": {
+        "net": "3v3",
+        "pin": "p"
+      },
+      "id": "LOAD_WIFI:p->3v3",
+      "label": "p",
+      "source": "LOAD_WIFI",
+      "sourceHandle": "pin:p",
+      "target": "net:3v3",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "n"
+      },
+      "id": "LOAD_WIFI:n->gnd",
+      "label": "n",
+      "source": "LOAD_WIFI",
+      "sourceHandle": "pin:n",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "bat",
+        "pin": "in"
+      },
+      "id": "U_REG:in->bat",
+      "label": "in",
+      "source": "U_REG",
+      "sourceHandle": "pin:in",
+      "target": "net:bat",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "3v3",
+        "pin": "out"
+      },
+      "id": "U_REG:out->3v3",
+      "label": "out",
+      "source": "U_REG",
+      "sourceHandle": "pin:out",
+      "target": "net:3v3",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "gnd"
+      },
+      "id": "U_REG:gnd->gnd",
+      "label": "gnd",
+      "source": "U_REG",
+      "sourceHandle": "pin:gnd",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    }
+  ],
+  "nodes": [
+    {
+      "data": {
+        "label": "LOAD_WIFI",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "n",
+            "net": "gnd"
+          },
+          {
+            "function": "",
+            "name": "p",
+            "net": "3v3"
+          }
+        ],
+        "spice_model": "",
+        "type": "generic_load",
+        "value": "700mA"
+      },
+      "id": "LOAD_WIFI",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "U_REG",
+        "part": "generic_ldo_3v3",
+        "pins": [
+          {
+            "function": "",
+            "name": "gnd",
+            "net": "gnd"
+          },
+          {
+            "function": "",
+            "name": "in",
+            "net": "bat"
+          },
+          {
+            "function": "",
+            "name": "out",
+            "net": "3v3"
+          }
+        ],
+        "spice_model": "",
+        "type": "ldo",
+        "value": ""
+      },
+      "id": "U_REG",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "3v3",
+        "role": "power"
+      },
+      "id": "net:3v3",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "bat",
+        "role": "power"
+      },
+      "id": "net:bat",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "gnd",
+        "role": "ground"
+      },
+      "id": "net:gnd",
+      "type": "net"
+    }
+  ]
+}

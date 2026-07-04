@@ -1,0 +1,94 @@
+{
+  "edges": [
+    {
+      "data": {
+        "net": "3v3",
+        "pin": "3V3"
+      },
+      "id": "U_MCU:3V3->3v3",
+      "label": "3V3",
+      "source": "U_MCU",
+      "sourceHandle": "pin:3V3",
+      "target": "net:3v3",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "GND"
+      },
+      "id": "U_MCU:GND->gnd",
+      "label": "GND",
+      "source": "U_MCU",
+      "sourceHandle": "pin:GND",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "sda",
+        "pin": "GPIO4"
+      },
+      "id": "U_MCU:GPIO4->sda",
+      "label": "GPIO4",
+      "source": "U_MCU",
+      "sourceHandle": "pin:GPIO4",
+      "target": "net:sda",
+      "targetHandle": "net"
+    }
+  ],
+  "nodes": [
+    {
+      "data": {
+        "label": "U_MCU",
+        "part": "ESP32-C3",
+        "pins": [
+          {
+            "function": "",
+            "name": "3V3",
+            "net": "3v3"
+          },
+          {
+            "function": "",
+            "name": "GND",
+            "net": "gnd"
+          },
+          {
+            "function": "I2C_SDA",
+            "name": "GPIO4",
+            "net": "sda"
+          }
+        ],
+        "spice_model": "",
+        "type": "mcu",
+        "value": ""
+      },
+      "id": "U_MCU",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "3v3",
+        "role": "power"
+      },
+      "id": "net:3v3",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "gnd",
+        "role": "ground"
+      },
+      "id": "net:gnd",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "sda",
+        "role": "digital_signal"
+      },
+      "id": "net:sda",
+      "type": "net"
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+<?xml version="1.0" ?>
+<system ir_version="0.1" name="phase3_failure_demo">
+  <metadata>
+    <title>Phase 3 Failure Demo</title>
+    <description>Tests source overload, I2C pullup strength, and voltage mismatch.</description>
+  </metadata>
+  <nets>
+    <net id="1v8" nominal_voltage="1.8V" role="power"/>
+    <net id="3v3" nominal_voltage="3.3V" role="power"/>
+    <net id="gnd" role="ground"/>
+    <net id="scl" role="digital_signal"/>
+    <net id="sda" role="digital_signal"/>
+    <net id="v_bat" nominal_voltage="3.7V" role="power"/>
+  </nets>
+  <components>
+    <component id="L_HEAVY" type="generic_load">
+      <value>200mA</value>
+      <pin name="p" net="3v3"/>
+      <pin name="n" net="gnd"/>
+    </component>
+    <component id="U_MCU" part="ESP32-C3" type="mcu">
+      <pin name="3V3" net="3v3"/>
+      <pin name="GND" net="gnd"/>
+      <pin function="I2C_SDA" name="GPIO8" net="sda"/>
+      <pin function="I2C_SCL" name="GPIO9" net="scl"/>
+    </component>
+    <component id="U_REG_3V3" type="ldo">
+      <pin name="in" net="v_bat"/>
+      <pin name="out" net="3v3"/>
+      <pin name="gnd" net="gnd"/>
+      <property name="vout" value="3.3V"/>
+      <property name="iout_max" value="500mA"/>
+      <property name="v_dropout" value="0.2V"/>
+      <property name="iq" value="1mA"/>
+    </component>
+    <component id="V_BAT" type="voltage_source">
+      <value>3.7V</value>
+      <pin name="p" net="v_bat"/>
+      <pin name="n" net="gnd"/>
+      <property name="i_max" value="100mA"/>
+    </component>
+  </components>
+  <interfaces>
+    <interface id="i2c_bus" type="i2c">
+      <controller component="U_MCU" peripheral="I2C0"/>
+      <sda net="sda"/>
+      <scl net="scl"/>
+      <pullup net="sda" to="1v8" value="10k"/>
+      <pullup net="scl" to="1v8" value="10k"/>
+      <property name="speed" value="400kHz"/>
+    </interface>
+  </interfaces>
+  <tests>
+    <test id="basic">
+      <run duration="1ms"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="default">
+      <backend type="ngspice"/>
+      <run test="basic"/>
+    </profile>
+  </simulation_profiles>
+</system>

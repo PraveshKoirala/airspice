@@ -1,0 +1,727 @@
+{
+  "edges": [
+    {
+      "data": {
+        "net": "v_solar",
+        "pin": "a"
+      },
+      "id": "D_SCHOTTKY:a->v_solar",
+      "label": "a",
+      "source": "D_SCHOTTKY",
+      "sourceHandle": "pin:a",
+      "target": "net:v_solar",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_bat",
+        "pin": "c"
+      },
+      "id": "D_SCHOTTKY:c->v_bat",
+      "label": "c",
+      "source": "D_SCHOTTKY",
+      "sourceHandle": "pin:c",
+      "target": "net:v_bat",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_bat",
+        "pin": "p"
+      },
+      "id": "L_SYSTEM:p->v_bat",
+      "label": "p",
+      "source": "L_SYSTEM",
+      "sourceHandle": "pin:p",
+      "target": "net:v_bat",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "load_low",
+        "pin": "n"
+      },
+      "id": "L_SYSTEM:n->load_low",
+      "label": "n",
+      "source": "L_SYSTEM",
+      "sourceHandle": "pin:n",
+      "target": "net:load_low",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "load_ctrl",
+        "pin": "G"
+      },
+      "id": "Q_LOAD_SW:G->load_ctrl",
+      "label": "G",
+      "source": "Q_LOAD_SW",
+      "sourceHandle": "pin:G",
+      "target": "net:load_ctrl",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "load_low",
+        "pin": "D"
+      },
+      "id": "Q_LOAD_SW:D->load_low",
+      "label": "D",
+      "source": "Q_LOAD_SW",
+      "sourceHandle": "pin:D",
+      "target": "net:load_low",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "S"
+      },
+      "id": "Q_LOAD_SW:S->gnd",
+      "label": "S",
+      "source": "Q_LOAD_SW",
+      "sourceHandle": "pin:S",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "bat_sense",
+        "pin": "1"
+      },
+      "id": "R_BAT_BOT:1->bat_sense",
+      "label": "1",
+      "source": "R_BAT_BOT",
+      "sourceHandle": "pin:1",
+      "target": "net:bat_sense",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "2"
+      },
+      "id": "R_BAT_BOT:2->gnd",
+      "label": "2",
+      "source": "R_BAT_BOT",
+      "sourceHandle": "pin:2",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_bat",
+        "pin": "1"
+      },
+      "id": "R_BAT_TOP:1->v_bat",
+      "label": "1",
+      "source": "R_BAT_TOP",
+      "sourceHandle": "pin:1",
+      "target": "net:v_bat",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "bat_sense",
+        "pin": "2"
+      },
+      "id": "R_BAT_TOP:2->bat_sense",
+      "label": "2",
+      "source": "R_BAT_TOP",
+      "sourceHandle": "pin:2",
+      "target": "net:bat_sense",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "solar_sense",
+        "pin": "1"
+      },
+      "id": "R_SOLAR_BOT:1->solar_sense",
+      "label": "1",
+      "source": "R_SOLAR_BOT",
+      "sourceHandle": "pin:1",
+      "target": "net:solar_sense",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "2"
+      },
+      "id": "R_SOLAR_BOT:2->gnd",
+      "label": "2",
+      "source": "R_SOLAR_BOT",
+      "sourceHandle": "pin:2",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_solar_raw",
+        "pin": "1"
+      },
+      "id": "R_SOLAR_INTERNAL:1->v_solar_raw",
+      "label": "1",
+      "source": "R_SOLAR_INTERNAL",
+      "sourceHandle": "pin:1",
+      "target": "net:v_solar_raw",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_solar",
+        "pin": "2"
+      },
+      "id": "R_SOLAR_INTERNAL:2->v_solar",
+      "label": "2",
+      "source": "R_SOLAR_INTERNAL",
+      "sourceHandle": "pin:2",
+      "target": "net:v_solar",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_solar",
+        "pin": "1"
+      },
+      "id": "R_SOLAR_TOP:1->v_solar",
+      "label": "1",
+      "source": "R_SOLAR_TOP",
+      "sourceHandle": "pin:1",
+      "target": "net:v_solar",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "solar_sense",
+        "pin": "2"
+      },
+      "id": "R_SOLAR_TOP:2->solar_sense",
+      "label": "2",
+      "source": "R_SOLAR_TOP",
+      "sourceHandle": "pin:2",
+      "target": "net:solar_sense",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_logic",
+        "pin": "3V3"
+      },
+      "id": "U_MCU:3V3->v_logic",
+      "label": "3V3",
+      "source": "U_MCU",
+      "sourceHandle": "pin:3V3",
+      "target": "net:v_logic",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "GND"
+      },
+      "id": "U_MCU:GND->gnd",
+      "label": "GND",
+      "source": "U_MCU",
+      "sourceHandle": "pin:GND",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "solar_sense",
+        "pin": "GPIO0"
+      },
+      "id": "U_MCU:GPIO0->solar_sense",
+      "label": "GPIO0",
+      "source": "U_MCU",
+      "sourceHandle": "pin:GPIO0",
+      "target": "net:solar_sense",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "bat_sense",
+        "pin": "GPIO1"
+      },
+      "id": "U_MCU:GPIO1->bat_sense",
+      "label": "GPIO1",
+      "source": "U_MCU",
+      "sourceHandle": "pin:GPIO1",
+      "target": "net:bat_sense",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "load_ctrl",
+        "pin": "GPIO2"
+      },
+      "id": "U_MCU:GPIO2->load_ctrl",
+      "label": "GPIO2",
+      "source": "U_MCU",
+      "sourceHandle": "pin:GPIO2",
+      "target": "net:load_ctrl",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_bat",
+        "pin": "in"
+      },
+      "id": "U_REG:in->v_bat",
+      "label": "in",
+      "source": "U_REG",
+      "sourceHandle": "pin:in",
+      "target": "net:v_bat",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_logic",
+        "pin": "out"
+      },
+      "id": "U_REG:out->v_logic",
+      "label": "out",
+      "source": "U_REG",
+      "sourceHandle": "pin:out",
+      "target": "net:v_logic",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "gnd"
+      },
+      "id": "U_REG:gnd->gnd",
+      "label": "gnd",
+      "source": "U_REG",
+      "sourceHandle": "pin:gnd",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_bat",
+        "pin": "p"
+      },
+      "id": "V_BAT:p->v_bat",
+      "label": "p",
+      "source": "V_BAT",
+      "sourceHandle": "pin:p",
+      "target": "net:v_bat",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "n"
+      },
+      "id": "V_BAT:n->gnd",
+      "label": "n",
+      "source": "V_BAT",
+      "sourceHandle": "pin:n",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_solar_raw",
+        "pin": "p"
+      },
+      "id": "V_SOLAR:p->v_solar_raw",
+      "label": "p",
+      "source": "V_SOLAR",
+      "sourceHandle": "pin:p",
+      "target": "net:v_solar_raw",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "n"
+      },
+      "id": "V_SOLAR:n->gnd",
+      "label": "n",
+      "source": "V_SOLAR",
+      "sourceHandle": "pin:n",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    }
+  ],
+  "nodes": [
+    {
+      "data": {
+        "label": "D_SCHOTTKY",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "a",
+            "net": "v_solar"
+          },
+          {
+            "function": "",
+            "name": "c",
+            "net": "v_bat"
+          }
+        ],
+        "spice_model": "1N5819",
+        "type": "diode",
+        "value": ""
+      },
+      "id": "D_SCHOTTKY",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "L_SYSTEM",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "n",
+            "net": "load_low"
+          },
+          {
+            "function": "",
+            "name": "p",
+            "net": "v_bat"
+          }
+        ],
+        "spice_model": "",
+        "type": "generic_load",
+        "value": "150mA"
+      },
+      "id": "L_SYSTEM",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "Q_LOAD_SW",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "D",
+            "net": "load_low"
+          },
+          {
+            "function": "",
+            "name": "G",
+            "net": "load_ctrl"
+          },
+          {
+            "function": "",
+            "name": "S",
+            "net": "gnd"
+          }
+        ],
+        "spice_model": "2N7002",
+        "type": "mosfet",
+        "value": ""
+      },
+      "id": "Q_LOAD_SW",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "R_BAT_BOT",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "1",
+            "net": "bat_sense"
+          },
+          {
+            "function": "",
+            "name": "2",
+            "net": "gnd"
+          }
+        ],
+        "spice_model": "",
+        "type": "resistor",
+        "value": "1M"
+      },
+      "id": "R_BAT_BOT",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "R_BAT_TOP",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "1",
+            "net": "v_bat"
+          },
+          {
+            "function": "",
+            "name": "2",
+            "net": "bat_sense"
+          }
+        ],
+        "spice_model": "",
+        "type": "resistor",
+        "value": "1M"
+      },
+      "id": "R_BAT_TOP",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "R_SOLAR_BOT",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "1",
+            "net": "solar_sense"
+          },
+          {
+            "function": "",
+            "name": "2",
+            "net": "gnd"
+          }
+        ],
+        "spice_model": "",
+        "type": "resistor",
+        "value": "470k"
+      },
+      "id": "R_SOLAR_BOT",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "R_SOLAR_INTERNAL",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "1",
+            "net": "v_solar_raw"
+          },
+          {
+            "function": "",
+            "name": "2",
+            "net": "v_solar"
+          }
+        ],
+        "spice_model": "",
+        "type": "resistor",
+        "value": "10"
+      },
+      "id": "R_SOLAR_INTERNAL",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "R_SOLAR_TOP",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "1",
+            "net": "v_solar"
+          },
+          {
+            "function": "",
+            "name": "2",
+            "net": "solar_sense"
+          }
+        ],
+        "spice_model": "",
+        "type": "resistor",
+        "value": "1M"
+      },
+      "id": "R_SOLAR_TOP",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "U_MCU",
+        "part": "ESP32-C3",
+        "pins": [
+          {
+            "function": "",
+            "name": "3V3",
+            "net": "v_logic"
+          },
+          {
+            "function": "",
+            "name": "GND",
+            "net": "gnd"
+          },
+          {
+            "function": "ADC1_CH0",
+            "name": "GPIO0",
+            "net": "solar_sense"
+          },
+          {
+            "function": "ADC1_CH1",
+            "name": "GPIO1",
+            "net": "bat_sense"
+          },
+          {
+            "function": "GPIO_OUT",
+            "name": "GPIO2",
+            "net": "load_ctrl"
+          }
+        ],
+        "spice_model": "",
+        "type": "mcu",
+        "value": ""
+      },
+      "id": "U_MCU",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "U_REG",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "gnd",
+            "net": "gnd"
+          },
+          {
+            "function": "",
+            "name": "in",
+            "net": "v_bat"
+          },
+          {
+            "function": "",
+            "name": "out",
+            "net": "v_logic"
+          }
+        ],
+        "spice_model": "",
+        "type": "ldo",
+        "value": ""
+      },
+      "id": "U_REG",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "V_BAT",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "n",
+            "net": "gnd"
+          },
+          {
+            "function": "",
+            "name": "p",
+            "net": "v_bat"
+          }
+        ],
+        "spice_model": "",
+        "type": "voltage_source",
+        "value": "3.7V"
+      },
+      "id": "V_BAT",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "V_SOLAR",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "n",
+            "net": "gnd"
+          },
+          {
+            "function": "",
+            "name": "p",
+            "net": "v_solar_raw"
+          }
+        ],
+        "spice_model": "",
+        "type": "voltage_source",
+        "value": "5.5V"
+      },
+      "id": "V_SOLAR",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "bat_sense",
+        "role": "analog_signal"
+      },
+      "id": "net:bat_sense",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "gnd",
+        "role": "ground"
+      },
+      "id": "net:gnd",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "load_ctrl",
+        "role": "digital_signal"
+      },
+      "id": "net:load_ctrl",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "load_low",
+        "role": "analog_signal"
+      },
+      "id": "net:load_low",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "solar_sense",
+        "role": "analog_signal"
+      },
+      "id": "net:solar_sense",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "v_bat",
+        "role": "power"
+      },
+      "id": "net:v_bat",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "v_logic",
+        "role": "power"
+      },
+      "id": "net:v_logic",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "v_solar",
+        "role": "power"
+      },
+      "id": "net:v_solar",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "v_solar_raw",
+        "role": "power"
+      },
+      "id": "net:v_solar_raw",
+      "type": "net"
+    }
+  ]
+}

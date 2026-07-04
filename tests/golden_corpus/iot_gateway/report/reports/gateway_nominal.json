@@ -1,0 +1,74 @@
+{
+  "artifacts": [
+    "spice/main.cir",
+    "spice/probes.json",
+    "waveforms/gateway_nominal_bat_sense.csv",
+    "waveforms/gateway_nominal_v_1v8.csv",
+    "waveforms/gateway_nominal_v_3v3.csv"
+  ],
+  "backend": "builtin_dc_fallback",
+  "diagnostics": [],
+  "measurement_stats": {
+    "bat_sense": {
+      "final": "1.27891V",
+      "max": "1.27891V",
+      "min": "1.27891V",
+      "time_of_max": "0s",
+      "time_of_min": "0s"
+    },
+    "gnd": {
+      "final": "0V",
+      "max": "0V",
+      "min": "0V",
+      "time_of_max": "0s",
+      "time_of_min": "0s"
+    },
+    "i(L_RADIO)": {
+      "final": "400mA",
+      "max": "400mA",
+      "min": "400mA",
+      "time_of_max": "0s",
+      "time_of_min": "0s"
+    },
+    "v_1v8": {
+      "final": "1.8V",
+      "max": "1.8V",
+      "min": "1.8V",
+      "time_of_max": "0s",
+      "time_of_min": "0s"
+    },
+    "v_3v3": {
+      "final": "3.3V",
+      "max": "3.3V",
+      "min": "3.3V",
+      "time_of_max": "0s",
+      "time_of_min": "0s"
+    },
+    "v_bat": {
+      "final": "4V",
+      "max": "4V",
+      "min": "4V",
+      "time_of_max": "0s",
+      "time_of_min": "0s"
+    },
+    "v_ext": {
+      "final": "12V",
+      "max": "12V",
+      "min": "12V",
+      "time_of_max": "0s",
+      "time_of_min": "0s"
+    }
+  },
+  "measurements": {
+    "bat_sense": "1.27891V",
+    "gnd": "0V",
+    "i(L_RADIO)": "400mA",
+    "v_1v8": "1.8V",
+    "v_3v3": "3.3V",
+    "v_bat": "4V",
+    "v_ext": "12V"
+  },
+  "profile": "mixed_signal",
+  "status": "passed",
+  "test": "gateway_nominal"
+}

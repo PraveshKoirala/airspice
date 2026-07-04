@@ -1,0 +1,65 @@
+{
+  "artifacts": [
+    "spice/main.cir",
+    "spice/probes.json",
+    "waveforms/charge_cycle_bat.csv",
+    "waveforms/charge_cycle_charge_ctrl.csv"
+  ],
+  "backend": "ngspice",
+  "diagnostics": [],
+  "measurement_stats": {
+    "bat": {
+      "final": "3V",
+      "max": "3V",
+      "min": "3V",
+      "time_of_max": "0s",
+      "time_of_min": "0s"
+    },
+    "bat_sense": {
+      "final": "1.5V",
+      "max": "1.5V",
+      "min": "1.5V",
+      "time_of_max": "0s",
+      "time_of_min": "0s"
+    },
+    "charge_ctrl": {
+      "final": "0V",
+      "max": "0V",
+      "min": "0V",
+      "time_of_max": "0s",
+      "time_of_min": "0s"
+    },
+    "gnd": {
+      "final": "0V",
+      "max": "0V",
+      "min": "0V",
+      "time_of_max": "0s",
+      "time_of_min": "0s"
+    },
+    "v_3v3": {
+      "final": "3.3V",
+      "max": "3.3V",
+      "min": "3.3V",
+      "time_of_max": "0s",
+      "time_of_min": "0s"
+    },
+    "v_in": {
+      "final": "5V",
+      "max": "5V",
+      "min": "5V",
+      "time_of_max": "0s",
+      "time_of_min": "0s"
+    }
+  },
+  "measurements": {
+    "bat": "3V",
+    "bat_sense": "1.5V",
+    "charge_ctrl": "0V",
+    "gnd": "0V",
+    "v_3v3": "3.3V",
+    "v_in": "5V"
+  },
+  "profile": "full_verify",
+  "status": "passed",
+  "test": "charge_cycle"
+}

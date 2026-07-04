@@ -1,0 +1,156 @@
+{
+  "analog": [],
+  "bridges": [],
+  "components": {
+    "R_BOTTOM": {
+      "id": "R_BOTTOM",
+      "part": null,
+      "pins": {
+        "1": {
+          "function": null,
+          "name": "1",
+          "net": "battery_sense"
+        },
+        "2": {
+          "function": null,
+          "name": "2",
+          "net": "gnd"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "resistor",
+      "value": "1M"
+    },
+    "R_TOP": {
+      "id": "R_TOP",
+      "part": null,
+      "pins": {
+        "1": {
+          "function": null,
+          "name": "1",
+          "net": "bat"
+        },
+        "2": {
+          "function": null,
+          "name": "2",
+          "net": "battery_sense"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "resistor",
+      "value": "100k"
+    },
+    "U_MCU": {
+      "id": "U_MCU",
+      "part": "ESP32-C3",
+      "pins": {
+        "3V3": {
+          "function": null,
+          "name": "3V3",
+          "net": "bat"
+        },
+        "GND": {
+          "function": null,
+          "name": "GND",
+          "net": "gnd"
+        },
+        "GPIO4": {
+          "function": "ADC1_CH4",
+          "name": "GPIO4",
+          "net": "battery_sense"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "mcu",
+      "value": null
+    }
+  },
+  "exports": [],
+  "firmware_bindings": {
+    "battery_adc_binding": {
+      "channel": "ADC1_CH4",
+      "component": "U_MCU",
+      "id": "battery_adc_binding",
+      "net": "battery_sense",
+      "peripheral": "ADC1",
+      "signal": "battery_voltage"
+    }
+  },
+  "firmware_projects": {
+    "fw_main": {
+      "board": "esp32-c3-devkitm-1",
+      "framework": "platformio",
+      "id": "fw_main",
+      "language": "cpp",
+      "source_tree": "",
+      "target": "U_MCU"
+    }
+  },
+  "firmware_tasks": {},
+  "interfaces": {},
+  "ir_version": "0.1",
+  "metadata": {
+    "author": "",
+    "created_at": "",
+    "description": "",
+    "title": "Bad ADC Divider"
+  },
+  "name": "bad_adc_divider",
+  "nets": {
+    "bat": {
+      "id": "bat",
+      "nominal_voltage": "4.2V",
+      "role": "power"
+    },
+    "battery_sense": {
+      "id": "battery_sense",
+      "nominal_voltage": null,
+      "role": "analog_signal"
+    },
+    "gnd": {
+      "id": "gnd",
+      "nominal_voltage": null,
+      "role": "ground"
+    }
+  },
+  "power_domains": {},
+  "requirements": [],
+  "simulation_profiles": {
+    "analog_only": {
+      "backends": [
+        "ngspice"
+      ],
+      "default": true,
+      "id": "analog_only",
+      "included_subsystems": [],
+      "properties": {},
+      "tests": [
+        "battery_adc_nominal"
+      ]
+    }
+  },
+  "tests": {
+    "battery_adc_nominal": {
+      "assertions": [
+        {
+          "max": "1.06V",
+          "min": "1.02V",
+          "net": "battery_sense",
+          "op": "assert_voltage"
+        }
+      ],
+      "description": "",
+      "duration": "10ms",
+      "id": "battery_adc_nominal",
+      "setup": {
+        "bat": "4.2V"
+      }
+    }
+  }
+}

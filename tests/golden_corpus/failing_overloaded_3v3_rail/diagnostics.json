@@ -1,0 +1,23 @@
+{
+  "diagnostics": [
+    {
+      "code": "RAIL_LOAD_EXCEEDS_REGULATOR_LIMIT",
+      "domain": "power",
+      "expected": {
+        "max_current": "250mA"
+      },
+      "id": "diag_00001",
+      "message": "Loads on 3v3 (0.7A) exceed regulator U_REG limit (250mA).",
+      "observed": {
+        "load_current": "0.7A"
+      },
+      "related_elements": [
+        "U_REG",
+        "3v3"
+      ],
+      "severity": "error",
+      "suggested_actions": []
+    }
+  ],
+  "success": false
+}

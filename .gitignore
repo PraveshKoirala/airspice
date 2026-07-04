@@ -13,3 +13,9 @@ dist/
 .pytest_cache/
 *.egg-info/
 .claude/settings.local.json
+
+# The golden corpus (issue #4) is committed reference data produced ONLY by
+# scripts/export_golden.py. The globs above (*.csv, and formerly *.log) would
+# otherwise swallow its files, so re-include the whole corpus tree. Everything
+# under it is intentional and byte-checked in CI; never hand-edit it.
+!tests/golden_corpus/**

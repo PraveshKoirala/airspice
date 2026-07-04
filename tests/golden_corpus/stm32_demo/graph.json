@@ -1,0 +1,116 @@
+{
+  "edges": [
+    {
+      "data": {
+        "net": "v_3v3",
+        "pin": "VDD"
+      },
+      "id": "U_MCU:VDD->v_3v3",
+      "label": "VDD",
+      "source": "U_MCU",
+      "sourceHandle": "pin:VDD",
+      "target": "net:v_3v3",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "VSS"
+      },
+      "id": "U_MCU:VSS->gnd",
+      "label": "VSS",
+      "source": "U_MCU",
+      "sourceHandle": "pin:VSS",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_3v3",
+        "pin": "p"
+      },
+      "id": "V_SOURCE:p->v_3v3",
+      "label": "p",
+      "source": "V_SOURCE",
+      "sourceHandle": "pin:p",
+      "target": "net:v_3v3",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "n"
+      },
+      "id": "V_SOURCE:n->gnd",
+      "label": "n",
+      "source": "V_SOURCE",
+      "sourceHandle": "pin:n",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    }
+  ],
+  "nodes": [
+    {
+      "data": {
+        "label": "U_MCU",
+        "part": "STM32F103",
+        "pins": [
+          {
+            "function": "",
+            "name": "VDD",
+            "net": "v_3v3"
+          },
+          {
+            "function": "",
+            "name": "VSS",
+            "net": "gnd"
+          }
+        ],
+        "spice_model": "",
+        "type": "mcu",
+        "value": ""
+      },
+      "id": "U_MCU",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "V_SOURCE",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "n",
+            "net": "gnd"
+          },
+          {
+            "function": "",
+            "name": "p",
+            "net": "v_3v3"
+          }
+        ],
+        "spice_model": "",
+        "type": "voltage_source",
+        "value": "3.3V"
+      },
+      "id": "V_SOURCE",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "gnd",
+        "role": "ground"
+      },
+      "id": "net:gnd",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "v_3v3",
+        "role": "power"
+      },
+      "id": "net:v_3v3",
+      "type": "net"
+    }
+  ]
+}

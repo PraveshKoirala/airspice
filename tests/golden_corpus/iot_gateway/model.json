@@ -1,0 +1,548 @@
+{
+  "analog": [],
+  "bridges": [
+    {
+      "data": {
+        "analog_source": {
+          "net": "bat_sense"
+        },
+        "digital_target": {
+          "channel": "ADC1_CH0",
+          "component": "U_MCU",
+          "peripheral": "ADC1"
+        },
+        "id": "bat_bridge",
+        "type": "adc"
+      },
+      "id": "bat_bridge",
+      "type": "adc"
+    }
+  ],
+  "components": {
+    "L_RADIO": {
+      "id": "L_RADIO",
+      "part": null,
+      "pins": {
+        "n": {
+          "function": null,
+          "name": "n",
+          "net": "radio_high"
+        },
+        "p": {
+          "function": null,
+          "name": "p",
+          "net": "v_3v3"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "generic_load",
+      "value": "400mA"
+    },
+    "Q_RADIO_GATE": {
+      "id": "Q_RADIO_GATE",
+      "part": null,
+      "pins": {
+        "D": {
+          "function": null,
+          "name": "D",
+          "net": "radio_high"
+        },
+        "G": {
+          "function": null,
+          "name": "G",
+          "net": "radio_en"
+        },
+        "S": {
+          "function": null,
+          "name": "S",
+          "net": "gnd"
+        }
+      },
+      "properties": {},
+      "spice_model": "BSS138",
+      "spice_subckt": null,
+      "type": "mosfet",
+      "value": null
+    },
+    "Q_SCL_SHIFT": {
+      "id": "Q_SCL_SHIFT",
+      "part": null,
+      "pins": {
+        "D": {
+          "function": null,
+          "name": "D",
+          "net": "scl_3v3"
+        },
+        "G": {
+          "function": null,
+          "name": "G",
+          "net": "v_1v8"
+        },
+        "S": {
+          "function": null,
+          "name": "S",
+          "net": "scl_1v8"
+        }
+      },
+      "properties": {},
+      "spice_model": "BSS138",
+      "spice_subckt": null,
+      "type": "mosfet",
+      "value": null
+    },
+    "Q_SDA_SHIFT": {
+      "id": "Q_SDA_SHIFT",
+      "part": null,
+      "pins": {
+        "D": {
+          "function": null,
+          "name": "D",
+          "net": "sda_3v3"
+        },
+        "G": {
+          "function": null,
+          "name": "G",
+          "net": "v_1v8"
+        },
+        "S": {
+          "function": null,
+          "name": "S",
+          "net": "sda_1v8"
+        }
+      },
+      "properties": {},
+      "spice_model": "BSS138",
+      "spice_subckt": null,
+      "type": "mosfet",
+      "value": null
+    },
+    "R_BAT_HI": {
+      "id": "R_BAT_HI",
+      "part": null,
+      "pins": {
+        "1": {
+          "function": null,
+          "name": "1",
+          "net": "v_bat"
+        },
+        "2": {
+          "function": null,
+          "name": "2",
+          "net": "bat_sense"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "resistor",
+      "value": "1M"
+    },
+    "R_BAT_LO": {
+      "id": "R_BAT_LO",
+      "part": null,
+      "pins": {
+        "1": {
+          "function": null,
+          "name": "1",
+          "net": "bat_sense"
+        },
+        "2": {
+          "function": null,
+          "name": "2",
+          "net": "gnd"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "resistor",
+      "value": "470k"
+    },
+    "U_MCU": {
+      "id": "U_MCU",
+      "part": "ESP32-C3",
+      "pins": {
+        "3V3": {
+          "function": null,
+          "name": "3V3",
+          "net": "v_3v3"
+        },
+        "GND": {
+          "function": null,
+          "name": "GND",
+          "net": "gnd"
+        },
+        "GPIO0": {
+          "function": "ADC1_CH0",
+          "name": "GPIO0",
+          "net": "bat_sense"
+        },
+        "GPIO1": {
+          "function": "GPIO_OUT",
+          "name": "GPIO1",
+          "net": "radio_en"
+        },
+        "GPIO8": {
+          "function": "I2C_SDA",
+          "name": "GPIO8",
+          "net": "sda_3v3"
+        },
+        "GPIO9": {
+          "function": "I2C_SCL",
+          "name": "GPIO9",
+          "net": "scl_3v3"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "mcu",
+      "value": null
+    },
+    "U_REG_1V8": {
+      "id": "U_REG_1V8",
+      "part": null,
+      "pins": {
+        "gnd": {
+          "function": null,
+          "name": "gnd",
+          "net": "gnd"
+        },
+        "in": {
+          "function": null,
+          "name": "in",
+          "net": "v_3v3"
+        },
+        "out": {
+          "function": null,
+          "name": "out",
+          "net": "v_1v8"
+        }
+      },
+      "properties": {
+        "iout_max": "150mA",
+        "iq": "25uA",
+        "v_dropout": "0.1V",
+        "vout": "1.8V"
+      },
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "ldo",
+      "value": null
+    },
+    "U_REG_3V3": {
+      "id": "U_REG_3V3",
+      "part": null,
+      "pins": {
+        "gnd": {
+          "function": null,
+          "name": "gnd",
+          "net": "gnd"
+        },
+        "in": {
+          "function": null,
+          "name": "in",
+          "net": "v_bat"
+        },
+        "out": {
+          "function": null,
+          "name": "out",
+          "net": "v_3v3"
+        }
+      },
+      "properties": {
+        "iout_max": "600mA",
+        "iq": "50uA",
+        "v_dropout": "0.15V",
+        "vout": "3.3V"
+      },
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "ldo",
+      "value": null
+    },
+    "V_EXT": {
+      "id": "V_EXT",
+      "part": null,
+      "pins": {
+        "n": {
+          "function": null,
+          "name": "n",
+          "net": "gnd"
+        },
+        "p": {
+          "function": null,
+          "name": "p",
+          "net": "v_ext"
+        }
+      },
+      "properties": {
+        "i_max": "1A"
+      },
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "voltage_source",
+      "value": "12V"
+    },
+    "X_CHARGER": {
+      "id": "X_CHARGER",
+      "part": null,
+      "pins": {
+        "GND": {
+          "function": null,
+          "name": "GND",
+          "net": "gnd"
+        },
+        "VBAT": {
+          "function": null,
+          "name": "VBAT",
+          "net": "v_bat"
+        },
+        "VIN": {
+          "function": null,
+          "name": "VIN",
+          "net": "v_ext"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": "MCP73831",
+      "type": "power_manager",
+      "value": null
+    },
+    "X_SENSOR": {
+      "id": "X_SENSOR",
+      "part": null,
+      "pins": {
+        "GND": {
+          "function": null,
+          "name": "GND",
+          "net": "gnd"
+        },
+        "SCL": {
+          "function": null,
+          "name": "SCL",
+          "net": "scl_1v8"
+        },
+        "SDA": {
+          "function": null,
+          "name": "SDA",
+          "net": "sda_1v8"
+        },
+        "VDD": {
+          "function": null,
+          "name": "VDD",
+          "net": "v_1v8"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": "BME280",
+      "type": "sensor",
+      "value": null
+    }
+  },
+  "exports": [],
+  "firmware_bindings": {
+    "bat_adc": {
+      "channel": "ADC1_CH0",
+      "component": "U_MCU",
+      "id": "bat_adc",
+      "net": "bat_sense",
+      "peripheral": "ADC1",
+      "signal": ""
+    }
+  },
+  "firmware_projects": {
+    "fw_main": {
+      "board": "esp32-c3-devkitm-1",
+      "framework": "platformio",
+      "id": "fw_main",
+      "language": "cpp",
+      "source_tree": "",
+      "target": "U_MCU"
+    }
+  },
+  "firmware_tasks": {
+    "gateway_loop": {
+      "id": "gateway_loop",
+      "operations": [
+        {
+          "binding": "bat_adc",
+          "into": "v_bat_raw",
+          "op": "read_adc"
+        },
+        {
+          "op": "write_gpio",
+          "pin": "GPIO1",
+          "value": "high"
+        },
+        {
+          "duration": "50ms",
+          "op": "delay"
+        },
+        {
+          "op": "write_gpio",
+          "pin": "GPIO1",
+          "value": "low"
+        }
+      ],
+      "period": "500ms",
+      "target": "fw_main"
+    }
+  },
+  "interfaces": {
+    "i2c_internal": {
+      "data": {
+        "controller": {
+          "component": "U_MCU",
+          "peripheral": "I2C0"
+        },
+        "property": {
+          "name": "speed",
+          "value": "400kHz"
+        },
+        "pullup": [
+          {
+            "net": "sda_3v3",
+            "to": "v_3v3",
+            "value": "4.7k"
+          },
+          {
+            "net": "scl_3v3",
+            "to": "v_3v3",
+            "value": "4.7k"
+          }
+        ],
+        "scl": {
+          "net": "scl_3v3"
+        },
+        "sda": {
+          "net": "sda_3v3"
+        }
+      },
+      "id": "i2c_internal",
+      "type": "i2c"
+    }
+  },
+  "ir_version": "0.1",
+  "metadata": {
+    "author": "",
+    "created_at": "",
+    "description": "Complex mixed-signal gateway with nested power domains, high-current load switching, and level-shifted I2C.",
+    "title": "Battery-Backed IoT Gateway"
+  },
+  "name": "iot_gateway",
+  "nets": {
+    "bat_sense": {
+      "id": "bat_sense",
+      "nominal_voltage": null,
+      "role": "analog_signal"
+    },
+    "gnd": {
+      "id": "gnd",
+      "nominal_voltage": null,
+      "role": "ground"
+    },
+    "radio_en": {
+      "id": "radio_en",
+      "nominal_voltage": null,
+      "role": "digital_signal"
+    },
+    "radio_high": {
+      "id": "radio_high",
+      "nominal_voltage": null,
+      "role": "analog_signal"
+    },
+    "scl_1v8": {
+      "id": "scl_1v8",
+      "nominal_voltage": null,
+      "role": "digital_signal"
+    },
+    "scl_3v3": {
+      "id": "scl_3v3",
+      "nominal_voltage": null,
+      "role": "digital_signal"
+    },
+    "sda_1v8": {
+      "id": "sda_1v8",
+      "nominal_voltage": null,
+      "role": "digital_signal"
+    },
+    "sda_3v3": {
+      "id": "sda_3v3",
+      "nominal_voltage": null,
+      "role": "digital_signal"
+    },
+    "v_1v8": {
+      "id": "v_1v8",
+      "nominal_voltage": "1.8V",
+      "role": "power"
+    },
+    "v_3v3": {
+      "id": "v_3v3",
+      "nominal_voltage": "3.3V",
+      "role": "power"
+    },
+    "v_bat": {
+      "id": "v_bat",
+      "nominal_voltage": "3.7V",
+      "role": "power"
+    },
+    "v_ext": {
+      "id": "v_ext",
+      "nominal_voltage": "12V",
+      "role": "power"
+    }
+  },
+  "power_domains": {},
+  "requirements": [],
+  "simulation_profiles": {
+    "mixed_signal": {
+      "backends": [
+        "ngspice",
+        "renode"
+      ],
+      "default": true,
+      "id": "mixed_signal",
+      "included_subsystems": [],
+      "properties": {},
+      "tests": [
+        "gateway_nominal"
+      ]
+    }
+  },
+  "tests": {
+    "gateway_nominal": {
+      "assertions": [
+        {
+          "max": "3.4V",
+          "min": "3.2V",
+          "net": "v_3v3",
+          "op": "assert_voltage"
+        },
+        {
+          "max": "1.9V",
+          "min": "1.7V",
+          "net": "v_1v8",
+          "op": "assert_voltage"
+        },
+        {
+          "max": "1.4V",
+          "min": "1.2V",
+          "net": "bat_sense",
+          "op": "assert_voltage"
+        }
+      ],
+      "description": "Verify power rail stability and ADC levels during radio TX.",
+      "duration": "1s",
+      "id": "gateway_nominal",
+      "setup": {
+        "v_bat": "4.0V",
+        "v_ext": "12V"
+      }
+    }
+  }
+}

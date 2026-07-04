@@ -1,0 +1,42 @@
+{
+  "diagnostics": [
+    {
+      "code": "MISSING_GROUND",
+      "domain": "electrical",
+      "expected": {},
+      "id": "diag_00001",
+      "message": "Design must define a ground net.",
+      "observed": {},
+      "related_elements": [],
+      "severity": "error",
+      "suggested_actions": []
+    },
+    {
+      "code": "MISSING_POWER_OR_GROUND",
+      "domain": "power",
+      "expected": {},
+      "id": "diag_00002",
+      "message": "Non-passive component U_MCU must connect to power and ground.",
+      "observed": {},
+      "related_elements": [
+        "U_MCU"
+      ],
+      "severity": "error",
+      "suggested_actions": []
+    },
+    {
+      "code": "MISSING_MCU_POWER_PIN",
+      "domain": "pin",
+      "expected": {},
+      "id": "diag_00003",
+      "message": "MCU U_MCU is missing required pin GND.",
+      "observed": {},
+      "related_elements": [
+        "U_MCU"
+      ],
+      "severity": "error",
+      "suggested_actions": []
+    }
+  ],
+  "success": false
+}

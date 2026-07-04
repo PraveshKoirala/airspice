@@ -1,0 +1,79 @@
+{
+  "diagnostics": [
+    {
+      "code": "SOURCE_OVERLOADED",
+      "domain": "power",
+      "expected": {
+        "max_current": "100mA"
+      },
+      "id": "diag_00001",
+      "message": "Total current draw from V_BAT (0.201A) exceeds limit (100mA).",
+      "observed": {
+        "total_draw": "0.201A"
+      },
+      "related_elements": [
+        "V_BAT",
+        "v_bat"
+      ],
+      "severity": "error",
+      "suggested_actions": []
+    },
+    {
+      "code": "I2C_VOLTAGE_MISMATCH",
+      "domain": "interface",
+      "expected": {},
+      "id": "diag_00002",
+      "message": "I2C pullup rail 1v8 differs from MCU rail 3v3.",
+      "observed": {},
+      "related_elements": [
+        "i2c_bus",
+        "1v8",
+        "U_MCU"
+      ],
+      "severity": "error",
+      "suggested_actions": []
+    },
+    {
+      "code": "I2C_VOLTAGE_MISMATCH",
+      "domain": "interface",
+      "expected": {},
+      "id": "diag_00003",
+      "message": "I2C pullup rail 1v8 differs from MCU rail 3v3.",
+      "observed": {},
+      "related_elements": [
+        "i2c_bus",
+        "1v8",
+        "U_MCU"
+      ],
+      "severity": "error",
+      "suggested_actions": []
+    },
+    {
+      "code": "I2C_PULLUP_TOO_WEAK",
+      "domain": "interface",
+      "expected": {},
+      "id": "diag_00004",
+      "message": "I2C pullup 10k may be too weak for 400kHz.",
+      "observed": {},
+      "related_elements": [
+        "i2c_bus"
+      ],
+      "severity": "warning",
+      "suggested_actions": []
+    },
+    {
+      "code": "I2C_PULLUP_TOO_WEAK",
+      "domain": "interface",
+      "expected": {},
+      "id": "diag_00005",
+      "message": "I2C pullup 10k may be too weak for 400kHz.",
+      "observed": {},
+      "related_elements": [
+        "i2c_bus"
+      ],
+      "severity": "warning",
+      "suggested_actions": []
+    }
+  ],
+  "success": false
+}

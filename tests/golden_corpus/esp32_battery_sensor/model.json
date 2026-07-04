@@ -1,0 +1,374 @@
+{
+  "analog": [
+    {
+      "id": "battery_measurement",
+      "probes": [
+        {
+          "id": "probe_battery_sense",
+          "net": "battery_sense",
+          "quantity": "voltage"
+        }
+      ],
+      "uses": [
+        "C_BAT_SENSE",
+        "R_BAT_BOTTOM",
+        "R_BAT_TOP"
+      ]
+    }
+  ],
+  "bridges": [
+    {
+      "data": {
+        "analog_source": {
+          "net": "battery_sense"
+        },
+        "conversion": {
+          "bits": "12",
+          "reference_voltage": "3.3V"
+        },
+        "digital_target": {
+          "channel": "ADC1_CH4",
+          "component": "U_MCU",
+          "peripheral": "ADC1"
+        },
+        "id": "battery_adc_bridge",
+        "sampling": {
+          "sample_rate": "1kHz",
+          "sample_time": "10us"
+        },
+        "type": "adc"
+      },
+      "id": "battery_adc_bridge",
+      "type": "adc"
+    }
+  ],
+  "components": {
+    "C_BAT_SENSE": {
+      "id": "C_BAT_SENSE",
+      "part": null,
+      "pins": {
+        "1": {
+          "function": null,
+          "name": "1",
+          "net": "battery_sense"
+        },
+        "2": {
+          "function": null,
+          "name": "2",
+          "net": "gnd"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "capacitor",
+      "value": "100nF"
+    },
+    "R_BAT_BOTTOM": {
+      "id": "R_BAT_BOTTOM",
+      "part": null,
+      "pins": {
+        "1": {
+          "function": null,
+          "name": "1",
+          "net": "battery_sense"
+        },
+        "2": {
+          "function": null,
+          "name": "2",
+          "net": "gnd"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "resistor",
+      "value": "330k"
+    },
+    "R_BAT_TOP": {
+      "id": "R_BAT_TOP",
+      "part": null,
+      "pins": {
+        "1": {
+          "function": null,
+          "name": "1",
+          "net": "bat"
+        },
+        "2": {
+          "function": null,
+          "name": "2",
+          "net": "battery_sense"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "resistor",
+      "value": "1M"
+    },
+    "U_MCU": {
+      "id": "U_MCU",
+      "part": "ESP32-C3",
+      "pins": {
+        "3V3": {
+          "function": null,
+          "name": "3V3",
+          "net": "3v3"
+        },
+        "GND": {
+          "function": null,
+          "name": "GND",
+          "net": "gnd"
+        },
+        "GPIO4": {
+          "function": "ADC1_CH4",
+          "name": "GPIO4",
+          "net": "battery_sense"
+        },
+        "GPIO8": {
+          "function": "I2C_SDA",
+          "name": "GPIO8",
+          "net": "i2c_sda"
+        },
+        "GPIO9": {
+          "function": "I2C_SCL",
+          "name": "GPIO9",
+          "net": "i2c_scl"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "mcu",
+      "value": null
+    },
+    "U_REG": {
+      "id": "U_REG",
+      "part": "generic_ldo_3v3",
+      "pins": {
+        "gnd": {
+          "function": null,
+          "name": "gnd",
+          "net": "gnd"
+        },
+        "in": {
+          "function": null,
+          "name": "in",
+          "net": "bat"
+        },
+        "out": {
+          "function": null,
+          "name": "out",
+          "net": "3v3"
+        }
+      },
+      "properties": {
+        "iout_max": "700mA",
+        "iq": "10uA",
+        "v_dropout": "200mV",
+        "vout": "3.3V"
+      },
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "ldo",
+      "value": null
+    }
+  },
+  "exports": [
+    {
+      "enabled": true,
+      "target": "firmware"
+    },
+    {
+      "enabled": false,
+      "target": "kicad"
+    },
+    {
+      "enabled": false,
+      "target": "renode"
+    },
+    {
+      "enabled": true,
+      "target": "spice"
+    }
+  ],
+  "firmware_bindings": {
+    "battery_adc_binding": {
+      "channel": "ADC1_CH4",
+      "component": "U_MCU",
+      "id": "battery_adc_binding",
+      "net": "battery_sense",
+      "peripheral": "ADC1",
+      "signal": "battery_voltage"
+    }
+  },
+  "firmware_projects": {
+    "fw_main": {
+      "board": "esp32-c3-devkitm-1",
+      "framework": "platformio",
+      "id": "fw_main",
+      "language": "cpp",
+      "source_tree": "",
+      "target": "U_MCU"
+    }
+  },
+  "firmware_tasks": {
+    "read_battery": {
+      "id": "read_battery",
+      "operations": [
+        {
+          "binding": "battery_adc_binding",
+          "into": "battery_raw",
+          "op": "read_adc"
+        },
+        {
+          "expr": "battery_raw_to_mv(battery_raw)",
+          "into": "battery_mv",
+          "op": "convert"
+        },
+        {
+          "op": "log",
+          "value": "battery_mv"
+        }
+      ],
+      "period": "60s",
+      "target": "fw_main"
+    }
+  },
+  "interfaces": {
+    "i2c0": {
+      "data": {
+        "controller": {
+          "component": "U_MCU",
+          "peripheral": "I2C0"
+        },
+        "pullup": [
+          {
+            "net": "i2c_sda",
+            "to": "3v3",
+            "value": "4.7k"
+          },
+          {
+            "net": "i2c_scl",
+            "to": "3v3",
+            "value": "4.7k"
+          }
+        ],
+        "scl": {
+          "net": "i2c_scl"
+        },
+        "sda": {
+          "net": "i2c_sda"
+        }
+      },
+      "id": "i2c0",
+      "type": "i2c"
+    }
+  },
+  "ir_version": "0.1",
+  "metadata": {
+    "author": "AI",
+    "created_at": "2026-06-05T00:00:00Z",
+    "description": "Battery-powered ESP32-C3 sensor node with ADC battery measurement.",
+    "title": "ESP32 Battery Sensor"
+  },
+  "name": "esp32_battery_sensor",
+  "nets": {
+    "3v3": {
+      "id": "3v3",
+      "nominal_voltage": "3.3V",
+      "role": "power"
+    },
+    "bat": {
+      "id": "bat",
+      "nominal_voltage": "3.7V",
+      "role": "power"
+    },
+    "battery_sense": {
+      "id": "battery_sense",
+      "nominal_voltage": null,
+      "role": "analog_signal"
+    },
+    "gnd": {
+      "id": "gnd",
+      "nominal_voltage": null,
+      "role": "ground"
+    },
+    "i2c_scl": {
+      "id": "i2c_scl",
+      "nominal_voltage": null,
+      "role": "digital_signal"
+    },
+    "i2c_sda": {
+      "id": "i2c_sda",
+      "nominal_voltage": null,
+      "role": "digital_signal"
+    }
+  },
+  "power_domains": {
+    "bat_domain": {
+      "id": "bat_domain",
+      "net": "bat",
+      "nominal": "3.7V",
+      "source": null
+    },
+    "logic_3v3": {
+      "id": "logic_3v3",
+      "net": "3v3",
+      "nominal": "3.3V",
+      "source": "U_REG.out"
+    }
+  },
+  "requirements": [],
+  "simulation_profiles": {
+    "analog_only": {
+      "backends": [
+        "ngspice"
+      ],
+      "default": true,
+      "id": "analog_only",
+      "included_subsystems": [
+        "battery_measurement"
+      ],
+      "properties": {},
+      "tests": [
+        "battery_adc_nominal",
+        "rail_startup"
+      ]
+    }
+  },
+  "tests": {
+    "battery_adc_nominal": {
+      "assertions": [
+        {
+          "max": "1.06V",
+          "min": "1.02V",
+          "net": "battery_sense",
+          "op": "assert_voltage"
+        }
+      ],
+      "description": "Verify ADC voltage for full battery.",
+      "duration": "500ms",
+      "id": "battery_adc_nominal",
+      "setup": {
+        "bat": "4.2V"
+      }
+    },
+    "rail_startup": {
+      "assertions": [
+        {
+          "max": "3.6V",
+          "min": "3.0V",
+          "net": "3v3",
+          "op": "assert_voltage"
+        }
+      ],
+      "description": "",
+      "duration": "100ms",
+      "id": "rail_startup",
+      "setup": {
+        "bat": "3.7V"
+      }
+    }
+  }
+}

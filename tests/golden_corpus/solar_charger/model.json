@@ -1,0 +1,486 @@
+{
+  "analog": [],
+  "bridges": [
+    {
+      "data": {
+        "analog_source": {
+          "net": "bat_sense"
+        },
+        "conversion": {
+          "bits": "12",
+          "reference_voltage": "3.3V"
+        },
+        "digital_target": {
+          "channel": "ADC1_CH1",
+          "component": "U_MCU",
+          "peripheral": "ADC1"
+        },
+        "id": "bat_bridge",
+        "type": "adc"
+      },
+      "id": "bat_bridge",
+      "type": "adc"
+    },
+    {
+      "data": {
+        "analog_source": {
+          "net": "solar_sense"
+        },
+        "conversion": {
+          "bits": "12",
+          "reference_voltage": "3.3V"
+        },
+        "digital_target": {
+          "channel": "ADC1_CH0",
+          "component": "U_MCU",
+          "peripheral": "ADC1"
+        },
+        "id": "solar_bridge",
+        "type": "adc"
+      },
+      "id": "solar_bridge",
+      "type": "adc"
+    }
+  ],
+  "components": {
+    "D_SCHOTTKY": {
+      "id": "D_SCHOTTKY",
+      "part": null,
+      "pins": {
+        "a": {
+          "function": null,
+          "name": "a",
+          "net": "v_solar"
+        },
+        "c": {
+          "function": null,
+          "name": "c",
+          "net": "v_bat"
+        }
+      },
+      "properties": {},
+      "spice_model": "1N5819",
+      "spice_subckt": null,
+      "type": "diode",
+      "value": null
+    },
+    "L_SYSTEM": {
+      "id": "L_SYSTEM",
+      "part": null,
+      "pins": {
+        "n": {
+          "function": null,
+          "name": "n",
+          "net": "load_low"
+        },
+        "p": {
+          "function": null,
+          "name": "p",
+          "net": "v_bat"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "generic_load",
+      "value": "150mA"
+    },
+    "Q_LOAD_SW": {
+      "id": "Q_LOAD_SW",
+      "part": null,
+      "pins": {
+        "D": {
+          "function": null,
+          "name": "D",
+          "net": "load_low"
+        },
+        "G": {
+          "function": null,
+          "name": "G",
+          "net": "load_ctrl"
+        },
+        "S": {
+          "function": null,
+          "name": "S",
+          "net": "gnd"
+        }
+      },
+      "properties": {},
+      "spice_model": "2N7002",
+      "spice_subckt": null,
+      "type": "mosfet",
+      "value": null
+    },
+    "R_BAT_BOT": {
+      "id": "R_BAT_BOT",
+      "part": null,
+      "pins": {
+        "1": {
+          "function": null,
+          "name": "1",
+          "net": "bat_sense"
+        },
+        "2": {
+          "function": null,
+          "name": "2",
+          "net": "gnd"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "resistor",
+      "value": "1M"
+    },
+    "R_BAT_TOP": {
+      "id": "R_BAT_TOP",
+      "part": null,
+      "pins": {
+        "1": {
+          "function": null,
+          "name": "1",
+          "net": "v_bat"
+        },
+        "2": {
+          "function": null,
+          "name": "2",
+          "net": "bat_sense"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "resistor",
+      "value": "1M"
+    },
+    "R_SOLAR_BOT": {
+      "id": "R_SOLAR_BOT",
+      "part": null,
+      "pins": {
+        "1": {
+          "function": null,
+          "name": "1",
+          "net": "solar_sense"
+        },
+        "2": {
+          "function": null,
+          "name": "2",
+          "net": "gnd"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "resistor",
+      "value": "470k"
+    },
+    "R_SOLAR_INTERNAL": {
+      "id": "R_SOLAR_INTERNAL",
+      "part": null,
+      "pins": {
+        "1": {
+          "function": null,
+          "name": "1",
+          "net": "v_solar_raw"
+        },
+        "2": {
+          "function": null,
+          "name": "2",
+          "net": "v_solar"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "resistor",
+      "value": "10"
+    },
+    "R_SOLAR_TOP": {
+      "id": "R_SOLAR_TOP",
+      "part": null,
+      "pins": {
+        "1": {
+          "function": null,
+          "name": "1",
+          "net": "v_solar"
+        },
+        "2": {
+          "function": null,
+          "name": "2",
+          "net": "solar_sense"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "resistor",
+      "value": "1M"
+    },
+    "U_MCU": {
+      "id": "U_MCU",
+      "part": "ESP32-C3",
+      "pins": {
+        "3V3": {
+          "function": null,
+          "name": "3V3",
+          "net": "v_logic"
+        },
+        "GND": {
+          "function": null,
+          "name": "GND",
+          "net": "gnd"
+        },
+        "GPIO0": {
+          "function": "ADC1_CH0",
+          "name": "GPIO0",
+          "net": "solar_sense"
+        },
+        "GPIO1": {
+          "function": "ADC1_CH1",
+          "name": "GPIO1",
+          "net": "bat_sense"
+        },
+        "GPIO2": {
+          "function": "GPIO_OUT",
+          "name": "GPIO2",
+          "net": "load_ctrl"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "mcu",
+      "value": null
+    },
+    "U_REG": {
+      "id": "U_REG",
+      "part": null,
+      "pins": {
+        "gnd": {
+          "function": null,
+          "name": "gnd",
+          "net": "gnd"
+        },
+        "in": {
+          "function": null,
+          "name": "in",
+          "net": "v_bat"
+        },
+        "out": {
+          "function": null,
+          "name": "out",
+          "net": "v_logic"
+        }
+      },
+      "properties": {
+        "iout_max": "500mA",
+        "iq": "100uA",
+        "v_dropout": "0.2V",
+        "vout": "3.3V"
+      },
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "ldo",
+      "value": null
+    },
+    "V_BAT": {
+      "id": "V_BAT",
+      "part": null,
+      "pins": {
+        "n": {
+          "function": null,
+          "name": "n",
+          "net": "gnd"
+        },
+        "p": {
+          "function": null,
+          "name": "p",
+          "net": "v_bat"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "voltage_source",
+      "value": "3.7V"
+    },
+    "V_SOLAR": {
+      "id": "V_SOLAR",
+      "part": null,
+      "pins": {
+        "n": {
+          "function": null,
+          "name": "n",
+          "net": "gnd"
+        },
+        "p": {
+          "function": null,
+          "name": "p",
+          "net": "v_solar_raw"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "voltage_source",
+      "value": "5.5V"
+    }
+  },
+  "exports": [],
+  "firmware_bindings": {
+    "bat_adc": {
+      "channel": "ADC1_CH1",
+      "component": "U_MCU",
+      "id": "bat_adc",
+      "net": "bat_sense",
+      "peripheral": "ADC1",
+      "signal": "battery_v"
+    },
+    "solar_adc": {
+      "channel": "ADC1_CH0",
+      "component": "U_MCU",
+      "id": "solar_adc",
+      "net": "solar_sense",
+      "peripheral": "ADC1",
+      "signal": "solar_v"
+    }
+  },
+  "firmware_projects": {
+    "fw_main": {
+      "board": "esp32-c3-devkitm-1",
+      "framework": "platformio",
+      "id": "fw_main",
+      "language": "cpp",
+      "source_tree": "",
+      "target": "U_MCU"
+    }
+  },
+  "firmware_tasks": {
+    "power_management": {
+      "id": "power_management",
+      "operations": [
+        {
+          "binding": "solar_adc",
+          "into": "s_val",
+          "op": "read_adc"
+        },
+        {
+          "binding": "bat_adc",
+          "into": "b_val",
+          "op": "read_adc"
+        },
+        {
+          "op": "write_gpio",
+          "pin": "GPIO2",
+          "value": "high"
+        }
+      ],
+      "period": "100ms",
+      "target": "fw_main"
+    }
+  },
+  "interfaces": {},
+  "ir_version": "0.1",
+  "metadata": {
+    "author": "",
+    "created_at": "",
+    "description": "Solar panel charging a battery with MCU-controlled load switching and dual-rail sensing.",
+    "title": "Solar Powered Sensor Node"
+  },
+  "name": "solar_sensor_node",
+  "nets": {
+    "bat_sense": {
+      "id": "bat_sense",
+      "nominal_voltage": null,
+      "role": "analog_signal"
+    },
+    "gnd": {
+      "id": "gnd",
+      "nominal_voltage": null,
+      "role": "ground"
+    },
+    "load_ctrl": {
+      "id": "load_ctrl",
+      "nominal_voltage": null,
+      "role": "digital_signal"
+    },
+    "load_low": {
+      "id": "load_low",
+      "nominal_voltage": null,
+      "role": "analog_signal"
+    },
+    "solar_sense": {
+      "id": "solar_sense",
+      "nominal_voltage": null,
+      "role": "analog_signal"
+    },
+    "v_bat": {
+      "id": "v_bat",
+      "nominal_voltage": "3.7V",
+      "role": "power"
+    },
+    "v_logic": {
+      "id": "v_logic",
+      "nominal_voltage": "3.3V",
+      "role": "power"
+    },
+    "v_solar": {
+      "id": "v_solar",
+      "nominal_voltage": "5.5V",
+      "role": "power"
+    },
+    "v_solar_raw": {
+      "id": "v_solar_raw",
+      "nominal_voltage": null,
+      "role": "power"
+    }
+  },
+  "power_domains": {},
+  "requirements": [],
+  "simulation_profiles": {
+    "mixed_signal": {
+      "backends": [
+        "ngspice",
+        "renode"
+      ],
+      "default": true,
+      "id": "mixed_signal",
+      "included_subsystems": [],
+      "properties": {},
+      "tests": [
+        "charging_scenario"
+      ]
+    }
+  },
+  "tests": {
+    "charging_scenario": {
+      "assertions": [
+        {
+          "max": "3.4V",
+          "min": "3.2V",
+          "net": "v_logic",
+          "op": "assert_voltage"
+        },
+        {
+          "max": "1.8V",
+          "min": "1.7V",
+          "net": "solar_sense",
+          "op": "assert_voltage"
+        },
+        {
+          "max": "1.9V",
+          "min": "1.8V",
+          "net": "bat_sense",
+          "op": "assert_voltage"
+        }
+      ],
+      "description": "Verify voltage levels during active charging.",
+      "duration": "200ms",
+      "id": "charging_scenario",
+      "setup": {
+        "v_bat": "3.7V",
+        "v_solar": "5.5V"
+      }
+    }
+  }
+}

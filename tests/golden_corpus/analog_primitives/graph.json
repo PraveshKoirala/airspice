@@ -1,0 +1,218 @@
+{
+  "edges": [
+    {
+      "data": {
+        "net": "vin",
+        "pin": "p"
+      },
+      "id": "LOAD_A:p->vin",
+      "label": "p",
+      "source": "LOAD_A",
+      "sourceHandle": "pin:p",
+      "target": "net:vin",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "n"
+      },
+      "id": "LOAD_A:n->gnd",
+      "label": "n",
+      "source": "LOAD_A",
+      "sourceHandle": "pin:n",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "mid",
+        "pin": "1"
+      },
+      "id": "R_BOTTOM:1->mid",
+      "label": "1",
+      "source": "R_BOTTOM",
+      "sourceHandle": "pin:1",
+      "target": "net:mid",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "2"
+      },
+      "id": "R_BOTTOM:2->gnd",
+      "label": "2",
+      "source": "R_BOTTOM",
+      "sourceHandle": "pin:2",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "vin",
+        "pin": "1"
+      },
+      "id": "R_TOP:1->vin",
+      "label": "1",
+      "source": "R_TOP",
+      "sourceHandle": "pin:1",
+      "target": "net:vin",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "mid",
+        "pin": "2"
+      },
+      "id": "R_TOP:2->mid",
+      "label": "2",
+      "source": "R_TOP",
+      "sourceHandle": "pin:2",
+      "target": "net:mid",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "vin",
+        "pin": "p"
+      },
+      "id": "V_IN:p->vin",
+      "label": "p",
+      "source": "V_IN",
+      "sourceHandle": "pin:p",
+      "target": "net:vin",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "n"
+      },
+      "id": "V_IN:n->gnd",
+      "label": "n",
+      "source": "V_IN",
+      "sourceHandle": "pin:n",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    }
+  ],
+  "nodes": [
+    {
+      "data": {
+        "label": "LOAD_A",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "n",
+            "net": "gnd"
+          },
+          {
+            "function": "",
+            "name": "p",
+            "net": "vin"
+          }
+        ],
+        "spice_model": "",
+        "type": "generic_load",
+        "value": "10mA"
+      },
+      "id": "LOAD_A",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "R_BOTTOM",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "1",
+            "net": "mid"
+          },
+          {
+            "function": "",
+            "name": "2",
+            "net": "gnd"
+          }
+        ],
+        "spice_model": "",
+        "type": "resistor",
+        "value": "10k"
+      },
+      "id": "R_BOTTOM",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "R_TOP",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "1",
+            "net": "vin"
+          },
+          {
+            "function": "",
+            "name": "2",
+            "net": "mid"
+          }
+        ],
+        "spice_model": "",
+        "type": "resistor",
+        "value": "10k"
+      },
+      "id": "R_TOP",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "V_IN",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "n",
+            "net": "gnd"
+          },
+          {
+            "function": "",
+            "name": "p",
+            "net": "vin"
+          }
+        ],
+        "spice_model": "",
+        "type": "voltage_source",
+        "value": "5V"
+      },
+      "id": "V_IN",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "gnd",
+        "role": "ground"
+      },
+      "id": "net:gnd",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "mid",
+        "role": "analog_signal"
+      },
+      "id": "net:mid",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "vin",
+        "role": "power"
+      },
+      "id": "net:vin",
+      "type": "net"
+    }
+  ]
+}

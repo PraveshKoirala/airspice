@@ -1,0 +1,87 @@
+{
+  "analog": [],
+  "bridges": [],
+  "components": {
+    "U_MCU": {
+      "id": "U_MCU",
+      "part": "ESP32-C3",
+      "pins": {
+        "3V3": {
+          "function": null,
+          "name": "3V3",
+          "net": "3v3"
+        },
+        "GND": {
+          "function": null,
+          "name": "GND",
+          "net": "gnd"
+        },
+        "GPIO4": {
+          "function": "I2C_SDA",
+          "name": "GPIO4",
+          "net": "sda"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "mcu",
+      "value": null
+    }
+  },
+  "exports": [],
+  "firmware_bindings": {},
+  "firmware_projects": {},
+  "firmware_tasks": {},
+  "interfaces": {},
+  "ir_version": "0.1",
+  "metadata": {
+    "author": "",
+    "created_at": "",
+    "description": "",
+    "title": "Invalid Pin Function"
+  },
+  "name": "invalid_pin_function",
+  "nets": {
+    "3v3": {
+      "id": "3v3",
+      "nominal_voltage": "3.3V",
+      "role": "power"
+    },
+    "gnd": {
+      "id": "gnd",
+      "nominal_voltage": null,
+      "role": "ground"
+    },
+    "sda": {
+      "id": "sda",
+      "nominal_voltage": null,
+      "role": "digital_signal"
+    }
+  },
+  "power_domains": {},
+  "requirements": [],
+  "simulation_profiles": {
+    "analog_only": {
+      "backends": [
+        "ngspice"
+      ],
+      "default": false,
+      "id": "analog_only",
+      "included_subsystems": [],
+      "properties": {},
+      "tests": [
+        "noop"
+      ]
+    }
+  },
+  "tests": {
+    "noop": {
+      "assertions": [],
+      "description": "",
+      "duration": "1ms",
+      "id": "noop",
+      "setup": {}
+    }
+  }
+}

@@ -1,0 +1,60 @@
+<?xml version="1.0" ?>
+<system ir_version="0.1" name="advanced_components_demo">
+  <metadata>
+    <title>Advanced Components Demo</title>
+    <description>Testing Diodes, custom MOSFET models, and Subcircuits.</description>
+  </metadata>
+  <nets>
+    <net id="ctrl" role="digital_signal"/>
+    <net id="gnd" role="ground"/>
+    <net id="switched" role="analog_signal"/>
+    <net id="v_in" nominal_voltage="5V" role="power"/>
+    <net id="v_out" role="power"/>
+    <net id="v_prot" role="power"/>
+  </nets>
+  <components>
+    <component id="D_PROT" type="diode">
+      <pin name="a" net="v_in"/>
+      <pin name="c" net="v_prot"/>
+    </component>
+    <component id="Q_SW" spice_model="MY_NMOS" type="mosfet">
+      <pin name="G" net="ctrl"/>
+      <pin name="D" net="switched"/>
+      <pin name="S" net="gnd"/>
+    </component>
+    <component id="U_REG" type="ldo">
+      <pin name="in" net="v_prot"/>
+      <pin name="out" net="v_out"/>
+      <pin name="gnd" net="gnd"/>
+      <property name="vout" value="3.3V"/>
+      <property name="iout_max" value="500mA"/>
+      <property name="v_dropout" value="0.2V"/>
+      <property name="iq" value="50uA"/>
+    </component>
+    <component id="V_SOURCE" type="voltage_source">
+      <value>5V</value>
+      <pin name="p" net="v_in"/>
+      <pin name="n" net="gnd"/>
+    </component>
+    <component id="X_CUSTOM" spice_subckt="LM358" type="opamp">
+      <pin name="1" net="v_out"/>
+      <pin name="2" net="gnd"/>
+      <pin name="3" net="switched"/>
+    </component>
+  </components>
+  <tests>
+    <test id="basic">
+      <setup>
+        <set_voltage net="ctrl" value="3.3V"/>
+      </setup>
+      <run duration="1ms"/>
+      <assert_voltage max="3.4V" min="3.2V" net="v_out"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="default">
+      <backend type="ngspice"/>
+      <run test="basic"/>
+    </profile>
+  </simulation_profiles>
+</system>

@@ -1,0 +1,297 @@
+{
+  "analog": [
+    {
+      "id": "charging_loop",
+      "probes": [
+        {
+          "id": "p_bat",
+          "net": "bat",
+          "quantity": "voltage"
+        },
+        {
+          "id": "p_ctrl",
+          "net": "charge_ctrl",
+          "quantity": "voltage"
+        }
+      ],
+      "uses": [
+        "C_BAT",
+        "Q_CHG"
+      ]
+    }
+  ],
+  "bridges": [],
+  "components": {
+    "C_BAT": {
+      "id": "C_BAT",
+      "part": null,
+      "pins": {
+        "1": {
+          "function": null,
+          "name": "1",
+          "net": "bat"
+        },
+        "2": {
+          "function": null,
+          "name": "2",
+          "net": "gnd"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "capacitor",
+      "value": "1000uF"
+    },
+    "MCU": {
+      "id": "MCU",
+      "part": "ESP32-C3",
+      "pins": {
+        "3V3": {
+          "function": null,
+          "name": "3V3",
+          "net": "v_3v3"
+        },
+        "GND": {
+          "function": null,
+          "name": "GND",
+          "net": "gnd"
+        },
+        "GPIO0": {
+          "function": "ADC1_CH0",
+          "name": "GPIO0",
+          "net": "bat_sense"
+        },
+        "GPIO1": {
+          "function": "GPIO_OUT",
+          "name": "GPIO1",
+          "net": "charge_ctrl"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "mcu",
+      "value": null
+    },
+    "Q_CHG": {
+      "id": "Q_CHG",
+      "part": "bss138",
+      "pins": {
+        "D": {
+          "function": null,
+          "name": "D",
+          "net": "v_in"
+        },
+        "G": {
+          "function": null,
+          "name": "G",
+          "net": "charge_ctrl"
+        },
+        "S": {
+          "function": null,
+          "name": "S",
+          "net": "bat"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "mosfet",
+      "value": null
+    },
+    "R_SENSE_BOT": {
+      "id": "R_SENSE_BOT",
+      "part": null,
+      "pins": {
+        "1": {
+          "function": null,
+          "name": "1",
+          "net": "bat_sense"
+        },
+        "2": {
+          "function": null,
+          "name": "2",
+          "net": "gnd"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "resistor",
+      "value": "100k"
+    },
+    "R_SENSE_TOP": {
+      "id": "R_SENSE_TOP",
+      "part": null,
+      "pins": {
+        "1": {
+          "function": null,
+          "name": "1",
+          "net": "bat"
+        },
+        "2": {
+          "function": null,
+          "name": "2",
+          "net": "bat_sense"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "resistor",
+      "value": "100k"
+    },
+    "U_REG": {
+      "id": "U_REG",
+      "part": "generic_3v3",
+      "pins": {
+        "gnd": {
+          "function": null,
+          "name": "gnd",
+          "net": "gnd"
+        },
+        "in": {
+          "function": null,
+          "name": "in",
+          "net": "v_in"
+        },
+        "out": {
+          "function": null,
+          "name": "out",
+          "net": "v_3v3"
+        }
+      },
+      "properties": {
+        "iout_max": "500mA",
+        "iq": "10uA",
+        "v_dropout": "0.2V",
+        "vout": "3.3V"
+      },
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "ldo",
+      "value": null
+    },
+    "V_SUPPLY": {
+      "id": "V_SUPPLY",
+      "part": null,
+      "pins": {
+        "n": {
+          "function": null,
+          "name": "n",
+          "net": "gnd"
+        },
+        "p": {
+          "function": null,
+          "name": "p",
+          "net": "v_in"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "voltage_source",
+      "value": "5V"
+    }
+  },
+  "exports": [],
+  "firmware_bindings": {
+    "bat_v_sense": {
+      "channel": "ADC1_CH0",
+      "component": "MCU",
+      "id": "bat_v_sense",
+      "net": "bat_sense",
+      "peripheral": "ADC1",
+      "signal": "battery_voltage"
+    }
+  },
+  "firmware_projects": {
+    "bms_fw": {
+      "board": "esp32-c3-devkitm-1",
+      "framework": "arduino",
+      "id": "bms_fw",
+      "language": "",
+      "source_tree": "tests/capability_suite/firmware",
+      "target": "MCU"
+    }
+  },
+  "firmware_tasks": {},
+  "interfaces": {},
+  "ir_version": "0.1",
+  "metadata": {
+    "author": "Test Suite",
+    "created_at": "2026-06-06",
+    "description": "A multi-stage LiPo charger with CC/CV logic implemented in C++.",
+    "title": "Complex Battery Management System"
+  },
+  "name": "complex_bms",
+  "nets": {
+    "bat": {
+      "id": "bat",
+      "nominal_voltage": "3.7V",
+      "role": "power"
+    },
+    "bat_sense": {
+      "id": "bat_sense",
+      "nominal_voltage": null,
+      "role": "analog_signal"
+    },
+    "charge_ctrl": {
+      "id": "charge_ctrl",
+      "nominal_voltage": null,
+      "role": "analog_signal"
+    },
+    "gnd": {
+      "id": "gnd",
+      "nominal_voltage": null,
+      "role": "ground"
+    },
+    "v_3v3": {
+      "id": "v_3v3",
+      "nominal_voltage": "3.3V",
+      "role": "power"
+    },
+    "v_in": {
+      "id": "v_in",
+      "nominal_voltage": "5V",
+      "role": "power"
+    }
+  },
+  "power_domains": {},
+  "requirements": [],
+  "simulation_profiles": {
+    "full_verify": {
+      "backends": [
+        "ngspice"
+      ],
+      "default": true,
+      "id": "full_verify",
+      "included_subsystems": [
+        "charging_loop"
+      ],
+      "properties": {},
+      "tests": [
+        "charge_cycle"
+      ]
+    }
+  },
+  "tests": {
+    "charge_cycle": {
+      "assertions": [
+        {
+          "max": "4.3V",
+          "min": "3.0V",
+          "net": "bat",
+          "op": "assert_voltage"
+        }
+      ],
+      "description": "",
+      "duration": "1s",
+      "id": "charge_cycle",
+      "setup": {
+        "bat": "3.0V"
+      }
+    }
+  }
+}

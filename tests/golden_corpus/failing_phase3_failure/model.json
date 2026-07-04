@@ -1,0 +1,215 @@
+{
+  "analog": [],
+  "bridges": [],
+  "components": {
+    "L_HEAVY": {
+      "id": "L_HEAVY",
+      "part": null,
+      "pins": {
+        "n": {
+          "function": null,
+          "name": "n",
+          "net": "gnd"
+        },
+        "p": {
+          "function": null,
+          "name": "p",
+          "net": "3v3"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "generic_load",
+      "value": "200mA"
+    },
+    "U_MCU": {
+      "id": "U_MCU",
+      "part": "ESP32-C3",
+      "pins": {
+        "3V3": {
+          "function": null,
+          "name": "3V3",
+          "net": "3v3"
+        },
+        "GND": {
+          "function": null,
+          "name": "GND",
+          "net": "gnd"
+        },
+        "GPIO8": {
+          "function": "I2C_SDA",
+          "name": "GPIO8",
+          "net": "sda"
+        },
+        "GPIO9": {
+          "function": "I2C_SCL",
+          "name": "GPIO9",
+          "net": "scl"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "mcu",
+      "value": null
+    },
+    "U_REG_3V3": {
+      "id": "U_REG_3V3",
+      "part": null,
+      "pins": {
+        "gnd": {
+          "function": null,
+          "name": "gnd",
+          "net": "gnd"
+        },
+        "in": {
+          "function": null,
+          "name": "in",
+          "net": "v_bat"
+        },
+        "out": {
+          "function": null,
+          "name": "out",
+          "net": "3v3"
+        }
+      },
+      "properties": {
+        "iout_max": "500mA",
+        "iq": "1mA",
+        "v_dropout": "0.2V",
+        "vout": "3.3V"
+      },
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "ldo",
+      "value": null
+    },
+    "V_BAT": {
+      "id": "V_BAT",
+      "part": null,
+      "pins": {
+        "n": {
+          "function": null,
+          "name": "n",
+          "net": "gnd"
+        },
+        "p": {
+          "function": null,
+          "name": "p",
+          "net": "v_bat"
+        }
+      },
+      "properties": {
+        "i_max": "100mA"
+      },
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "voltage_source",
+      "value": "3.7V"
+    }
+  },
+  "exports": [],
+  "firmware_bindings": {},
+  "firmware_projects": {},
+  "firmware_tasks": {},
+  "interfaces": {
+    "i2c_bus": {
+      "data": {
+        "controller": {
+          "component": "U_MCU",
+          "peripheral": "I2C0"
+        },
+        "property": {
+          "name": "speed",
+          "value": "400kHz"
+        },
+        "pullup": [
+          {
+            "net": "sda",
+            "to": "1v8",
+            "value": "10k"
+          },
+          {
+            "net": "scl",
+            "to": "1v8",
+            "value": "10k"
+          }
+        ],
+        "scl": {
+          "net": "scl"
+        },
+        "sda": {
+          "net": "sda"
+        }
+      },
+      "id": "i2c_bus",
+      "type": "i2c"
+    }
+  },
+  "ir_version": "0.1",
+  "metadata": {
+    "author": "",
+    "created_at": "",
+    "description": "Tests source overload, I2C pullup strength, and voltage mismatch.",
+    "title": "Phase 3 Failure Demo"
+  },
+  "name": "phase3_failure_demo",
+  "nets": {
+    "1v8": {
+      "id": "1v8",
+      "nominal_voltage": "1.8V",
+      "role": "power"
+    },
+    "3v3": {
+      "id": "3v3",
+      "nominal_voltage": "3.3V",
+      "role": "power"
+    },
+    "gnd": {
+      "id": "gnd",
+      "nominal_voltage": null,
+      "role": "ground"
+    },
+    "scl": {
+      "id": "scl",
+      "nominal_voltage": null,
+      "role": "digital_signal"
+    },
+    "sda": {
+      "id": "sda",
+      "nominal_voltage": null,
+      "role": "digital_signal"
+    },
+    "v_bat": {
+      "id": "v_bat",
+      "nominal_voltage": "3.7V",
+      "role": "power"
+    }
+  },
+  "power_domains": {},
+  "requirements": [],
+  "simulation_profiles": {
+    "default": {
+      "backends": [
+        "ngspice"
+      ],
+      "default": false,
+      "id": "default",
+      "included_subsystems": [],
+      "properties": {},
+      "tests": [
+        "basic"
+      ]
+    }
+  },
+  "tests": {
+    "basic": {
+      "assertions": [],
+      "description": "",
+      "duration": "1ms",
+      "id": "basic",
+      "setup": {}
+    }
+  }
+}

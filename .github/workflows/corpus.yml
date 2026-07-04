@@ -1,0 +1,134 @@
+name: Golden corpus
+
+# The golden corpus (issue #4) freezes the Python oracle's reference outputs so
+# every future TS/WASM port can be verified against them. This workflow has two
+# jobs, both on ubuntu with the SAME apt ngspice that the required `core-py` job
+# (ci.yml) installs -- so the version they see is identical:
+#
+#   corpus-check  (push/PR touching the corpus or engine): regenerates into a temp
+#                 dir and diffs against the committed corpus, then runs the mutation
+#                 self-test. This is the "reproducible + not silently edited" gate.
+#
+#   corpus-generate (workflow_dispatch only): regenerates the corpus with the pinned
+#                 ngspice and uploads tests/golden_corpus as an artifact. Used to
+#                 produce the committed corpus from CI's ngspice when the maintainer's
+#                 local ngspice differs from the pin (per issue #4's ngspice-pin
+#                 strategy comment).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tests/golden_corpus/**"
+      - "scripts/export_golden.py"
+      - "packages/core/src/air/**"
+      - ".github/workflows/corpus.yml"
+  pull_request:
+    paths:
+      - "tests/golden_corpus/**"
+      - "scripts/export_golden.py"
+      - "packages/core/src/air/**"
+      - ".github/workflows/corpus.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: corpus-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  corpus-check:
+    name: corpus --check (reproducibility + mutation self-test)
+    # Skip on workflow_dispatch: that path is for (re)generating, not checking a
+    # possibly-absent corpus.
+    if: github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install ngspice (same apt package as core-py)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ngspice
+          ngspice --version | head -n 5
+
+      - name: Install package and deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e . python-dotenv
+
+      # Two --check runs in a row prove determinism (same requirement the issue
+      # names for the local proof). The self-test proves the check has teeth.
+      - name: corpus --check (run 1)
+        env:
+          PYTHONPATH: packages/core/src
+        run: python scripts/export_golden.py --check
+
+      - name: corpus --check (run 2)
+        env:
+          PYTHONPATH: packages/core/src
+        run: python scripts/export_golden.py --check
+
+      - name: corpus mutation self-test
+        env:
+          PYTHONPATH: packages/core/src
+        run: python scripts/export_golden.py --self-test
+
+  corpus-generate:
+    name: corpus generate (upload artifact)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install ngspice (same apt package as core-py)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ngspice
+          ngspice --version | head -n 5
+
+      - name: Install package and deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e . python-dotenv
+
+      # Re-pin to the apt ngspice this runner has, then regenerate everything from it.
+      - name: Regenerate corpus from CI's ngspice
+        env:
+          PYTHONPATH: packages/core/src
+        run: |
+          rm -f tests/golden_corpus/ENGINE_VERSIONS
+          python scripts/export_golden.py
+
+      - name: Verify the freshly generated corpus reproduces (twice) + self-test
+        env:
+          PYTHONPATH: packages/core/src
+        run: |
+          python scripts/export_golden.py --check
+          python scripts/export_golden.py --check
+          python scripts/export_golden.py --self-test
+
+      - name: Show pinned version
+        run: cat tests/golden_corpus/ENGINE_VERSIONS
+
+      - name: Upload corpus artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-corpus
+          path: tests/golden_corpus
+          if-no-files-found: error
+          include-hidden-files: true

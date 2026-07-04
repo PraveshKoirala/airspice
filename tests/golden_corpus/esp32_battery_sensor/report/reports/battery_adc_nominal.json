@@ -1,0 +1,48 @@
+{
+  "artifacts": [
+    "spice/main.cir",
+    "spice/probes.json",
+    "waveforms/battery_adc_nominal_battery_sense.csv"
+  ],
+  "backend": "ngspice",
+  "diagnostics": [],
+  "measurement_stats": {
+    "3v3": {
+      "final": "3.3V",
+      "max": "3.3V",
+      "min": "3.3V",
+      "time_of_max": "0s",
+      "time_of_min": "0s"
+    },
+    "bat": {
+      "final": "4.2V",
+      "max": "4.2V",
+      "min": "4.2V",
+      "time_of_max": "0s",
+      "time_of_min": "0s"
+    },
+    "battery_sense": {
+      "final": "1.04211V",
+      "max": "1.04211V",
+      "min": "1.04211V",
+      "time_of_max": "0s",
+      "time_of_min": "0s"
+    },
+    "gnd": {
+      "final": "0V",
+      "max": "0V",
+      "min": "0V",
+      "time_of_max": "0s",
+      "time_of_min": "0s"
+    }
+  },
+  "measurements": {
+    "3v3": "3.3V",
+    "bat": "4.2V",
+    "battery_sense": "1.04211V",
+    "gnd": "0V"
+  },
+  "profile": "analog_only",
+  "status": "passed",
+  "test": "battery_adc_nominal"
+}

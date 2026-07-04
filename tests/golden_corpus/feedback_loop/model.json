@@ -1,0 +1,250 @@
+{
+  "analog": [],
+  "bridges": [
+    {
+      "data": {
+        "analog_source": {
+          "net": "v_out"
+        },
+        "digital_target": {
+          "channel": "ADC1_CH0",
+          "component": "U_MCU",
+          "peripheral": "ADC1"
+        },
+        "id": "b1",
+        "type": "adc"
+      },
+      "id": "b1",
+      "type": "adc"
+    }
+  ],
+  "components": {
+    "C_FILTER": {
+      "id": "C_FILTER",
+      "part": null,
+      "pins": {
+        "1": {
+          "function": null,
+          "name": "1",
+          "net": "v_out"
+        },
+        "2": {
+          "function": null,
+          "name": "2",
+          "net": "gnd"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "capacitor",
+      "value": "10uF"
+    },
+    "L_LOAD": {
+      "id": "L_LOAD",
+      "part": null,
+      "pins": {
+        "n": {
+          "function": null,
+          "name": "n",
+          "net": "gnd"
+        },
+        "p": {
+          "function": null,
+          "name": "p",
+          "net": "v_out"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "generic_load",
+      "value": "100mA"
+    },
+    "Q_SW": {
+      "id": "Q_SW",
+      "part": null,
+      "pins": {
+        "D": {
+          "function": null,
+          "name": "D",
+          "net": "v_in"
+        },
+        "G": {
+          "function": null,
+          "name": "G",
+          "net": "ctrl"
+        },
+        "S": {
+          "function": null,
+          "name": "S",
+          "net": "v_out"
+        }
+      },
+      "properties": {},
+      "spice_model": "BSS138",
+      "spice_subckt": null,
+      "type": "mosfet",
+      "value": null
+    },
+    "U_MCU": {
+      "id": "U_MCU",
+      "part": "ESP32-C3",
+      "pins": {
+        "3V3": {
+          "function": null,
+          "name": "3V3",
+          "net": "v_in"
+        },
+        "GND": {
+          "function": null,
+          "name": "GND",
+          "net": "gnd"
+        },
+        "GPIO0": {
+          "function": "ADC1_CH0",
+          "name": "GPIO0",
+          "net": "v_out"
+        },
+        "GPIO2": {
+          "function": "GPIO_OUT",
+          "name": "GPIO2",
+          "net": "ctrl"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "mcu",
+      "value": null
+    },
+    "V_IN": {
+      "id": "V_IN",
+      "part": null,
+      "pins": {
+        "n": {
+          "function": null,
+          "name": "n",
+          "net": "gnd"
+        },
+        "p": {
+          "function": null,
+          "name": "p",
+          "net": "v_in"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "voltage_source",
+      "value": "12V"
+    }
+  },
+  "exports": [],
+  "firmware_bindings": {
+    "out_sense": {
+      "channel": "ADC1_CH0",
+      "component": "U_MCU",
+      "id": "out_sense",
+      "net": "v_out",
+      "peripheral": "ADC1",
+      "signal": ""
+    }
+  },
+  "firmware_projects": {
+    "fw": {
+      "board": "esp32-c3-devkitm-1",
+      "framework": "platformio",
+      "id": "fw",
+      "language": "cpp",
+      "source_tree": "",
+      "target": "U_MCU"
+    }
+  },
+  "firmware_tasks": {
+    "pid_loop": {
+      "id": "pid_loop",
+      "operations": [
+        {
+          "binding": "out_sense",
+          "into": "val",
+          "op": "read_adc"
+        },
+        {
+          "op": "write_gpio",
+          "pin": "GPIO2",
+          "value": "high"
+        }
+      ],
+      "period": "100us",
+      "target": "fw"
+    }
+  },
+  "interfaces": {},
+  "ir_version": "0.1",
+  "metadata": {
+    "author": "",
+    "created_at": "",
+    "description": "Simulating a scenario where slow co-simulation fails (e.g., motor controller or fast regulator).",
+    "title": "High-Speed Feedback Loop Test"
+  },
+  "name": "feedback_loop_test",
+  "nets": {
+    "ctrl": {
+      "id": "ctrl",
+      "nominal_voltage": null,
+      "role": "digital_signal"
+    },
+    "gnd": {
+      "id": "gnd",
+      "nominal_voltage": null,
+      "role": "ground"
+    },
+    "v_in": {
+      "id": "v_in",
+      "nominal_voltage": "12V",
+      "role": "power"
+    },
+    "v_out": {
+      "id": "v_out",
+      "nominal_voltage": null,
+      "role": "power"
+    }
+  },
+  "power_domains": {},
+  "requirements": [],
+  "simulation_profiles": {
+    "lockstep_sim": {
+      "backends": [
+        "ngspice",
+        "renode"
+      ],
+      "default": true,
+      "id": "lockstep_sim",
+      "included_subsystems": [],
+      "properties": {
+        "co_sim_mode": "lockstep",
+        "time_step": "100us"
+      },
+      "tests": [
+        "fast_regulation"
+      ]
+    }
+  },
+  "tests": {
+    "fast_regulation": {
+      "assertions": [
+        {
+          "max": "5.5V",
+          "min": "4.5V",
+          "net": "v_out",
+          "op": "assert_voltage"
+        }
+      ],
+      "description": "",
+      "duration": "10ms",
+      "id": "fast_regulation",
+      "setup": {}
+    }
+  }
+}

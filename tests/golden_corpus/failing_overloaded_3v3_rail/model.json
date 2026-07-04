@@ -1,0 +1,122 @@
+{
+  "analog": [],
+  "bridges": [],
+  "components": {
+    "LOAD_WIFI": {
+      "id": "LOAD_WIFI",
+      "part": null,
+      "pins": {
+        "n": {
+          "function": null,
+          "name": "n",
+          "net": "gnd"
+        },
+        "p": {
+          "function": null,
+          "name": "p",
+          "net": "3v3"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "generic_load",
+      "value": "700mA"
+    },
+    "U_REG": {
+      "id": "U_REG",
+      "part": "generic_ldo_3v3",
+      "pins": {
+        "gnd": {
+          "function": null,
+          "name": "gnd",
+          "net": "gnd"
+        },
+        "in": {
+          "function": null,
+          "name": "in",
+          "net": "bat"
+        },
+        "out": {
+          "function": null,
+          "name": "out",
+          "net": "3v3"
+        }
+      },
+      "properties": {
+        "iout_max": "250mA",
+        "iq": "10uA",
+        "v_dropout": "200mV",
+        "vout": "3.3V"
+      },
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "ldo",
+      "value": null
+    }
+  },
+  "exports": [],
+  "firmware_bindings": {},
+  "firmware_projects": {},
+  "firmware_tasks": {},
+  "interfaces": {},
+  "ir_version": "0.1",
+  "metadata": {
+    "author": "",
+    "created_at": "",
+    "description": "",
+    "title": "Overloaded 3V3 Rail"
+  },
+  "name": "overloaded_3v3_rail",
+  "nets": {
+    "3v3": {
+      "id": "3v3",
+      "nominal_voltage": "3.3V",
+      "role": "power"
+    },
+    "bat": {
+      "id": "bat",
+      "nominal_voltage": "3.7V",
+      "role": "power"
+    },
+    "gnd": {
+      "id": "gnd",
+      "nominal_voltage": null,
+      "role": "ground"
+    }
+  },
+  "power_domains": {},
+  "requirements": [],
+  "simulation_profiles": {
+    "analog_only": {
+      "backends": [
+        "ngspice"
+      ],
+      "default": false,
+      "id": "analog_only",
+      "included_subsystems": [],
+      "properties": {},
+      "tests": [
+        "rail_current"
+      ]
+    }
+  },
+  "tests": {
+    "rail_current": {
+      "assertions": [
+        {
+          "max": "3.6V",
+          "min": "3.0V",
+          "net": "3v3",
+          "op": "assert_voltage"
+        }
+      ],
+      "description": "",
+      "duration": "1ms",
+      "id": "rail_current",
+      "setup": {
+        "bat": "3.7V"
+      }
+    }
+  }
+}

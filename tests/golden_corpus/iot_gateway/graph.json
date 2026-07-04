@@ -1,0 +1,870 @@
+{
+  "edges": [
+    {
+      "data": {
+        "net": "v_3v3",
+        "pin": "p"
+      },
+      "id": "L_RADIO:p->v_3v3",
+      "label": "p",
+      "source": "L_RADIO",
+      "sourceHandle": "pin:p",
+      "target": "net:v_3v3",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "radio_high",
+        "pin": "n"
+      },
+      "id": "L_RADIO:n->radio_high",
+      "label": "n",
+      "source": "L_RADIO",
+      "sourceHandle": "pin:n",
+      "target": "net:radio_high",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "radio_en",
+        "pin": "G"
+      },
+      "id": "Q_RADIO_GATE:G->radio_en",
+      "label": "G",
+      "source": "Q_RADIO_GATE",
+      "sourceHandle": "pin:G",
+      "target": "net:radio_en",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "radio_high",
+        "pin": "D"
+      },
+      "id": "Q_RADIO_GATE:D->radio_high",
+      "label": "D",
+      "source": "Q_RADIO_GATE",
+      "sourceHandle": "pin:D",
+      "target": "net:radio_high",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "S"
+      },
+      "id": "Q_RADIO_GATE:S->gnd",
+      "label": "S",
+      "source": "Q_RADIO_GATE",
+      "sourceHandle": "pin:S",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "scl_1v8",
+        "pin": "S"
+      },
+      "id": "Q_SCL_SHIFT:S->scl_1v8",
+      "label": "S",
+      "source": "Q_SCL_SHIFT",
+      "sourceHandle": "pin:S",
+      "target": "net:scl_1v8",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_1v8",
+        "pin": "G"
+      },
+      "id": "Q_SCL_SHIFT:G->v_1v8",
+      "label": "G",
+      "source": "Q_SCL_SHIFT",
+      "sourceHandle": "pin:G",
+      "target": "net:v_1v8",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "scl_3v3",
+        "pin": "D"
+      },
+      "id": "Q_SCL_SHIFT:D->scl_3v3",
+      "label": "D",
+      "source": "Q_SCL_SHIFT",
+      "sourceHandle": "pin:D",
+      "target": "net:scl_3v3",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "sda_1v8",
+        "pin": "S"
+      },
+      "id": "Q_SDA_SHIFT:S->sda_1v8",
+      "label": "S",
+      "source": "Q_SDA_SHIFT",
+      "sourceHandle": "pin:S",
+      "target": "net:sda_1v8",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_1v8",
+        "pin": "G"
+      },
+      "id": "Q_SDA_SHIFT:G->v_1v8",
+      "label": "G",
+      "source": "Q_SDA_SHIFT",
+      "sourceHandle": "pin:G",
+      "target": "net:v_1v8",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "sda_3v3",
+        "pin": "D"
+      },
+      "id": "Q_SDA_SHIFT:D->sda_3v3",
+      "label": "D",
+      "source": "Q_SDA_SHIFT",
+      "sourceHandle": "pin:D",
+      "target": "net:sda_3v3",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_bat",
+        "pin": "1"
+      },
+      "id": "R_BAT_HI:1->v_bat",
+      "label": "1",
+      "source": "R_BAT_HI",
+      "sourceHandle": "pin:1",
+      "target": "net:v_bat",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "bat_sense",
+        "pin": "2"
+      },
+      "id": "R_BAT_HI:2->bat_sense",
+      "label": "2",
+      "source": "R_BAT_HI",
+      "sourceHandle": "pin:2",
+      "target": "net:bat_sense",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "bat_sense",
+        "pin": "1"
+      },
+      "id": "R_BAT_LO:1->bat_sense",
+      "label": "1",
+      "source": "R_BAT_LO",
+      "sourceHandle": "pin:1",
+      "target": "net:bat_sense",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "2"
+      },
+      "id": "R_BAT_LO:2->gnd",
+      "label": "2",
+      "source": "R_BAT_LO",
+      "sourceHandle": "pin:2",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_3v3",
+        "pin": "3V3"
+      },
+      "id": "U_MCU:3V3->v_3v3",
+      "label": "3V3",
+      "source": "U_MCU",
+      "sourceHandle": "pin:3V3",
+      "target": "net:v_3v3",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "GND"
+      },
+      "id": "U_MCU:GND->gnd",
+      "label": "GND",
+      "source": "U_MCU",
+      "sourceHandle": "pin:GND",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "bat_sense",
+        "pin": "GPIO0"
+      },
+      "id": "U_MCU:GPIO0->bat_sense",
+      "label": "GPIO0",
+      "source": "U_MCU",
+      "sourceHandle": "pin:GPIO0",
+      "target": "net:bat_sense",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "radio_en",
+        "pin": "GPIO1"
+      },
+      "id": "U_MCU:GPIO1->radio_en",
+      "label": "GPIO1",
+      "source": "U_MCU",
+      "sourceHandle": "pin:GPIO1",
+      "target": "net:radio_en",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "sda_3v3",
+        "pin": "GPIO8"
+      },
+      "id": "U_MCU:GPIO8->sda_3v3",
+      "label": "GPIO8",
+      "source": "U_MCU",
+      "sourceHandle": "pin:GPIO8",
+      "target": "net:sda_3v3",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "scl_3v3",
+        "pin": "GPIO9"
+      },
+      "id": "U_MCU:GPIO9->scl_3v3",
+      "label": "GPIO9",
+      "source": "U_MCU",
+      "sourceHandle": "pin:GPIO9",
+      "target": "net:scl_3v3",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_3v3",
+        "pin": "in"
+      },
+      "id": "U_REG_1V8:in->v_3v3",
+      "label": "in",
+      "source": "U_REG_1V8",
+      "sourceHandle": "pin:in",
+      "target": "net:v_3v3",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_1v8",
+        "pin": "out"
+      },
+      "id": "U_REG_1V8:out->v_1v8",
+      "label": "out",
+      "source": "U_REG_1V8",
+      "sourceHandle": "pin:out",
+      "target": "net:v_1v8",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "gnd"
+      },
+      "id": "U_REG_1V8:gnd->gnd",
+      "label": "gnd",
+      "source": "U_REG_1V8",
+      "sourceHandle": "pin:gnd",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_bat",
+        "pin": "in"
+      },
+      "id": "U_REG_3V3:in->v_bat",
+      "label": "in",
+      "source": "U_REG_3V3",
+      "sourceHandle": "pin:in",
+      "target": "net:v_bat",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_3v3",
+        "pin": "out"
+      },
+      "id": "U_REG_3V3:out->v_3v3",
+      "label": "out",
+      "source": "U_REG_3V3",
+      "sourceHandle": "pin:out",
+      "target": "net:v_3v3",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "gnd"
+      },
+      "id": "U_REG_3V3:gnd->gnd",
+      "label": "gnd",
+      "source": "U_REG_3V3",
+      "sourceHandle": "pin:gnd",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_ext",
+        "pin": "p"
+      },
+      "id": "V_EXT:p->v_ext",
+      "label": "p",
+      "source": "V_EXT",
+      "sourceHandle": "pin:p",
+      "target": "net:v_ext",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "n"
+      },
+      "id": "V_EXT:n->gnd",
+      "label": "n",
+      "source": "V_EXT",
+      "sourceHandle": "pin:n",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_ext",
+        "pin": "VIN"
+      },
+      "id": "X_CHARGER:VIN->v_ext",
+      "label": "VIN",
+      "source": "X_CHARGER",
+      "sourceHandle": "pin:VIN",
+      "target": "net:v_ext",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_bat",
+        "pin": "VBAT"
+      },
+      "id": "X_CHARGER:VBAT->v_bat",
+      "label": "VBAT",
+      "source": "X_CHARGER",
+      "sourceHandle": "pin:VBAT",
+      "target": "net:v_bat",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "GND"
+      },
+      "id": "X_CHARGER:GND->gnd",
+      "label": "GND",
+      "source": "X_CHARGER",
+      "sourceHandle": "pin:GND",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_1v8",
+        "pin": "VDD"
+      },
+      "id": "X_SENSOR:VDD->v_1v8",
+      "label": "VDD",
+      "source": "X_SENSOR",
+      "sourceHandle": "pin:VDD",
+      "target": "net:v_1v8",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "sda_1v8",
+        "pin": "SDA"
+      },
+      "id": "X_SENSOR:SDA->sda_1v8",
+      "label": "SDA",
+      "source": "X_SENSOR",
+      "sourceHandle": "pin:SDA",
+      "target": "net:sda_1v8",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "scl_1v8",
+        "pin": "SCL"
+      },
+      "id": "X_SENSOR:SCL->scl_1v8",
+      "label": "SCL",
+      "source": "X_SENSOR",
+      "sourceHandle": "pin:SCL",
+      "target": "net:scl_1v8",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "GND"
+      },
+      "id": "X_SENSOR:GND->gnd",
+      "label": "GND",
+      "source": "X_SENSOR",
+      "sourceHandle": "pin:GND",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    }
+  ],
+  "nodes": [
+    {
+      "data": {
+        "label": "L_RADIO",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "n",
+            "net": "radio_high"
+          },
+          {
+            "function": "",
+            "name": "p",
+            "net": "v_3v3"
+          }
+        ],
+        "spice_model": "",
+        "type": "generic_load",
+        "value": "400mA"
+      },
+      "id": "L_RADIO",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "Q_RADIO_GATE",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "D",
+            "net": "radio_high"
+          },
+          {
+            "function": "",
+            "name": "G",
+            "net": "radio_en"
+          },
+          {
+            "function": "",
+            "name": "S",
+            "net": "gnd"
+          }
+        ],
+        "spice_model": "BSS138",
+        "type": "mosfet",
+        "value": ""
+      },
+      "id": "Q_RADIO_GATE",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "Q_SCL_SHIFT",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "D",
+            "net": "scl_3v3"
+          },
+          {
+            "function": "",
+            "name": "G",
+            "net": "v_1v8"
+          },
+          {
+            "function": "",
+            "name": "S",
+            "net": "scl_1v8"
+          }
+        ],
+        "spice_model": "BSS138",
+        "type": "mosfet",
+        "value": ""
+      },
+      "id": "Q_SCL_SHIFT",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "Q_SDA_SHIFT",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "D",
+            "net": "sda_3v3"
+          },
+          {
+            "function": "",
+            "name": "G",
+            "net": "v_1v8"
+          },
+          {
+            "function": "",
+            "name": "S",
+            "net": "sda_1v8"
+          }
+        ],
+        "spice_model": "BSS138",
+        "type": "mosfet",
+        "value": ""
+      },
+      "id": "Q_SDA_SHIFT",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "R_BAT_HI",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "1",
+            "net": "v_bat"
+          },
+          {
+            "function": "",
+            "name": "2",
+            "net": "bat_sense"
+          }
+        ],
+        "spice_model": "",
+        "type": "resistor",
+        "value": "1M"
+      },
+      "id": "R_BAT_HI",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "R_BAT_LO",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "1",
+            "net": "bat_sense"
+          },
+          {
+            "function": "",
+            "name": "2",
+            "net": "gnd"
+          }
+        ],
+        "spice_model": "",
+        "type": "resistor",
+        "value": "470k"
+      },
+      "id": "R_BAT_LO",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "U_MCU",
+        "part": "ESP32-C3",
+        "pins": [
+          {
+            "function": "",
+            "name": "3V3",
+            "net": "v_3v3"
+          },
+          {
+            "function": "",
+            "name": "GND",
+            "net": "gnd"
+          },
+          {
+            "function": "ADC1_CH0",
+            "name": "GPIO0",
+            "net": "bat_sense"
+          },
+          {
+            "function": "GPIO_OUT",
+            "name": "GPIO1",
+            "net": "radio_en"
+          },
+          {
+            "function": "I2C_SDA",
+            "name": "GPIO8",
+            "net": "sda_3v3"
+          },
+          {
+            "function": "I2C_SCL",
+            "name": "GPIO9",
+            "net": "scl_3v3"
+          }
+        ],
+        "spice_model": "",
+        "type": "mcu",
+        "value": ""
+      },
+      "id": "U_MCU",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "U_REG_1V8",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "gnd",
+            "net": "gnd"
+          },
+          {
+            "function": "",
+            "name": "in",
+            "net": "v_3v3"
+          },
+          {
+            "function": "",
+            "name": "out",
+            "net": "v_1v8"
+          }
+        ],
+        "spice_model": "",
+        "type": "ldo",
+        "value": ""
+      },
+      "id": "U_REG_1V8",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "U_REG_3V3",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "gnd",
+            "net": "gnd"
+          },
+          {
+            "function": "",
+            "name": "in",
+            "net": "v_bat"
+          },
+          {
+            "function": "",
+            "name": "out",
+            "net": "v_3v3"
+          }
+        ],
+        "spice_model": "",
+        "type": "ldo",
+        "value": ""
+      },
+      "id": "U_REG_3V3",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "V_EXT",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "n",
+            "net": "gnd"
+          },
+          {
+            "function": "",
+            "name": "p",
+            "net": "v_ext"
+          }
+        ],
+        "spice_model": "",
+        "type": "voltage_source",
+        "value": "12V"
+      },
+      "id": "V_EXT",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "X_CHARGER",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "GND",
+            "net": "gnd"
+          },
+          {
+            "function": "",
+            "name": "VBAT",
+            "net": "v_bat"
+          },
+          {
+            "function": "",
+            "name": "VIN",
+            "net": "v_ext"
+          }
+        ],
+        "spice_model": "",
+        "type": "power_manager",
+        "value": ""
+      },
+      "id": "X_CHARGER",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "X_SENSOR",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "GND",
+            "net": "gnd"
+          },
+          {
+            "function": "",
+            "name": "SCL",
+            "net": "scl_1v8"
+          },
+          {
+            "function": "",
+            "name": "SDA",
+            "net": "sda_1v8"
+          },
+          {
+            "function": "",
+            "name": "VDD",
+            "net": "v_1v8"
+          }
+        ],
+        "spice_model": "",
+        "type": "sensor",
+        "value": ""
+      },
+      "id": "X_SENSOR",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "bat_sense",
+        "role": "analog_signal"
+      },
+      "id": "net:bat_sense",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "gnd",
+        "role": "ground"
+      },
+      "id": "net:gnd",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "radio_en",
+        "role": "digital_signal"
+      },
+      "id": "net:radio_en",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "radio_high",
+        "role": "analog_signal"
+      },
+      "id": "net:radio_high",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "scl_1v8",
+        "role": "digital_signal"
+      },
+      "id": "net:scl_1v8",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "scl_3v3",
+        "role": "digital_signal"
+      },
+      "id": "net:scl_3v3",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "sda_1v8",
+        "role": "digital_signal"
+      },
+      "id": "net:sda_1v8",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "sda_3v3",
+        "role": "digital_signal"
+      },
+      "id": "net:sda_3v3",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "v_1v8",
+        "role": "power"
+      },
+      "id": "net:v_1v8",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "v_3v3",
+        "role": "power"
+      },
+      "id": "net:v_3v3",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "v_bat",
+        "role": "power"
+      },
+      "id": "net:v_bat",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "v_ext",
+        "role": "power"
+      },
+      "id": "net:v_ext",
+      "type": "net"
+    }
+  ]
+}

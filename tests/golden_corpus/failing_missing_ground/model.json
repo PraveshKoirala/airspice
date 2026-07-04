@@ -1,0 +1,67 @@
+{
+  "analog": [],
+  "bridges": [],
+  "components": {
+    "U_MCU": {
+      "id": "U_MCU",
+      "part": "ESP32-C3",
+      "pins": {
+        "3V3": {
+          "function": null,
+          "name": "3V3",
+          "net": "bat"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "mcu",
+      "value": null
+    }
+  },
+  "exports": [],
+  "firmware_bindings": {},
+  "firmware_projects": {},
+  "firmware_tasks": {},
+  "interfaces": {},
+  "ir_version": "0.1",
+  "metadata": {
+    "author": "",
+    "created_at": "",
+    "description": "",
+    "title": "Missing Ground"
+  },
+  "name": "missing_ground",
+  "nets": {
+    "bat": {
+      "id": "bat",
+      "nominal_voltage": "3.7V",
+      "role": "power"
+    }
+  },
+  "power_domains": {},
+  "requirements": [],
+  "simulation_profiles": {
+    "analog_only": {
+      "backends": [
+        "ngspice"
+      ],
+      "default": false,
+      "id": "analog_only",
+      "included_subsystems": [],
+      "properties": {},
+      "tests": [
+        "noop"
+      ]
+    }
+  },
+  "tests": {
+    "noop": {
+      "assertions": [],
+      "description": "",
+      "duration": "1ms",
+      "id": "noop",
+      "setup": {}
+    }
+  }
+}

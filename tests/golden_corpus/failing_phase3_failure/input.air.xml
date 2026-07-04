@@ -1,0 +1,64 @@
+<system name="phase3_failure_demo" ir_version="0.1">
+  <metadata>
+    <title>Phase 3 Failure Demo</title>
+    <description>Tests source overload, I2C pullup strength, and voltage mismatch.</description>
+  </metadata>
+  <nets>
+    <net id="gnd" role="ground"/>
+    <net id="v_bat" role="power" nominal_voltage="3.7V"/>
+    <net id="3v3" role="power" nominal_voltage="3.3V"/>
+    <net id="1v8" role="power" nominal_voltage="1.8V"/>
+    <net id="sda" role="digital_signal"/>
+    <net id="scl" role="digital_signal"/>
+  </nets>
+  <components>
+    <component id="V_BAT" type="voltage_source">
+      <value>3.7V</value>
+      <pin name="p" net="v_bat"/>
+      <pin name="n" net="gnd"/>
+      <property name="i_max" value="100mA"/>
+    </component>
+    <component id="U_MCU" type="mcu" part="ESP32-C3">
+      <pin name="3V3" net="3v3"/>
+      <pin name="GND" net="gnd"/>
+      <pin name="GPIO8" net="sda" function="I2C_SDA"/>
+      <pin name="GPIO9" net="scl" function="I2C_SCL"/>
+    </component>
+    <component id="U_REG_3V3" type="ldo">
+      <pin name="in" net="v_bat"/>
+      <pin name="out" net="3v3"/>
+      <pin name="gnd" net="gnd"/>
+      <property name="vout" value="3.3V"/>
+      <property name="iout_max" value="500mA"/>
+      <property name="v_dropout" value="0.2V"/>
+      <property name="iq" value="1mA"/>
+    </component>
+    <component id="L_HEAVY" type="generic_load">
+      <value>200mA</value>
+      <pin name="p" net="3v3"/>
+      <pin name="n" net="gnd"/>
+    </component>
+  </components>
+  <interfaces>
+    <interface id="i2c_bus" type="i2c">
+      <controller component="U_MCU" peripheral="I2C0"/>
+      <sda net="sda"/>
+      <scl net="scl"/>
+      <!-- Pullup to wrong voltage (1.8V instead of 3.3V) -->
+      <pullup net="sda" value="10k" to="1v8"/>
+      <pullup net="scl" value="10k" to="1v8"/>
+      <property name="speed" value="400kHz"/>
+    </interface>
+  </interfaces>
+  <tests>
+    <test id="basic">
+      <run duration="1ms"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="default">
+      <backend type="ngspice"/>
+      <run test="basic"/>
+    </profile>
+  </simulation_profiles>
+</system>

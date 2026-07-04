@@ -1,0 +1,253 @@
+{
+  "analog": [],
+  "bridges": [
+    {
+      "data": {
+        "analog_source": {
+          "net": "load_low"
+        },
+        "conversion": {
+          "bits": "12",
+          "reference_voltage": "3.3V"
+        },
+        "digital_target": {
+          "channel": "ADC1_CH0",
+          "component": "U_MCU",
+          "peripheral": "ADC1"
+        },
+        "id": "load_sense",
+        "type": "adc"
+      },
+      "id": "load_sense",
+      "type": "adc"
+    }
+  ],
+  "components": {
+    "L_LOAD": {
+      "id": "L_LOAD",
+      "part": null,
+      "pins": {
+        "n": {
+          "function": null,
+          "name": "n",
+          "net": "load_low"
+        },
+        "p": {
+          "function": null,
+          "name": "p",
+          "net": "v_bat"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "generic_load",
+      "value": "100mA"
+    },
+    "Q_SWITCH": {
+      "id": "Q_SWITCH",
+      "part": null,
+      "pins": {
+        "D": {
+          "function": null,
+          "name": "D",
+          "net": "load_low"
+        },
+        "G": {
+          "function": null,
+          "name": "G",
+          "net": "gate_drive"
+        },
+        "S": {
+          "function": null,
+          "name": "S",
+          "net": "gnd"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "mosfet",
+      "value": null
+    },
+    "U_MCU": {
+      "id": "U_MCU",
+      "part": "ESP32-C3",
+      "pins": {
+        "3V3": {
+          "function": null,
+          "name": "3V3",
+          "net": "3v3"
+        },
+        "GND": {
+          "function": null,
+          "name": "GND",
+          "net": "gnd"
+        },
+        "GPIO0": {
+          "function": "ADC1_CH0",
+          "name": "GPIO0",
+          "net": "load_low"
+        },
+        "GPIO2": {
+          "function": "GPIO_OUT",
+          "name": "GPIO2",
+          "net": "gate_drive"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "mcu",
+      "value": null
+    },
+    "V_3V3": {
+      "id": "V_3V3",
+      "part": null,
+      "pins": {
+        "n": {
+          "function": null,
+          "name": "n",
+          "net": "gnd"
+        },
+        "p": {
+          "function": null,
+          "name": "p",
+          "net": "3v3"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "voltage_source",
+      "value": "3.3V"
+    },
+    "V_BAT": {
+      "id": "V_BAT",
+      "part": null,
+      "pins": {
+        "n": {
+          "function": null,
+          "name": "n",
+          "net": "gnd"
+        },
+        "p": {
+          "function": null,
+          "name": "p",
+          "net": "v_bat"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "voltage_source",
+      "value": "3.7V"
+    }
+  },
+  "exports": [],
+  "firmware_bindings": {},
+  "firmware_projects": {
+    "fw_main": {
+      "board": "esp32-c3-devkitm-1",
+      "framework": "platformio",
+      "id": "fw_main",
+      "language": "cpp",
+      "source_tree": "",
+      "target": "U_MCU"
+    }
+  },
+  "firmware_tasks": {
+    "toggle_load": {
+      "id": "toggle_load",
+      "operations": [
+        {
+          "op": "write_gpio",
+          "pin": "GPIO2",
+          "value": "high"
+        },
+        {
+          "duration": "5ms",
+          "op": "delay"
+        },
+        {
+          "op": "write_gpio",
+          "pin": "GPIO2",
+          "value": "low"
+        }
+      ],
+      "period": "10ms",
+      "target": "fw_main"
+    }
+  },
+  "interfaces": {},
+  "ir_version": "0.1",
+  "metadata": {
+    "author": "AI",
+    "created_at": "",
+    "description": "ESP32-C3 toggles a MOSFET to drive a load and senses voltage.",
+    "title": "Mixed Signal Switch"
+  },
+  "name": "mixed_signal_switch",
+  "nets": {
+    "3v3": {
+      "id": "3v3",
+      "nominal_voltage": "3.3V",
+      "role": "power"
+    },
+    "gate_drive": {
+      "id": "gate_drive",
+      "nominal_voltage": null,
+      "role": "digital_signal"
+    },
+    "gnd": {
+      "id": "gnd",
+      "nominal_voltage": null,
+      "role": "ground"
+    },
+    "load_low": {
+      "id": "load_low",
+      "nominal_voltage": null,
+      "role": "analog_signal"
+    },
+    "v_bat": {
+      "id": "v_bat",
+      "nominal_voltage": "3.7V",
+      "role": "power"
+    }
+  },
+  "power_domains": {},
+  "requirements": [],
+  "simulation_profiles": {
+    "mixed_signal": {
+      "backends": [
+        "ngspice",
+        "renode"
+      ],
+      "default": true,
+      "id": "mixed_signal",
+      "included_subsystems": [],
+      "properties": {},
+      "tests": [
+        "switch_test"
+      ]
+    }
+  },
+  "tests": {
+    "switch_test": {
+      "assertions": [
+        {
+          "max": "3.8V",
+          "min": "0V",
+          "net": "load_low",
+          "op": "assert_voltage"
+        }
+      ],
+      "description": "",
+      "duration": "20ms",
+      "id": "switch_test",
+      "setup": {
+        "load_low": "3.7V"
+      }
+    }
+  }
+}

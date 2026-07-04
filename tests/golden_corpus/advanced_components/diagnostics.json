@@ -1,0 +1,18 @@
+{
+  "diagnostics": [
+    {
+      "code": "UNSUPPORTED_SPICE_TYPE",
+      "domain": "compiler",
+      "expected": {},
+      "id": "diag_00001",
+      "message": "Component X_CUSTOM type opamp is not supported by the v0.1 SPICE compiler.",
+      "observed": {},
+      "related_elements": [
+        "X_CUSTOM"
+      ],
+      "severity": "warning",
+      "suggested_actions": []
+    }
+  ],
+  "success": true
+}
