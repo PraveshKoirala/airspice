@@ -1,0 +1,24 @@
+{
+  "circuit": "rc_lowpass_fc",
+  "profile": "analog_only",
+  "test": "lpf_fc",
+  "outcome": "expected_fail",
+  "failure_mode": "no_ac_analysis",
+  "issue": "NEW_AC_GAP",
+  "dc_settle_check": {
+    "net": "vout",
+    "nominal_v": 1.0,
+    "min_v": 0.97,
+    "max_v": 1.03,
+    "basis": "Compiler emits only .tran with a DC source, so vout DC-settles to Vin=1V (0dB at DC), NOT the -3dB=0.7071V corner value. Runner confirms the DC settle and the ABSENCE of the frequency response."
+  },
+  "would_pass_checks": [
+    {
+      "net": "vout",
+      "nominal_v": 0.7071,
+      "min_v": 0.697,
+      "max_v": 0.717,
+      "basis": "|H(fc)|=1/sqrt(2)=0.7071 at fc=1/(2piRC)=995Hz; -3.01dB. Needs .ac sweep which the compiler never emits."
+    }
+  ]
+}

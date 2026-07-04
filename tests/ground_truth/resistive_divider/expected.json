@@ -1,0 +1,17 @@
+{
+  "circuit": "resistive_divider",
+  "profile": "analog_only",
+  "test": "divider_ratio",
+  "outcome": "pass",
+  "require_backend": "ngspice",
+  "checks": [
+    {
+      "net": "vout",
+      "nominal_v": 3.0,
+      "min_v": 2.97,
+      "max_v": 3.03,
+      "basis": "V_out = 9V * R_bottom/(R_top+R_bottom) = 9 * 10k/30k = 3.000V exact; window +/-1% absorbs solver reltol only"
+    }
+  ],
+  "issue": null
+}

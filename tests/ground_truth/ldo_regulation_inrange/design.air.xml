@@ -1,0 +1,48 @@
+<system name="gt_ldo_regulation_inrange" ir_version="0.1">
+  <metadata>
+    <title>Ground truth: LDO regulation (input well above dropout)</title>
+    <description>5V input into an ideal-behavioural LDO regulating 3.3V with 0.2V dropout. Since Vin-dropout=4.8V exceeds the 3.3V target, the regulator holds 3.3V. The AIR LDO model is Vout=min(Vtarget, Vin-Vdropout).</description>
+    <author>issue-41</author>
+  </metadata>
+  <nets>
+    <net id="gnd" role="ground"/>
+    <net id="vin" role="power" nominal_voltage="5V"/>
+    <net id="vout" role="power" nominal_voltage="3.3V"/>
+  </nets>
+  <components>
+    <component id="V_IN" type="voltage_source">
+      <value>5V</value>
+      <pin name="p" net="vin"/>
+      <pin name="n" net="gnd"/>
+    </component>
+    <component id="U_REG" type="ldo">
+      <pin name="in" net="vin"/>
+      <pin name="out" net="vout"/>
+      <pin name="gnd" net="gnd"/>
+      <property name="vout" value="3.3V"/>
+      <property name="iout_max" value="500mA"/>
+      <property name="v_dropout" value="0.2V"/>
+      <property name="iq" value="0"/>
+    </component>
+  </components>
+  <analog>
+    <subsystem id="reg">
+      <uses component="V_IN"/>
+      <uses component="U_REG"/>
+      <probe id="probe_vout" net="vout" quantity="voltage"/>
+    </subsystem>
+  </analog>
+  <tests>
+    <test id="ldo_inrange">
+      <run duration="1ms"/>
+      <assert_voltage net="vout" min="3.267V" max="3.333V"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="analog_only" default="true">
+      <backend type="ngspice"/>
+      <include subsystem="reg"/>
+      <run test="ldo_inrange"/>
+    </profile>
+  </simulation_profiles>
+</system>

@@ -1,0 +1,67 @@
+<system name="gt_rc_step_response" ir_version="0.1">
+  <metadata>
+    <title>Ground truth: RC step response at t = tau, 2tau, 5tau</title>
+    <description>An MCU GPIO driven high (0V-&gt;3.3V step) feeds a series R into a shunt C. The step stimulus is produced by the compiler's firmware PULSE translation (GPIO high held for 1s, far beyond the 5ms window, so it is effectively a step at t=0). Capacitor voltage sampled at t=tau, 2tau, 5tau and compared to the exponential charging law. R=1k, C=1uF, tau=1ms.</description>
+    <author>issue-41</author>
+  </metadata>
+  <nets>
+    <net id="gnd" role="ground"/>
+    <net id="v3v3" role="power" nominal_voltage="3.3V"/>
+    <net id="drive" role="digital_signal"/>
+    <net id="cap" role="analog_signal"/>
+  </nets>
+  <components>
+    <component id="V_3V3" type="voltage_source">
+      <value>3.3V</value>
+      <pin name="p" net="v3v3"/>
+      <pin name="n" net="gnd"/>
+    </component>
+    <component id="U_MCU" type="mcu" part="ESP32-C3">
+      <pin name="3V3" net="v3v3"/>
+      <pin name="GND" net="gnd"/>
+      <pin name="GPIO2" net="drive" function="GPIO_OUT"/>
+    </component>
+    <component id="R_S" type="resistor">
+      <value>1k</value>
+      <pin name="1" net="drive"/>
+      <pin name="2" net="cap"/>
+    </component>
+    <component id="C_S" type="capacitor">
+      <value>1uF</value>
+      <pin name="1" net="cap"/>
+      <pin name="2" net="gnd"/>
+    </component>
+  </components>
+  <firmware>
+    <project id="fw_main" target="U_MCU" framework="platformio" language="cpp">
+      <board>esp32-c3-devkitm-1</board>
+      <source_tree path="firmware/"/>
+    </project>
+    <task id="drive_step" target="fw_main">
+      <period>2s</period>
+      <write_gpio pin="GPIO2" value="high"/>
+      <delay duration="1s"/>
+      <write_gpio pin="GPIO2" value="low"/>
+    </task>
+  </firmware>
+  <analog>
+    <subsystem id="rc">
+      <uses component="R_S"/>
+      <uses component="C_S"/>
+      <probe id="probe_cap" net="cap" quantity="voltage"/>
+    </subsystem>
+  </analog>
+  <tests>
+    <test id="rc_step">
+      <run duration="5ms"/>
+      <assert_voltage net="cap" min="0V" max="3.3V"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="analog_only" default="true">
+      <backend type="ngspice"/>
+      <include subsystem="rc"/>
+      <run test="rc_step"/>
+    </profile>
+  </simulation_profiles>
+</system>

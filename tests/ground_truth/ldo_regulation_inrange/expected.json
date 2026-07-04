@@ -1,0 +1,17 @@
+{
+  "circuit": "ldo_regulation_inrange",
+  "profile": "analog_only",
+  "test": "ldo_inrange",
+  "outcome": "pass",
+  "require_backend": "ngspice",
+  "checks": [
+    {
+      "net": "vout",
+      "nominal_v": 3.3,
+      "min_v": 3.267,
+      "max_v": 3.333,
+      "basis": "Vout=min(3.3, Vin-0.2)=min(3.3,4.8)=3.300V; regulation branch of the LDO min()"
+    }
+  ],
+  "issue": null
+}

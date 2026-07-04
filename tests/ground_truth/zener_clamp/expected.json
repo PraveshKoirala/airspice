@@ -1,0 +1,17 @@
+{
+  "circuit": "zener_clamp",
+  "profile": "analog_only",
+  "test": "zener_clamp",
+  "outcome": "expected_fail",
+  "failure_mode": "undefined_model",
+  "issue": 55,
+  "would_pass_checks": [
+    {
+      "net": "clamp",
+      "nominal_v": 5.1,
+      "min_v": 4.9,
+      "max_v": 5.3,
+      "basis": "Zener holds V(clamp)~BV=5.1V (+Zzt*Iz). Blocked: spice_model=ZENER_5V1 has no .model card (bug #55); generic D has BV=inf so no breakdown even without the name error."
+    }
+  ]
+}

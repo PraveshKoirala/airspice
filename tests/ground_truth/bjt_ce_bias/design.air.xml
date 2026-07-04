@@ -1,0 +1,57 @@
+<system name="gt_bjt_ce_bias" ir_version="0.1">
+  <metadata>
+    <title>Ground truth: BJT common-emitter bias point (generic NPN, Bf=100)</title>
+    <description>NPN common-emitter stage. Base current is FORCED at 10uA with an ideal current source, so the collector current is Bf*Ib independent of Vbe. Uses the compiler's generic .model NPN NPN(Bf=100). Collector node voltage derived by hand.</description>
+    <author>issue-41</author>
+  </metadata>
+  <nets>
+    <net id="gnd" role="ground"/>
+    <net id="vcc" role="power" nominal_voltage="5V"/>
+    <net id="collector" role="analog_signal"/>
+    <net id="base" role="analog_signal"/>
+  </nets>
+  <components>
+    <component id="V_CC" type="voltage_source">
+      <value>5V</value>
+      <pin name="p" net="vcc"/>
+      <pin name="n" net="gnd"/>
+    </component>
+    <component id="R_C" type="resistor">
+      <value>1k</value>
+      <pin name="1" net="vcc"/>
+      <pin name="2" net="collector"/>
+    </component>
+    <component id="I_B" type="current_source">
+      <value>10uA</value>
+      <pin name="p" net="gnd"/>
+      <pin name="n" net="base"/>
+    </component>
+    <component id="Q1" type="bjt">
+      <pin name="C" net="collector"/>
+      <pin name="B" net="base"/>
+      <pin name="E" net="gnd"/>
+    </component>
+  </components>
+  <analog>
+    <subsystem id="ce_stage">
+      <uses component="V_CC"/>
+      <uses component="R_C"/>
+      <uses component="I_B"/>
+      <uses component="Q1"/>
+      <probe id="probe_collector" net="collector" quantity="voltage"/>
+    </subsystem>
+  </analog>
+  <tests>
+    <test id="ce_bias">
+      <run duration="1ms"/>
+      <assert_voltage net="collector" min="3.80V" max="4.20V"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="analog_only" default="true">
+      <backend type="ngspice"/>
+      <include subsystem="ce_stage"/>
+      <run test="ce_bias"/>
+    </profile>
+  </simulation_profiles>
+</system>

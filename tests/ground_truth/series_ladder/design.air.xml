@@ -1,0 +1,59 @@
+<system name="gt_series_ladder" ir_version="0.1">
+  <metadata>
+    <title>Ground truth: 3-resistor series ladder (two taps)</title>
+    <description>10V source across R1=1k,R2=2k,R3=2k in series. Two internal tap voltages derived by hand from the single series current.</description>
+    <author>issue-41</author>
+  </metadata>
+  <nets>
+    <net id="gnd" role="ground"/>
+    <net id="vin" role="power" nominal_voltage="10V"/>
+    <net id="tap_a" role="analog_signal"/>
+    <net id="tap_b" role="analog_signal"/>
+  </nets>
+  <components>
+    <component id="V_IN" type="voltage_source">
+      <value>10V</value>
+      <pin name="p" net="vin"/>
+      <pin name="n" net="gnd"/>
+    </component>
+    <component id="R1" type="resistor">
+      <value>1k</value>
+      <pin name="1" net="vin"/>
+      <pin name="2" net="tap_a"/>
+    </component>
+    <component id="R2" type="resistor">
+      <value>2k</value>
+      <pin name="1" net="tap_a"/>
+      <pin name="2" net="tap_b"/>
+    </component>
+    <component id="R3" type="resistor">
+      <value>2k</value>
+      <pin name="1" net="tap_b"/>
+      <pin name="2" net="gnd"/>
+    </component>
+  </components>
+  <analog>
+    <subsystem id="ladder">
+      <uses component="V_IN"/>
+      <uses component="R1"/>
+      <uses component="R2"/>
+      <uses component="R3"/>
+      <probe id="probe_a" net="tap_a" quantity="voltage"/>
+      <probe id="probe_b" net="tap_b" quantity="voltage"/>
+    </subsystem>
+  </analog>
+  <tests>
+    <test id="ladder_taps">
+      <run duration="1ms"/>
+      <assert_voltage net="tap_a" min="7.92V" max="8.08V"/>
+      <assert_voltage net="tap_b" min="3.96V" max="4.04V"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="analog_only" default="true">
+      <backend type="ngspice"/>
+      <include subsystem="ladder"/>
+      <run test="ladder_taps"/>
+    </profile>
+  </simulation_profiles>
+</system>

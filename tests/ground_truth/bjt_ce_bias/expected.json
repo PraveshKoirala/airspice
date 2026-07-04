@@ -1,0 +1,17 @@
+{
+  "circuit": "bjt_ce_bias",
+  "profile": "analog_only",
+  "test": "ce_bias",
+  "outcome": "pass",
+  "require_backend": "ngspice",
+  "checks": [
+    {
+      "net": "collector",
+      "nominal_v": 4.0,
+      "min_v": 3.80,
+      "max_v": 4.20,
+      "basis": "I_C=Bf*I_B=100*10uA=1.0mA; V_C=5V-1mA*1k=4.000V. Active region (V_CE=4V). Window +/-0.2V = beta spread 80..120."
+    }
+  ],
+  "issue": null
+}

@@ -1,0 +1,24 @@
+{
+  "circuit": "series_ladder",
+  "profile": "analog_only",
+  "test": "ladder_taps",
+  "outcome": "pass",
+  "require_backend": "ngspice",
+  "checks": [
+    {
+      "net": "tap_a",
+      "nominal_v": 8.0,
+      "min_v": 7.92,
+      "max_v": 8.08,
+      "basis": "I=10V/5k=2mA; V(tap_a)=I*(R2+R3)=2mA*4k=8.000V exact"
+    },
+    {
+      "net": "tap_b",
+      "nominal_v": 4.0,
+      "min_v": 3.96,
+      "max_v": 4.04,
+      "basis": "V(tap_b)=I*R3=2mA*2k=4.000V exact"
+    }
+  ],
+  "issue": null
+}

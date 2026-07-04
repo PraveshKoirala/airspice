@@ -1,0 +1,42 @@
+<system name="gt_diode_forward_drop" ir_version="0.1">
+  <metadata>
+    <title>Ground truth: silicon diode forward drop (generic D model)</title>
+    <description>1mA forced through a diode using the compiler's generic .model D D (ngspice default IS=1e-14, N=1). Forward voltage from the Shockley equation. This is the generic-silicon diode; a color-specific LED window (Vf~2V) is NOT achievable here because it needs a custom model (see led_forward_drop, blocked by #55).</description>
+    <author>issue-41</author>
+  </metadata>
+  <nets>
+    <net id="gnd" role="ground"/>
+    <net id="anode" role="analog_signal"/>
+  </nets>
+  <components>
+    <component id="I_FWD" type="current_source">
+      <value>1mA</value>
+      <pin name="p" net="gnd"/>
+      <pin name="n" net="anode"/>
+    </component>
+    <component id="D1" type="diode">
+      <pin name="a" net="anode"/>
+      <pin name="c" net="gnd"/>
+    </component>
+  </components>
+  <analog>
+    <subsystem id="diode">
+      <uses component="I_FWD"/>
+      <uses component="D1"/>
+      <probe id="probe_anode" net="anode" quantity="voltage"/>
+    </subsystem>
+  </analog>
+  <tests>
+    <test id="diode_fwd">
+      <run duration="1ms"/>
+      <assert_voltage net="anode" min="0.60V" max="0.71V"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="analog_only" default="true">
+      <backend type="ngspice"/>
+      <include subsystem="diode"/>
+      <run test="diode_fwd"/>
+    </profile>
+  </simulation_profiles>
+</system>

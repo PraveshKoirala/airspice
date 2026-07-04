@@ -1,0 +1,17 @@
+{
+  "circuit": "loaded_divider_thevenin",
+  "profile": "analog_only",
+  "test": "loaded_divider",
+  "outcome": "pass",
+  "require_backend": "ngspice",
+  "checks": [
+    {
+      "net": "vout",
+      "nominal_v": 4.0,
+      "min_v": 3.96,
+      "max_v": 4.04,
+      "basis": "V_th=12*10k/20k=6V, R_th=10k||10k=5k, V_out=6*10k/(5k+10k)=4.000V exact"
+    }
+  ],
+  "issue": null
+}

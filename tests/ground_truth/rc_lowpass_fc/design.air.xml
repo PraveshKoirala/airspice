@@ -1,0 +1,50 @@
+<system name="gt_rc_lowpass_fc" ir_version="0.1">
+  <metadata>
+    <title>Expected-failure (compiler limitation): RC low-pass attenuation at fc</title>
+    <description>First-order RC low-pass. At the corner frequency fc=1/(2*pi*R*C) the output should be -3.01dB (0.7071x) of the input with -45deg phase. Verifying this needs an AC (.ac) sweep, but the compiler only ever emits a .tran with a constant DC source, so there is no frequency-domain response to measure. Captured as an expected-failure; a new oracle-gap issue is filed. R=1.6k, C=100nF, fc~=995Hz.</description>
+    <author>issue-41</author>
+  </metadata>
+  <nets>
+    <net id="gnd" role="ground"/>
+    <net id="vin" role="power" nominal_voltage="1V"/>
+    <net id="vout" role="analog_signal"/>
+  </nets>
+  <components>
+    <component id="V_IN" type="voltage_source">
+      <value>1V</value>
+      <pin name="p" net="vin"/>
+      <pin name="n" net="gnd"/>
+    </component>
+    <component id="R_F" type="resistor">
+      <value>1.6k</value>
+      <pin name="1" net="vin"/>
+      <pin name="2" net="vout"/>
+    </component>
+    <component id="C_F" type="capacitor">
+      <value>100nF</value>
+      <pin name="1" net="vout"/>
+      <pin name="2" net="gnd"/>
+    </component>
+  </components>
+  <analog>
+    <subsystem id="lpf">
+      <uses component="V_IN"/>
+      <uses component="R_F"/>
+      <uses component="C_F"/>
+      <probe id="probe_vout" net="vout" quantity="voltage"/>
+    </subsystem>
+  </analog>
+  <tests>
+    <test id="lpf_fc">
+      <run duration="1ms"/>
+      <assert_voltage net="vout" min="0.697V" max="0.717V"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="analog_only" default="true">
+      <backend type="ngspice"/>
+      <include subsystem="lpf"/>
+      <run test="lpf_fc"/>
+    </profile>
+  </simulation_profiles>
+</system>

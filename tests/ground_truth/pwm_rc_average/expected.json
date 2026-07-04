@@ -1,0 +1,18 @@
+{
+  "circuit": "pwm_rc_average",
+  "profile": "analog_only",
+  "test": "pwm_avg",
+  "outcome": "pass",
+  "require_backend": "ngspice",
+  "mean_checks": [
+    {
+      "net": "avg",
+      "from_t_s": 0.005,
+      "nominal_v": 1.65,
+      "min_v": 1.55,
+      "max_v": 1.75,
+      "basis": "V_avg = D*Vstep = 0.5*3.3 = 1.650V; averaged over t>5ms (>5tau, tau=1ms). Window +/-0.10V excludes 0V, 3.3V and duty errors."
+    }
+  ],
+  "issue": null
+}

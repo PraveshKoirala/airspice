@@ -1,0 +1,48 @@
+<system name="gt_ldo_dropout" ir_version="0.1">
+  <metadata>
+    <title>Ground truth: LDO in dropout</title>
+    <description>3.4V input into an LDO targeting 3.3V with 0.2V dropout. Vin-dropout=3.2V is BELOW the 3.3V target, so the regulator drops out and tracks Vin-Vdropout. Exercises the other branch of Vout=min(Vtarget, Vin-Vdropout).</description>
+    <author>issue-41</author>
+  </metadata>
+  <nets>
+    <net id="gnd" role="ground"/>
+    <net id="vin" role="power" nominal_voltage="3.4V"/>
+    <net id="vout" role="power" nominal_voltage="3.2V"/>
+  </nets>
+  <components>
+    <component id="V_IN" type="voltage_source">
+      <value>3.4V</value>
+      <pin name="p" net="vin"/>
+      <pin name="n" net="gnd"/>
+    </component>
+    <component id="U_REG" type="ldo">
+      <pin name="in" net="vin"/>
+      <pin name="out" net="vout"/>
+      <pin name="gnd" net="gnd"/>
+      <property name="vout" value="3.3V"/>
+      <property name="iout_max" value="500mA"/>
+      <property name="v_dropout" value="0.2V"/>
+      <property name="iq" value="0"/>
+    </component>
+  </components>
+  <analog>
+    <subsystem id="reg">
+      <uses component="V_IN"/>
+      <uses component="U_REG"/>
+      <probe id="probe_vout" net="vout" quantity="voltage"/>
+    </subsystem>
+  </analog>
+  <tests>
+    <test id="ldo_dropout">
+      <run duration="1ms"/>
+      <assert_voltage net="vout" min="3.168V" max="3.232V"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="analog_only" default="true">
+      <backend type="ngspice"/>
+      <include subsystem="reg"/>
+      <run test="ldo_dropout"/>
+    </profile>
+  </simulation_profiles>
+</system>
