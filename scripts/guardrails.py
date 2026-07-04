@@ -7,14 +7,17 @@ that every failure is explainable, reproducible, and stable across runs and
 platforms (it is expected to run on ubuntu CI and locally on Windows, pure
 stdlib, no third-party deps).
 
-Rules implemented (issue #42, #56):
+Rules implemented (issue #42, #56, #69):
   R1 fixture-port-separation  AGENTS.md rule (fixture/port separation, ADR 0009)
   R2 test-weakening           AGENTS.md rule 2
   R3 wall-clock-ban           AGENTS.md rules 9 / 22
   R4 fixture-special-casing   AGENTS.md rule 13
   R5 secret-hygiene           AGENTS.md rule 15
   R6 guardrails-self-protection  issue #56 (any PR touching the enforcement
-                              layer must carry the override label + section)
+                              layer must carry the override label + section;
+                              on push events -- which cannot carry a label --
+                              R6 reports informationally instead of failing,
+                              issue #69)
 
 Two entry modes:
   * CI / local diff check (default): reconstruct the change under review from a
@@ -155,6 +158,15 @@ OVERRIDE_SECTION_RE = re.compile(
 # a/-side and the explicit `rename from` header), so renaming an enforcement
 # file away fires R6 like any other touch. The verifier's rename-and-gut
 # attack is a permanent self-test below.
+#
+# Event scoping (issue #69, M0 gate audit): R6 ENFORCES only in PR context.
+# On push events no label can exist, so a firing R6 was unwaivable and painted
+# main red on the merge push of every properly-overridden enforcement-layer PR
+# (run 28712215535 after PR #66). On push, R6 findings are reported
+# informationally (visible in log + job summary) but do not fail the job; the
+# merged PR already passed R6 with its label. See run_all_rules and
+# detect_pr_context; the disposition is fail-closed (PR context assumed unless
+# the run is explicitly a push).
 GUARDRAILS_SELF_PATHS = (
     ".github/workflows/guardrails.yml",
     "scripts/guardrails.py",
@@ -217,11 +229,18 @@ class Change:
     added_lines   : the '+' lines of the diff, with file + line-number context.
     labels        : PR labels (lower-cased).
     pr_body       : PR description text (for override justification).
+    pr_context    : True when the run has PR context (labels/body exist and can
+                    waive R6). False on push events, where no label can ever be
+                    attached -- R6 then reports informationally instead of
+                    failing (issue #69). FAIL-CLOSED default: True, so local
+                    runs and PR simulations enforce R6 fully unless the run is
+                    explicitly identified as a push event.
     """
     changed_files: list[str] = field(default_factory=list)
     added_lines: list[AddedLine] = field(default_factory=list)
     labels: list[str] = field(default_factory=list)
     pr_body: str = ""
+    pr_context: bool = True
 
     def has_label(self, name: str) -> bool:
         return name.lower() in self.labels
@@ -622,6 +641,9 @@ class Report:
     corpus_present: bool
     override_active: bool
     override_justification: str = ""
+    # Findings reported for visibility but NOT failing the job. Currently only
+    # R6 on push (non-PR) events lands here -- see run_all_rules (issue #69).
+    informational: list[Violation] = field(default_factory=list)
 
     @property
     def failed(self) -> bool:
@@ -637,7 +659,26 @@ def run_all_rules(change: Change, tree_root: Optional[Path]) -> Report:
     r4, corpus_present = rule_fixture_special_casing(change, corpus_names)
     violations += r4
     violations += rule_secret_hygiene(change)
-    violations += rule_guardrails_self_protection(change)
+
+    # R6 is the one rule whose ONLY remedy is the override label + PR-body
+    # section. On a push event there is no PR: no label can ever be attached,
+    # so a firing R6 would be unwaivable and paint main red on every
+    # legitimately-overridden enforcement-layer merge (issue #69, M0 gate
+    # audit: run 28712215535 on the merge push of PR #66). Any push to main
+    # arrives via a merged PR that already passed R6 WITH its label, so
+    # push-time enforcement is double jeopardy against an event surface that
+    # cannot carry the waiver. On push (pr_context False) R6 therefore reports
+    # INFORMATIONALLY -- printed, in the job summary, but not failing.
+    # Detection logic is untouched; only the disposition changes, and only for
+    # R6: every other rule enforces identically on push (a weakening token or
+    # secret pushed to main still fails). Direct-push abuse of this window is
+    # the domain of branch protection (PR required, no force-push), not R6.
+    informational: list[Violation] = []
+    r6 = rule_guardrails_self_protection(change)
+    if change.pr_context:
+        violations += r6
+    else:
+        informational = r6
 
     override_active = False
     justification = ""
@@ -652,6 +693,7 @@ def run_all_rules(change: Change, tree_root: Optional[Path]) -> Report:
         corpus_present=corpus_present,
         override_active=override_active,
         override_justification=justification,
+        informational=informational,
     )
 
 
@@ -699,9 +741,31 @@ def print_report(report: Report) -> None:
         for v in report.violations:
             print(v.format())
 
+    if report.informational:
+        print("-" * 72)
+        print(f"{len(report.informational)} informational finding(s) "
+              "(push event - no PR context; NOT failing the job):")
+        for v in report.informational:
+            print(v.format())
+        print("R6 note: a push to main arrives via a merged PR that already "
+              "passed R6 with its override label; the push event cannot carry "
+              "a label, so enforcing here would be unwaivable (issue #69).")
+
     summary_lines = ["## Guardrails CI"]
     if not report.corpus_present:
         summary_lines.append("- R4 fixture-special-casing: corpus not present — check skipped")
+    if report.informational:
+        summary_lines.append("")
+        summary_lines.append(
+            f"### ℹ️ {len(report.informational)} informational finding(s) "
+            "(push event — not failing)"
+        )
+        for v in report.informational:
+            summary_lines.append(f"- {v.format().strip()}")
+        summary_lines.append(
+            "- R6 on push: the merged PR already passed R6 with its override "
+            "label; push events cannot carry labels (issue #69)."
+        )
 
     if report.override_active:
         print("-" * 72)
@@ -813,6 +877,43 @@ def load_diff(args: argparse.Namespace) -> str:
 # CLI.
 # --------------------------------------------------------------------------- #
 
+def detect_pr_context(args: argparse.Namespace) -> bool:
+    """Decide whether this run has PR context (a label could waive R6).
+
+    PAYLOAD-FIRST (PR #70 verifier hardening): a readable event payload that
+    contains a `pull_request` object is AUTHORITATIVE -- the run is PR context
+    regardless of `--push-event`. Otherwise the flag would outrank the payload,
+    and a PR that edits guardrails.yml to pass `--push-event` to its own
+    checker run would demote R6 to informational on a real PR event (the
+    verifier reproduced exactly that masquerade). With payload-first ordering
+    the flag only applies where it is legitimate: local runs with no event
+    payload at all.
+
+    FAIL-CLOSED: the default is True (full R6 enforcement). The run is treated
+    as a push (non-PR) event ONLY when explicitly identified as one:
+      * an event payload was provided (--event-path), is readable, and
+        contains no `pull_request` object -- exactly how the workflow's
+        push-to-main runs look, and the same payload shape
+        load_labels/load_pr_body already key off (an unreadable payload counts
+        as PR context, fail closed); or
+      * NO event payload exists and `--push-event` was passed (local
+        reproduction of the push behavior).
+    Local runs without an event payload or the flag therefore always enforce
+    R6 fully -- the own-diff check in DEVELOPMENT.md keeps failing without the
+    label.
+    """
+    if args.event_path and os.path.exists(args.event_path):
+        try:
+            with open(args.event_path, encoding="utf-8") as fh:
+                event = json.load(fh)
+        except (OSError, json.JSONDecodeError):
+            return True
+        return bool(event.get("pull_request"))
+    if getattr(args, "push_event", False):
+        return False
+    return True
+
+
 def build_change(args: argparse.Namespace) -> Change:
     diff_text = load_diff(args)
     changed_files, added_lines = parse_unified_diff(diff_text)
@@ -823,6 +924,7 @@ def build_change(args: argparse.Namespace) -> Change:
         added_lines=added_lines,
         labels=labels,
         pr_body=body,
+        pr_context=detect_pr_context(args),
     )
 
 
@@ -836,6 +938,15 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--body", help="PR body text.")
     parser.add_argument("--body-file", help="Path to a file containing the PR body.")
     parser.add_argument("--event-path", help="Path to the GitHub event payload JSON.")
+    parser.add_argument("--push-event", action="store_true",
+                        help="Treat the run as a push (non-PR) event: R6 reports "
+                             "informationally and does not fail (issue #69). "
+                             "Applies ONLY when no event payload exists; a "
+                             "readable payload containing a pull_request object "
+                             "is authoritative and forces PR context regardless "
+                             "of this flag (payload-first, PR #70 hardening). "
+                             "Without this flag or a pull_request-less event "
+                             "payload, R6 enforces fully (fail-closed).")
     parser.add_argument("--tree-root", default=".",
                         help="Filesystem root for whole-tree/corpus checks (default: cwd).")
     parser.add_argument("--no-tree", action="store_true",
@@ -924,10 +1035,12 @@ def _rename_diff_for(
     return "\n".join(lines) + "\n"
 
 
-def _change_from_diff(diff: str, labels: Optional[list[str]] = None, body: str = "") -> Change:
+def _change_from_diff(diff: str, labels: Optional[list[str]] = None, body: str = "",
+                      pr_context: bool = True) -> Change:
     files, added = parse_unified_diff(diff)
     return Change(changed_files=files, added_lines=added,
-                  labels=[l.lower() for l in (labels or [])], pr_body=body)
+                  labels=[l.lower() for l in (labels or [])], pr_body=body,
+                  pr_context=pr_context)
 
 
 class _SelfTest:
@@ -1311,6 +1424,91 @@ def run_self_tests() -> int:
     st.check("R6 normalization: case variant is a different path (no fire)",
              rule_guardrails_self_protection(ch) == [],
              detail=f"got {rule_guardrails_self_protection(ch)}")
+
+    # ---- R6 push-event scoping (issue #69) -------------------------------- #
+    # On a push event no PR label can exist, so a firing R6 was unwaivable and
+    # painted main red on the merge push of every properly-overridden
+    # enforcement-layer PR (M0 gate audit, run 28712215535 after PR #66). On
+    # push, R6 reports INFORMATIONALLY and does not fail; every other rule
+    # enforces identically in both contexts. Fail-closed: PR context is the
+    # default everywhere; push must be explicitly identified.
+    touch_diff = _diff_for("scripts/guardrails.py", ["    # edit the checker"])
+    # PR context (explicit): fails -- the enforcement baseline of this pair.
+    rep = run_all_rules(_change_from_diff(touch_diff, pr_context=True), None)
+    st.check("R6 events: PR context -> touch FAILS (enforced)",
+             rep.failed is True and rep.informational == [],
+             detail=f"failed={rep.failed} info={rep.informational}")
+    # Push context: same diff passes; R6 lands in informational, not violations.
+    rep = run_all_rules(_change_from_diff(touch_diff, pr_context=False), None)
+    st.check("R6 events: push context -> touch does NOT fail",
+             rep.failed is False,
+             detail=f"failed={rep.failed} viols={[v.rule for v in rep.violations]}")
+    st.check("R6 events: push context -> R6 reported informationally",
+             len(rep.informational) == 1
+             and rep.informational[0].rule.startswith("R6")
+             and not any(v.rule.startswith("R6") for v in rep.violations),
+             detail=f"info={rep.informational} viols={rep.violations}")
+    # The deletion and rename attacks on push: informational, not failing (the
+    # merged PR that produced the push already passed R6 with its label;
+    # direct-push abuse is branch protection's domain, not R6's).
+    rep = run_all_rules(_change_from_diff(del_diff, pr_context=False), None)
+    st.check("R6 events: deletion attack on push -> informational, passes",
+             rep.failed is False and len(rep.informational) == 1,
+             detail=f"failed={rep.failed} info={rep.informational}")
+    rep = run_all_rules(_change_from_diff(full_attack, pr_context=False), None)
+    st.check("R6 events: rename attack on push -> informational, passes",
+             rep.failed is False and len(rep.informational) == 1,
+             detail=f"failed={rep.failed} info={rep.informational}")
+    # NO LEAK: the push downgrade applies to R6 alone. A weakening token pushed
+    # to main still fails, and R6 stays informational in the same run.
+    mixed = (_diff_for(".github/workflows/x.yml",
+                       ["    continue-on-error" + ": true"])
+             + touch_diff)
+    rep = run_all_rules(_change_from_diff(mixed, pr_context=False), None)
+    st.check("R6 events: push context does NOT downgrade other rules (R2 fails)",
+             rep.failed is True
+             and any(v.rule.startswith("R2") for v in rep.violations)
+             and not any(v.rule.startswith("R6") for v in rep.violations)
+             and len(rep.informational) == 1,
+             detail=f"failed={rep.failed} viols={[v.rule for v in rep.violations]} "
+                    f"info={[v.rule for v in rep.informational]}")
+    # A clean push run stays clean (no phantom informational findings).
+    rep = run_all_rules(_change_from_diff(
+        _diff_for("packages/core/src/ok2.py", ["x = 1"]), pr_context=False), None)
+    st.check("R6 events: clean push run has no informational findings",
+             rep.failed is False and rep.informational == []
+             and rep.violations == [])
+    # detect_pr_context: the CI-facing decision. PR payload -> True; push
+    # payload (no pull_request key) -> False; no payload -> True (fail-closed);
+    # --push-event flag -> False.
+    with tempfile.TemporaryDirectory() as td:
+        pr_event = Path(td) / "pr_event.json"
+        pr_event.write_text(
+            json.dumps({"pull_request": {"number": 1, "labels": []}}),
+            encoding="utf-8")
+        push_event = Path(td) / "push_event.json"
+        push_event.write_text(
+            json.dumps({"ref": "refs/heads/main", "after": "abc123"}),
+            encoding="utf-8")
+        ns = argparse.Namespace(push_event=False, event_path=str(pr_event))
+        st.check("detect_pr_context: PR event payload -> PR context",
+                 detect_pr_context(ns) is True)
+        ns = argparse.Namespace(push_event=False, event_path=str(push_event))
+        st.check("detect_pr_context: push event payload -> push context",
+                 detect_pr_context(ns) is False)
+        ns = argparse.Namespace(push_event=False, event_path=None)
+        st.check("detect_pr_context: no event payload -> PR context (fail-closed)",
+                 detect_pr_context(ns) is True)
+        ns = argparse.Namespace(push_event=True, event_path=None)
+        st.check("detect_pr_context: --push-event (no payload) forces push context",
+                 detect_pr_context(ns) is False)
+        # PAYLOAD-FIRST hardening (PR #70 verifier): a real PR payload is
+        # authoritative and CANNOT be demoted by --push-event -- otherwise a PR
+        # editing guardrails.yml to pass the flag to its own checker run would
+        # get R6 informational on a genuine PR event (reproduced masquerade).
+        ns = argparse.Namespace(push_event=True, event_path=str(pr_event))
+        st.check("detect_pr_context: PR payload beats --push-event (payload-first)",
+                 detect_pr_context(ns) is True)
 
     # ---- Override path --------------------------------------------------- #
     # A violation waived by the guardrails-override label + a justification.

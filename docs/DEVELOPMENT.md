@@ -277,6 +277,23 @@ doing so would recreate the `SELF_DEFINITION_PATHS` self-exemption hole PR #52
 removed. (This PR, which itself edits `scripts/guardrails.py`, therefore carries
 the override label and section as a live demonstration of the recursion.)
 
+**R6 event scoping (issue #69).** R6 **enforces only in PR context**. On push
+events there is no PR, so no label can ever be attached — a firing R6 was
+unwaivable and painted main's guardrails job red on the merge push of every
+properly-overridden enforcement-layer PR (M0 gate audit: run 28712215535 after
+PR #66 merged). On push, R6 findings are reported **informationally** — printed
+in the log and the job summary, but not failing the job — because any push to
+main arrives via a merged PR that already passed R6 *with* its label;
+push-time enforcement is double jeopardy against an event surface that cannot
+carry the waiver. The disposition is **fail-closed**: PR context is assumed
+unless the run is explicitly a push (the event payload lacks a `pull_request`
+object, or `--push-event` is passed locally), so local own-diff checks keep
+failing without the label. Only R6's *disposition* changes on push — its
+detection logic and every other rule (R1–R5) behave identically in both
+contexts: a weakening token or secret pushed to main still fails the job.
+Direct pushes to main that touch the enforcement layer are the domain of
+branch protection (PR required, no force-push), not of R6.
+
 **Exemption model (narrow by construction).** The ONLY exemption anywhere in
 the checker: markdown documentation (`*.md`) is exempt from the **R2** token
 scan, because markdown is never executed by a test runner or CI -- a banned
@@ -369,8 +386,12 @@ run only in dry-run mode to show exactly what it will do.
 
 ### Intended settings
 
-- Required status checks (strict / up-to-date): `guardrails`, `core-py`, `ui`,
-  `parity`.
+- Required status checks (strict / up-to-date): `guardrails`,
+  `core-py (pytest + ngspice)`, `ui (lint + build)` — the **exact check-run
+  names** as GitHub reports them (bare job ids like `core-py`/`ui` never match
+  and would jam every PR; issue #69). Future checks (e.g. `parity`, #15/M2)
+  are added only when their jobs exist and are green on `main` — a required
+  context that never reports blocks every PR.
 - Force-pushes to `main`: **disabled**.
 - Branch deletion: **disabled**.
 - Linear history: **required**.

@@ -28,7 +28,13 @@
     Branch to protect. Default: main.
 
 .PARAMETER Checks
-    Required status check contexts (job names). Default: guardrails, core-py, ui, parity.
+    Required status check contexts. These must match the CHECK-RUN NAMES exactly
+    as GitHub reports them (the job's `name:`, including any parenthetical), not
+    the bare job ids -- GitHub matches required contexts by exact string
+    (issue #69, M0 gate audit). Default: guardrails, core-py (pytest + ngspice),
+    ui (lint + build). Future checks (e.g. parity, #15/M2) are ADDED HERE ONLY
+    WHEN THEIR JOBS EXIST AND ARE GREEN ON MAIN -- a required context that never
+    reports blocks every PR.
 
 .PARAMETER DryRun
     Print the exact gh api command and the JSON payload WITHOUT calling GitHub.
@@ -51,7 +57,16 @@
 param(
     [string]   $Repo    = "PraveshKoirala/airspice",
     [string]   $Branch  = "main",
-    [string[]] $Checks  = @("guardrails", "core-py", "ui", "parity"),
+    # Exact check-run names as reported by the check-runs API (issue #69):
+    # the ci.yml jobs carry display names, and GitHub matches required contexts
+    # by exact string -- bare "core-py"/"ui" would never be satisfied and would
+    # jam every PR. Future checks (parity, #15/M2; others) get appended when
+    # their jobs exist and are green on main, never before.
+    [string[]] $Checks  = @(
+        "guardrails",
+        "core-py (pytest + ngspice)",
+        "ui (lint + build)"
+    ),
     [switch]   $DryRun,
     [switch]   $ReadBack
 )
