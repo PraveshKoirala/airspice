@@ -1,0 +1,99 @@
+<?xml version="1.0" ?>
+<system ir_version="0.1" name="complex_bms">
+  <metadata>
+    <title>Complex Battery Management System</title>
+    <description>A multi-stage LiPo charger with CC/CV logic implemented in C++.</description>
+    <author>Test Suite</author>
+    <created_at>2026-06-06</created_at>
+  </metadata>
+  <nets>
+    <net id="bat" nominal_voltage="3.7V" role="power"/>
+    <net id="bat_sense" role="analog_signal"/>
+    <net id="charge_ctrl" role="analog_signal"/>
+    <net id="gnd" role="ground"/>
+    <net id="v_3v3" nominal_voltage="3.3V" role="power"/>
+    <net id="v_in" nominal_voltage="5V" role="power"/>
+  </nets>
+  <components>
+    <component id="C_BAT" type="capacitor">
+      <value>1000uF</value>
+      <pin name="1" net="bat"/>
+      <pin name="2" net="gnd"/>
+    </component>
+    <component id="MCU" part="ESP32-C3" type="mcu">
+      <pin function="ADC1_CH0" name="GPIO0" net="bat_sense"/>
+      <pin function="GPIO_OUT" name="GPIO1" net="charge_ctrl"/>
+      <pin name="3V3" net="v_3v3"/>
+      <pin name="GND" net="gnd"/>
+    </component>
+    <component id="Q_CHG" part="bss138" type="mosfet">
+      <pin name="G" net="charge_ctrl"/>
+      <pin name="D" net="v_in"/>
+      <pin name="S" net="bat"/>
+    </component>
+    <component id="R_SENSE_BOT" type="resistor">
+      <value>100k</value>
+      <pin name="1" net="bat_sense"/>
+      <pin name="2" net="gnd"/>
+    </component>
+    <component id="R_SENSE_TOP" type="resistor">
+      <value>100k</value>
+      <pin name="1" net="bat"/>
+      <pin name="2" net="bat_sense"/>
+    </component>
+    <component id="U_REG" part="generic_3v3" type="ldo">
+      <pin name="in" net="v_in"/>
+      <pin name="out" net="v_3v3"/>
+      <pin name="gnd" net="gnd"/>
+      <property name="vout" value="3.3V"/>
+      <property name="iout_max" value="500mA"/>
+      <property name="v_dropout" value="0.2V"/>
+      <property name="iq" value="10uA"/>
+    </component>
+    <component id="V_SUPPLY" type="voltage_source">
+      <value>5V</value>
+      <pin name="p" net="v_in"/>
+      <pin name="n" net="gnd"/>
+    </component>
+  </components>
+  <analog>
+    <subsystem id="charging_loop">
+      <uses component="Q_CHG"/>
+      <uses component="C_BAT"/>
+      <probe id="p_bat" net="bat" quantity="voltage"/>
+      <probe id="p_ctrl" net="charge_ctrl" quantity="voltage"/>
+    </subsystem>
+  </analog>
+  <firmware>
+    <project framework="arduino" id="bms_fw" source_tree="tests/capability_suite/firmware" target="MCU">
+      <board>esp32-c3-devkitm-1</board>
+    </project>
+    <binding id="bat_v_sense">
+      <signal name="battery_voltage"/>
+      <component ref="MCU"/>
+      <peripheral>ADC1</peripheral>
+      <channel>ADC1_CH0</channel>
+      <net>bat_sense</net>
+    </binding>
+  </firmware>
+  <tests>
+    <test id="charge_cycle">
+      <setup>
+        <set_voltage net="bat" value="3.0V"/>
+      </setup>
+      <run duration="1s"/>
+      <assert_voltage max="4.3V" min="3.0V" net="bat"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile default="true" id="full_verify">
+      <backend type="ngspice"/>
+      <include subsystem="charging_loop"/>
+      <run test="charge_cycle"/>
+      <properties>
+        <property name="co_sim_mode" value="lockstep"/>
+        <property name="time_step" value="1ms"/>
+      </properties>
+    </profile>
+  </simulation_profiles>
+</system>

@@ -1,0 +1,44 @@
+{
+  "edges": [
+    {
+      "data": {
+        "net": "bat",
+        "pin": "3V3"
+      },
+      "id": "U_MCU:3V3->bat",
+      "label": "3V3",
+      "source": "U_MCU",
+      "sourceHandle": "pin:3V3",
+      "target": "net:bat",
+      "targetHandle": "net"
+    }
+  ],
+  "nodes": [
+    {
+      "data": {
+        "label": "U_MCU",
+        "part": "ESP32-C3",
+        "pins": [
+          {
+            "function": "",
+            "name": "3V3",
+            "net": "bat"
+          }
+        ],
+        "spice_model": "",
+        "type": "mcu",
+        "value": ""
+      },
+      "id": "U_MCU",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "bat",
+        "role": "power"
+      },
+      "id": "net:bat",
+      "type": "net"
+    }
+  ]
+}

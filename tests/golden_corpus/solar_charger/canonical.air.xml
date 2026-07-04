@@ -1,0 +1,142 @@
+<?xml version="1.0" ?>
+<system ir_version="0.1" name="solar_sensor_node">
+  <metadata>
+    <title>Solar Powered Sensor Node</title>
+    <description>Solar panel charging a battery with MCU-controlled load switching and dual-rail sensing.</description>
+  </metadata>
+  <nets>
+    <net id="bat_sense" role="analog_signal"/>
+    <net id="gnd" role="ground"/>
+    <net id="load_ctrl" role="digital_signal"/>
+    <net id="load_low" role="analog_signal"/>
+    <net id="solar_sense" role="analog_signal"/>
+    <net id="v_bat" nominal_voltage="3.7V" role="power"/>
+    <net id="v_logic" nominal_voltage="3.3V" role="power"/>
+    <net id="v_solar" nominal_voltage="5.5V" role="power"/>
+    <net id="v_solar_raw" role="power"/>
+  </nets>
+  <components>
+    <component id="D_SCHOTTKY" spice_model="1N5819" type="diode">
+      <pin name="a" net="v_solar"/>
+      <pin name="c" net="v_bat"/>
+    </component>
+    <component id="L_SYSTEM" type="generic_load">
+      <value>150mA</value>
+      <pin name="p" net="v_bat"/>
+      <pin name="n" net="load_low"/>
+    </component>
+    <component id="Q_LOAD_SW" spice_model="2N7002" type="mosfet">
+      <pin name="G" net="load_ctrl"/>
+      <pin name="D" net="load_low"/>
+      <pin name="S" net="gnd"/>
+    </component>
+    <component id="R_BAT_BOT" type="resistor">
+      <value>1M</value>
+      <pin name="1" net="bat_sense"/>
+      <pin name="2" net="gnd"/>
+    </component>
+    <component id="R_BAT_TOP" type="resistor">
+      <value>1M</value>
+      <pin name="1" net="v_bat"/>
+      <pin name="2" net="bat_sense"/>
+    </component>
+    <component id="R_SOLAR_BOT" type="resistor">
+      <value>470k</value>
+      <pin name="1" net="solar_sense"/>
+      <pin name="2" net="gnd"/>
+    </component>
+    <component id="R_SOLAR_INTERNAL" type="resistor">
+      <value>10</value>
+      <pin name="1" net="v_solar_raw"/>
+      <pin name="2" net="v_solar"/>
+    </component>
+    <component id="R_SOLAR_TOP" type="resistor">
+      <value>1M</value>
+      <pin name="1" net="v_solar"/>
+      <pin name="2" net="solar_sense"/>
+    </component>
+    <component id="U_MCU" part="ESP32-C3" type="mcu">
+      <pin name="3V3" net="v_logic"/>
+      <pin name="GND" net="gnd"/>
+      <pin function="ADC1_CH0" name="GPIO0" net="solar_sense"/>
+      <pin function="ADC1_CH1" name="GPIO1" net="bat_sense"/>
+      <pin function="GPIO_OUT" name="GPIO2" net="load_ctrl"/>
+    </component>
+    <component id="U_REG" type="ldo">
+      <pin name="in" net="v_bat"/>
+      <pin name="out" net="v_logic"/>
+      <pin name="gnd" net="gnd"/>
+      <property name="vout" value="3.3V"/>
+      <property name="iout_max" value="500mA"/>
+      <property name="v_dropout" value="0.2V"/>
+      <property name="iq" value="100uA"/>
+    </component>
+    <component id="V_BAT" type="voltage_source">
+      <value>3.7V</value>
+      <pin name="p" net="v_bat"/>
+      <pin name="n" net="gnd"/>
+    </component>
+    <component id="V_SOLAR" type="voltage_source">
+      <value>5.5V</value>
+      <pin name="p" net="v_solar_raw"/>
+      <pin name="n" net="gnd"/>
+    </component>
+  </components>
+  <firmware>
+    <project framework="platformio" id="fw_main" language="cpp" target="U_MCU">
+      <board>esp32-c3-devkitm-1</board>
+    </project>
+    <binding id="solar_adc">
+      <signal name="solar_v"/>
+      <component ref="U_MCU"/>
+      <peripheral>ADC1</peripheral>
+      <channel>ADC1_CH0</channel>
+      <net>solar_sense</net>
+    </binding>
+    <binding id="bat_adc">
+      <signal name="battery_v"/>
+      <component ref="U_MCU"/>
+      <peripheral>ADC1</peripheral>
+      <channel>ADC1_CH1</channel>
+      <net>bat_sense</net>
+    </binding>
+    <task id="power_management" target="fw_main">
+      <period>100ms</period>
+      <read_adc binding="solar_adc" into="s_val"/>
+      <read_adc binding="bat_adc" into="b_val"/>
+      <write_gpio pin="GPIO2" value="high"/>
+    </task>
+  </firmware>
+  <bridges>
+    <bridge id="solar_bridge" type="adc">
+      <analog_source net="solar_sense"/>
+      <digital_target channel="ADC1_CH0" component="U_MCU" peripheral="ADC1"/>
+      <conversion bits="12" reference_voltage="3.3V"/>
+    </bridge>
+    <bridge id="bat_bridge" type="adc">
+      <analog_source net="bat_sense"/>
+      <digital_target channel="ADC1_CH1" component="U_MCU" peripheral="ADC1"/>
+      <conversion bits="12" reference_voltage="3.3V"/>
+    </bridge>
+  </bridges>
+  <tests>
+    <test id="charging_scenario">
+      <description>Verify voltage levels during active charging.</description>
+      <setup>
+        <set_voltage net="v_solar" value="5.5V"/>
+        <set_voltage net="v_bat" value="3.7V"/>
+      </setup>
+      <run duration="200ms"/>
+      <assert_voltage max="3.4V" min="3.2V" net="v_logic"/>
+      <assert_voltage max="1.8V" min="1.7V" net="solar_sense"/>
+      <assert_voltage max="1.9V" min="1.8V" net="bat_sense"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile default="true" id="mixed_signal">
+      <backend type="ngspice"/>
+      <backend type="renode"/>
+      <run test="charging_scenario"/>
+    </profile>
+  </simulation_profiles>
+</system>

@@ -1,0 +1,29 @@
+<?xml version="1.0" ?>
+<system ir_version="0.1" name="invalid_pin_function">
+  <metadata>
+    <title>Invalid Pin Function</title>
+  </metadata>
+  <nets>
+    <net id="3v3" nominal_voltage="3.3V" role="power"/>
+    <net id="gnd" role="ground"/>
+    <net id="sda" role="digital_signal"/>
+  </nets>
+  <components>
+    <component id="U_MCU" part="ESP32-C3" type="mcu">
+      <pin name="3V3" net="3v3"/>
+      <pin name="GND" net="gnd"/>
+      <pin function="I2C_SDA" name="GPIO4" net="sda"/>
+    </component>
+  </components>
+  <tests>
+    <test id="noop">
+      <run duration="1ms"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="analog_only">
+      <backend type="ngspice"/>
+      <run test="noop"/>
+    </profile>
+  </simulation_profiles>
+</system>

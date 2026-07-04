@@ -1,0 +1,210 @@
+{
+  "analog": [],
+  "bridges": [],
+  "components": {
+    "D_PROT": {
+      "id": "D_PROT",
+      "part": null,
+      "pins": {
+        "a": {
+          "function": null,
+          "name": "a",
+          "net": "v_in"
+        },
+        "c": {
+          "function": null,
+          "name": "c",
+          "net": "v_prot"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "diode",
+      "value": null
+    },
+    "Q_SW": {
+      "id": "Q_SW",
+      "part": null,
+      "pins": {
+        "D": {
+          "function": null,
+          "name": "D",
+          "net": "switched"
+        },
+        "G": {
+          "function": null,
+          "name": "G",
+          "net": "ctrl"
+        },
+        "S": {
+          "function": null,
+          "name": "S",
+          "net": "gnd"
+        }
+      },
+      "properties": {},
+      "spice_model": "MY_NMOS",
+      "spice_subckt": null,
+      "type": "mosfet",
+      "value": null
+    },
+    "U_REG": {
+      "id": "U_REG",
+      "part": null,
+      "pins": {
+        "gnd": {
+          "function": null,
+          "name": "gnd",
+          "net": "gnd"
+        },
+        "in": {
+          "function": null,
+          "name": "in",
+          "net": "v_prot"
+        },
+        "out": {
+          "function": null,
+          "name": "out",
+          "net": "v_out"
+        }
+      },
+      "properties": {
+        "iout_max": "500mA",
+        "iq": "50uA",
+        "v_dropout": "0.2V",
+        "vout": "3.3V"
+      },
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "ldo",
+      "value": null
+    },
+    "V_SOURCE": {
+      "id": "V_SOURCE",
+      "part": null,
+      "pins": {
+        "n": {
+          "function": null,
+          "name": "n",
+          "net": "gnd"
+        },
+        "p": {
+          "function": null,
+          "name": "p",
+          "net": "v_in"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "voltage_source",
+      "value": "5V"
+    },
+    "X_CUSTOM": {
+      "id": "X_CUSTOM",
+      "part": null,
+      "pins": {
+        "1": {
+          "function": null,
+          "name": "1",
+          "net": "v_out"
+        },
+        "2": {
+          "function": null,
+          "name": "2",
+          "net": "gnd"
+        },
+        "3": {
+          "function": null,
+          "name": "3",
+          "net": "switched"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": "LM358",
+      "type": "opamp",
+      "value": null
+    }
+  },
+  "exports": [],
+  "firmware_bindings": {},
+  "firmware_projects": {},
+  "firmware_tasks": {},
+  "interfaces": {},
+  "ir_version": "0.1",
+  "metadata": {
+    "author": "",
+    "created_at": "",
+    "description": "Testing Diodes, custom MOSFET models, and Subcircuits.",
+    "title": "Advanced Components Demo"
+  },
+  "name": "advanced_components_demo",
+  "nets": {
+    "ctrl": {
+      "id": "ctrl",
+      "nominal_voltage": null,
+      "role": "digital_signal"
+    },
+    "gnd": {
+      "id": "gnd",
+      "nominal_voltage": null,
+      "role": "ground"
+    },
+    "switched": {
+      "id": "switched",
+      "nominal_voltage": null,
+      "role": "analog_signal"
+    },
+    "v_in": {
+      "id": "v_in",
+      "nominal_voltage": "5V",
+      "role": "power"
+    },
+    "v_out": {
+      "id": "v_out",
+      "nominal_voltage": null,
+      "role": "power"
+    },
+    "v_prot": {
+      "id": "v_prot",
+      "nominal_voltage": null,
+      "role": "power"
+    }
+  },
+  "power_domains": {},
+  "requirements": [],
+  "simulation_profiles": {
+    "default": {
+      "backends": [
+        "ngspice"
+      ],
+      "default": false,
+      "id": "default",
+      "included_subsystems": [],
+      "properties": {},
+      "tests": [
+        "basic"
+      ]
+    }
+  },
+  "tests": {
+    "basic": {
+      "assertions": [
+        {
+          "max": "3.4V",
+          "min": "3.2V",
+          "net": "v_out",
+          "op": "assert_voltage"
+        }
+      ],
+      "description": "",
+      "duration": "1ms",
+      "id": "basic",
+      "setup": {
+        "ctrl": "3.3V"
+      }
+    }
+  }
+}

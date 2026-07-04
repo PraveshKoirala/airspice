@@ -53,6 +53,11 @@ def main(argv: list[str] | None = None) -> int:
     summarize_p.add_argument("design")
     summarize_p.add_argument("--json", action="store_true")
 
+    dump_model_p = sub.add_parser("dump-model", help="Dump the canonical typed model as deterministic JSON")
+    dump_model_p.add_argument("design")
+    dump_model_p.add_argument("--json", action="store_true", help="Emit deterministic model JSON (default and only output form)")
+    dump_model_p.add_argument("--out", help="Write to this path instead of stdout")
+
     explain_p = sub.add_parser("explain", help="Explain a design")
     explain_p.add_argument("design")
     explain_p.add_argument("--json", action="store_true")
@@ -179,6 +184,8 @@ def main(argv: list[str] | None = None) -> int:
         return _validate(Path(args.design), args.json)
     if args.command in {"summarize", "explain"}:
         return _summarize(Path(args.design), args.json)
+    if args.command == "dump-model":
+        return _dump_model(Path(args.design), Path(args.out) if args.out else None)
     if args.command == "generate-template":
         return _generate_template(args.template, Path(args.out), args.json)
     if args.command == "compile":
@@ -258,6 +265,20 @@ def _summarize(path: Path, as_json: bool) -> int:
     ir, _ = parse_file(path)
     summary = summarize_design(ir)
     print(json.dumps(summary, indent=2) if as_json else render_summary_text(summary))
+    return 0
+
+
+def _dump_model(path: Path, out: Path | None) -> int:
+    from .model_dump import model_to_dict
+
+    ir, _ = parse_file(path)
+    text = json.dumps(model_to_dict(ir), indent=2, sort_keys=True) + "\n"
+    if out is not None:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(text, encoding="utf-8")
+    else:
+        # Write raw bytes so stdout is LF-terminated regardless of platform.
+        sys.stdout.write(text)
     return 0
 
 

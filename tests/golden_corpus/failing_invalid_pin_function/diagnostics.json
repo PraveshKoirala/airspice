@@ -1,0 +1,27 @@
+{
+  "diagnostics": [
+    {
+      "code": "UNSUPPORTED_PIN_FUNCTION",
+      "domain": "pin",
+      "expected": {
+        "supported": [
+          "ADC1_CH4",
+          "GPIO",
+          "GPIO_OUT"
+        ]
+      },
+      "id": "diag_00001",
+      "message": "MCU U_MCU pin GPIO4 does not support function I2C_SDA.",
+      "observed": {
+        "function": "I2C_SDA"
+      },
+      "related_elements": [
+        "U_MCU",
+        "GPIO4"
+      ],
+      "severity": "error",
+      "suggested_actions": []
+    }
+  ],
+  "success": false
+}

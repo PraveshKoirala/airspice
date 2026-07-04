@@ -1,0 +1,48 @@
+{
+  "artifacts": [
+    "spice/main.cir",
+    "spice/probes.json",
+    "waveforms/divider_with_load_mid.csv"
+  ],
+  "backend": "ngspice",
+  "diagnostics": [],
+  "measurement_stats": {
+    "gnd": {
+      "final": "0V",
+      "max": "0V",
+      "min": "0V",
+      "time_of_max": "0s",
+      "time_of_min": "0s"
+    },
+    "i(LOAD_A)": {
+      "final": "10mA",
+      "max": "10mA",
+      "min": "10mA",
+      "time_of_max": "0s",
+      "time_of_min": "0s"
+    },
+    "mid": {
+      "final": "2.5V",
+      "max": "2.5V",
+      "min": "2.5V",
+      "time_of_max": "0s",
+      "time_of_min": "0s"
+    },
+    "vin": {
+      "final": "5V",
+      "max": "5V",
+      "min": "5V",
+      "time_of_max": "0s",
+      "time_of_min": "0s"
+    }
+  },
+  "measurements": {
+    "gnd": "0V",
+    "i(LOAD_A)": "10mA",
+    "mid": "2.5V",
+    "vin": "5V"
+  },
+  "profile": "analog_only",
+  "status": "passed",
+  "test": "divider_with_load"
+}

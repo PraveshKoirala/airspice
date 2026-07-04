@@ -1,0 +1,451 @@
+{
+  "edges": [
+    {
+      "data": {
+        "net": "bat",
+        "pin": "1"
+      },
+      "id": "C_BAT:1->bat",
+      "label": "1",
+      "source": "C_BAT",
+      "sourceHandle": "pin:1",
+      "target": "net:bat",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "2"
+      },
+      "id": "C_BAT:2->gnd",
+      "label": "2",
+      "source": "C_BAT",
+      "sourceHandle": "pin:2",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "bat_sense",
+        "pin": "GPIO0"
+      },
+      "id": "MCU:GPIO0->bat_sense",
+      "label": "GPIO0",
+      "source": "MCU",
+      "sourceHandle": "pin:GPIO0",
+      "target": "net:bat_sense",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "charge_ctrl",
+        "pin": "GPIO1"
+      },
+      "id": "MCU:GPIO1->charge_ctrl",
+      "label": "GPIO1",
+      "source": "MCU",
+      "sourceHandle": "pin:GPIO1",
+      "target": "net:charge_ctrl",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_3v3",
+        "pin": "3V3"
+      },
+      "id": "MCU:3V3->v_3v3",
+      "label": "3V3",
+      "source": "MCU",
+      "sourceHandle": "pin:3V3",
+      "target": "net:v_3v3",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "GND"
+      },
+      "id": "MCU:GND->gnd",
+      "label": "GND",
+      "source": "MCU",
+      "sourceHandle": "pin:GND",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "charge_ctrl",
+        "pin": "G"
+      },
+      "id": "Q_CHG:G->charge_ctrl",
+      "label": "G",
+      "source": "Q_CHG",
+      "sourceHandle": "pin:G",
+      "target": "net:charge_ctrl",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_in",
+        "pin": "D"
+      },
+      "id": "Q_CHG:D->v_in",
+      "label": "D",
+      "source": "Q_CHG",
+      "sourceHandle": "pin:D",
+      "target": "net:v_in",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "bat",
+        "pin": "S"
+      },
+      "id": "Q_CHG:S->bat",
+      "label": "S",
+      "source": "Q_CHG",
+      "sourceHandle": "pin:S",
+      "target": "net:bat",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "bat_sense",
+        "pin": "1"
+      },
+      "id": "R_SENSE_BOT:1->bat_sense",
+      "label": "1",
+      "source": "R_SENSE_BOT",
+      "sourceHandle": "pin:1",
+      "target": "net:bat_sense",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "2"
+      },
+      "id": "R_SENSE_BOT:2->gnd",
+      "label": "2",
+      "source": "R_SENSE_BOT",
+      "sourceHandle": "pin:2",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "bat",
+        "pin": "1"
+      },
+      "id": "R_SENSE_TOP:1->bat",
+      "label": "1",
+      "source": "R_SENSE_TOP",
+      "sourceHandle": "pin:1",
+      "target": "net:bat",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "bat_sense",
+        "pin": "2"
+      },
+      "id": "R_SENSE_TOP:2->bat_sense",
+      "label": "2",
+      "source": "R_SENSE_TOP",
+      "sourceHandle": "pin:2",
+      "target": "net:bat_sense",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_in",
+        "pin": "in"
+      },
+      "id": "U_REG:in->v_in",
+      "label": "in",
+      "source": "U_REG",
+      "sourceHandle": "pin:in",
+      "target": "net:v_in",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_3v3",
+        "pin": "out"
+      },
+      "id": "U_REG:out->v_3v3",
+      "label": "out",
+      "source": "U_REG",
+      "sourceHandle": "pin:out",
+      "target": "net:v_3v3",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "gnd"
+      },
+      "id": "U_REG:gnd->gnd",
+      "label": "gnd",
+      "source": "U_REG",
+      "sourceHandle": "pin:gnd",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_in",
+        "pin": "p"
+      },
+      "id": "V_SUPPLY:p->v_in",
+      "label": "p",
+      "source": "V_SUPPLY",
+      "sourceHandle": "pin:p",
+      "target": "net:v_in",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "n"
+      },
+      "id": "V_SUPPLY:n->gnd",
+      "label": "n",
+      "source": "V_SUPPLY",
+      "sourceHandle": "pin:n",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    }
+  ],
+  "nodes": [
+    {
+      "data": {
+        "label": "C_BAT",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "1",
+            "net": "bat"
+          },
+          {
+            "function": "",
+            "name": "2",
+            "net": "gnd"
+          }
+        ],
+        "spice_model": "",
+        "type": "capacitor",
+        "value": "1000uF"
+      },
+      "id": "C_BAT",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "MCU",
+        "part": "ESP32-C3",
+        "pins": [
+          {
+            "function": "",
+            "name": "3V3",
+            "net": "v_3v3"
+          },
+          {
+            "function": "",
+            "name": "GND",
+            "net": "gnd"
+          },
+          {
+            "function": "ADC1_CH0",
+            "name": "GPIO0",
+            "net": "bat_sense"
+          },
+          {
+            "function": "GPIO_OUT",
+            "name": "GPIO1",
+            "net": "charge_ctrl"
+          }
+        ],
+        "spice_model": "",
+        "type": "mcu",
+        "value": ""
+      },
+      "id": "MCU",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "Q_CHG",
+        "part": "bss138",
+        "pins": [
+          {
+            "function": "",
+            "name": "D",
+            "net": "v_in"
+          },
+          {
+            "function": "",
+            "name": "G",
+            "net": "charge_ctrl"
+          },
+          {
+            "function": "",
+            "name": "S",
+            "net": "bat"
+          }
+        ],
+        "spice_model": "",
+        "type": "mosfet",
+        "value": ""
+      },
+      "id": "Q_CHG",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "R_SENSE_BOT",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "1",
+            "net": "bat_sense"
+          },
+          {
+            "function": "",
+            "name": "2",
+            "net": "gnd"
+          }
+        ],
+        "spice_model": "",
+        "type": "resistor",
+        "value": "100k"
+      },
+      "id": "R_SENSE_BOT",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "R_SENSE_TOP",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "1",
+            "net": "bat"
+          },
+          {
+            "function": "",
+            "name": "2",
+            "net": "bat_sense"
+          }
+        ],
+        "spice_model": "",
+        "type": "resistor",
+        "value": "100k"
+      },
+      "id": "R_SENSE_TOP",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "U_REG",
+        "part": "generic_3v3",
+        "pins": [
+          {
+            "function": "",
+            "name": "gnd",
+            "net": "gnd"
+          },
+          {
+            "function": "",
+            "name": "in",
+            "net": "v_in"
+          },
+          {
+            "function": "",
+            "name": "out",
+            "net": "v_3v3"
+          }
+        ],
+        "spice_model": "",
+        "type": "ldo",
+        "value": ""
+      },
+      "id": "U_REG",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "V_SUPPLY",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "n",
+            "net": "gnd"
+          },
+          {
+            "function": "",
+            "name": "p",
+            "net": "v_in"
+          }
+        ],
+        "spice_model": "",
+        "type": "voltage_source",
+        "value": "5V"
+      },
+      "id": "V_SUPPLY",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "bat",
+        "role": "power"
+      },
+      "id": "net:bat",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "bat_sense",
+        "role": "analog_signal"
+      },
+      "id": "net:bat_sense",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "charge_ctrl",
+        "role": "analog_signal"
+      },
+      "id": "net:charge_ctrl",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "gnd",
+        "role": "ground"
+      },
+      "id": "net:gnd",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "v_3v3",
+        "role": "power"
+      },
+      "id": "net:v_3v3",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "v_in",
+        "role": "power"
+      },
+      "id": "net:v_in",
+      "type": "net"
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "diagnostics": [
+    {
+      "code": "UNSUPPORTED_SPICE_TYPE",
+      "domain": "compiler",
+      "expected": {},
+      "id": "diag_00001",
+      "message": "Component X_CHARGER type power_manager is not supported by the v0.1 SPICE compiler.",
+      "observed": {},
+      "related_elements": [
+        "X_CHARGER"
+      ],
+      "severity": "warning",
+      "suggested_actions": []
+    },
+    {
+      "code": "UNSUPPORTED_SPICE_TYPE",
+      "domain": "compiler",
+      "expected": {},
+      "id": "diag_00002",
+      "message": "Component X_SENSOR type sensor is not supported by the v0.1 SPICE compiler.",
+      "observed": {},
+      "related_elements": [
+        "X_SENSOR"
+      ],
+      "severity": "warning",
+      "suggested_actions": []
+    },
+    {
+      "code": "I2C_PULLUP_TOO_WEAK",
+      "domain": "interface",
+      "expected": {},
+      "id": "diag_00003",
+      "message": "I2C pullup 4.7k may be too weak for 400kHz.",
+      "observed": {},
+      "related_elements": [
+        "i2c_internal"
+      ],
+      "severity": "warning",
+      "suggested_actions": []
+    },
+    {
+      "code": "I2C_PULLUP_TOO_WEAK",
+      "domain": "interface",
+      "expected": {},
+      "id": "diag_00004",
+      "message": "I2C pullup 4.7k may be too weak for 400kHz.",
+      "observed": {},
+      "related_elements": [
+        "i2c_internal"
+      ],
+      "severity": "warning",
+      "suggested_actions": []
+    }
+  ],
+  "success": true
+}

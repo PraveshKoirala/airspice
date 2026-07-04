@@ -1,0 +1,340 @@
+{
+  "edges": [
+    {
+      "data": {
+        "net": "v_in",
+        "pin": "a"
+      },
+      "id": "D_PROT:a->v_in",
+      "label": "a",
+      "source": "D_PROT",
+      "sourceHandle": "pin:a",
+      "target": "net:v_in",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_prot",
+        "pin": "c"
+      },
+      "id": "D_PROT:c->v_prot",
+      "label": "c",
+      "source": "D_PROT",
+      "sourceHandle": "pin:c",
+      "target": "net:v_prot",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "ctrl",
+        "pin": "G"
+      },
+      "id": "Q_SW:G->ctrl",
+      "label": "G",
+      "source": "Q_SW",
+      "sourceHandle": "pin:G",
+      "target": "net:ctrl",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "switched",
+        "pin": "D"
+      },
+      "id": "Q_SW:D->switched",
+      "label": "D",
+      "source": "Q_SW",
+      "sourceHandle": "pin:D",
+      "target": "net:switched",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "S"
+      },
+      "id": "Q_SW:S->gnd",
+      "label": "S",
+      "source": "Q_SW",
+      "sourceHandle": "pin:S",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_prot",
+        "pin": "in"
+      },
+      "id": "U_REG:in->v_prot",
+      "label": "in",
+      "source": "U_REG",
+      "sourceHandle": "pin:in",
+      "target": "net:v_prot",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_out",
+        "pin": "out"
+      },
+      "id": "U_REG:out->v_out",
+      "label": "out",
+      "source": "U_REG",
+      "sourceHandle": "pin:out",
+      "target": "net:v_out",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "gnd"
+      },
+      "id": "U_REG:gnd->gnd",
+      "label": "gnd",
+      "source": "U_REG",
+      "sourceHandle": "pin:gnd",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_in",
+        "pin": "p"
+      },
+      "id": "V_SOURCE:p->v_in",
+      "label": "p",
+      "source": "V_SOURCE",
+      "sourceHandle": "pin:p",
+      "target": "net:v_in",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "n"
+      },
+      "id": "V_SOURCE:n->gnd",
+      "label": "n",
+      "source": "V_SOURCE",
+      "sourceHandle": "pin:n",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_out",
+        "pin": "1"
+      },
+      "id": "X_CUSTOM:1->v_out",
+      "label": "1",
+      "source": "X_CUSTOM",
+      "sourceHandle": "pin:1",
+      "target": "net:v_out",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "2"
+      },
+      "id": "X_CUSTOM:2->gnd",
+      "label": "2",
+      "source": "X_CUSTOM",
+      "sourceHandle": "pin:2",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "switched",
+        "pin": "3"
+      },
+      "id": "X_CUSTOM:3->switched",
+      "label": "3",
+      "source": "X_CUSTOM",
+      "sourceHandle": "pin:3",
+      "target": "net:switched",
+      "targetHandle": "net"
+    }
+  ],
+  "nodes": [
+    {
+      "data": {
+        "label": "D_PROT",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "a",
+            "net": "v_in"
+          },
+          {
+            "function": "",
+            "name": "c",
+            "net": "v_prot"
+          }
+        ],
+        "spice_model": "",
+        "type": "diode",
+        "value": ""
+      },
+      "id": "D_PROT",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "Q_SW",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "D",
+            "net": "switched"
+          },
+          {
+            "function": "",
+            "name": "G",
+            "net": "ctrl"
+          },
+          {
+            "function": "",
+            "name": "S",
+            "net": "gnd"
+          }
+        ],
+        "spice_model": "MY_NMOS",
+        "type": "mosfet",
+        "value": ""
+      },
+      "id": "Q_SW",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "U_REG",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "gnd",
+            "net": "gnd"
+          },
+          {
+            "function": "",
+            "name": "in",
+            "net": "v_prot"
+          },
+          {
+            "function": "",
+            "name": "out",
+            "net": "v_out"
+          }
+        ],
+        "spice_model": "",
+        "type": "ldo",
+        "value": ""
+      },
+      "id": "U_REG",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "V_SOURCE",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "n",
+            "net": "gnd"
+          },
+          {
+            "function": "",
+            "name": "p",
+            "net": "v_in"
+          }
+        ],
+        "spice_model": "",
+        "type": "voltage_source",
+        "value": "5V"
+      },
+      "id": "V_SOURCE",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "X_CUSTOM",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "1",
+            "net": "v_out"
+          },
+          {
+            "function": "",
+            "name": "2",
+            "net": "gnd"
+          },
+          {
+            "function": "",
+            "name": "3",
+            "net": "switched"
+          }
+        ],
+        "spice_model": "",
+        "type": "opamp",
+        "value": ""
+      },
+      "id": "X_CUSTOM",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "ctrl",
+        "role": "digital_signal"
+      },
+      "id": "net:ctrl",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "gnd",
+        "role": "ground"
+      },
+      "id": "net:gnd",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "switched",
+        "role": "analog_signal"
+      },
+      "id": "net:switched",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "v_in",
+        "role": "power"
+      },
+      "id": "net:v_in",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "v_out",
+        "role": "power"
+      },
+      "id": "net:v_out",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "v_prot",
+        "role": "power"
+      },
+      "id": "net:v_prot",
+      "type": "net"
+    }
+  ]
+}

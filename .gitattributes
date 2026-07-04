@@ -1,0 +1,9 @@
+# The golden corpus is byte-compared in CI (`export_golden.py --check`). Windows
+# devs must not churn it via CRLF autoconversion, so force LF for every corpus
+# file regardless of core.autocrlf. The exporter also writes LF explicitly; this
+# is the belt-and-suspenders half that survives checkout/clone.
+tests/golden_corpus/** text eol=lf
+
+# Corpus artifacts are generated, deterministic reference data -- keep them out of
+# language stats and mark them as generated so review tooling collapses them.
+tests/golden_corpus/** linguist-generated=true

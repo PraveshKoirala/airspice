@@ -1,0 +1,18 @@
+{
+  "diagnostics": [
+    {
+      "code": "I2C_PULLUPS_NOT_DECLARED",
+      "domain": "interface",
+      "expected": {},
+      "id": "diag_00001",
+      "message": "I2C interface i2c0 must declare SDA and SCL pullups.",
+      "observed": {},
+      "related_elements": [
+        "i2c0"
+      ],
+      "severity": "error",
+      "suggested_actions": []
+    }
+  ],
+  "success": false
+}

@@ -1,0 +1,26 @@
+<system name="stm32_demo" ir_version="0.1">
+  <metadata><title>STM32 Demo</title></metadata>
+  <nets>
+    <net id="gnd" role="ground"/>
+    <net id="v_3v3" role="power" nominal_voltage="3.3V"/>
+  </nets>
+  <components>
+    <component id="V_SOURCE" type="voltage_source">
+      <value>3.3V</value>
+      <pin name="p" net="v_3v3"/><pin name="n" net="gnd"/>
+    </component>
+    <component id="U_MCU" type="mcu" part="STM32F103">
+      <pin name="VDD" net="v_3v3"/>
+      <pin name="VSS" net="gnd"/>
+    </component>
+  </components>
+  <firmware>
+    <project id="fw" target="U_MCU" framework="platformio" language="cpp">
+      <board>bluepill_f103c8</board>
+    </project>
+  </firmware>
+  <tests><test id="t1"><run duration="10ms"/></test></tests>
+  <simulation_profiles>
+    <profile id="p1" default="true"><backend type="renode"/><run test="t1"/></profile>
+  </simulation_profiles>
+</system>

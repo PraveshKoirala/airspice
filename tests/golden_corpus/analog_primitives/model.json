@@ -1,0 +1,178 @@
+{
+  "analog": [
+    {
+      "id": "analog_core",
+      "probes": [
+        {
+          "id": "probe_mid",
+          "net": "mid",
+          "quantity": "voltage"
+        }
+      ],
+      "uses": [
+        "LOAD_A",
+        "R_BOTTOM",
+        "R_TOP",
+        "V_IN"
+      ]
+    }
+  ],
+  "bridges": [],
+  "components": {
+    "LOAD_A": {
+      "id": "LOAD_A",
+      "part": null,
+      "pins": {
+        "n": {
+          "function": null,
+          "name": "n",
+          "net": "gnd"
+        },
+        "p": {
+          "function": null,
+          "name": "p",
+          "net": "vin"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "generic_load",
+      "value": "10mA"
+    },
+    "R_BOTTOM": {
+      "id": "R_BOTTOM",
+      "part": null,
+      "pins": {
+        "1": {
+          "function": null,
+          "name": "1",
+          "net": "mid"
+        },
+        "2": {
+          "function": null,
+          "name": "2",
+          "net": "gnd"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "resistor",
+      "value": "10k"
+    },
+    "R_TOP": {
+      "id": "R_TOP",
+      "part": null,
+      "pins": {
+        "1": {
+          "function": null,
+          "name": "1",
+          "net": "vin"
+        },
+        "2": {
+          "function": null,
+          "name": "2",
+          "net": "mid"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "resistor",
+      "value": "10k"
+    },
+    "V_IN": {
+      "id": "V_IN",
+      "part": null,
+      "pins": {
+        "n": {
+          "function": null,
+          "name": "n",
+          "net": "gnd"
+        },
+        "p": {
+          "function": null,
+          "name": "p",
+          "net": "vin"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "voltage_source",
+      "value": "5V"
+    }
+  },
+  "exports": [],
+  "firmware_bindings": {},
+  "firmware_projects": {},
+  "firmware_tasks": {},
+  "interfaces": {},
+  "ir_version": "0.1",
+  "metadata": {
+    "author": "AIR",
+    "created_at": "",
+    "description": "Explicit voltage source, load current, and current assertion example.",
+    "title": "Analog Primitives"
+  },
+  "name": "analog_primitives",
+  "nets": {
+    "gnd": {
+      "id": "gnd",
+      "nominal_voltage": null,
+      "role": "ground"
+    },
+    "mid": {
+      "id": "mid",
+      "nominal_voltage": null,
+      "role": "analog_signal"
+    },
+    "vin": {
+      "id": "vin",
+      "nominal_voltage": "5V",
+      "role": "power"
+    }
+  },
+  "power_domains": {},
+  "requirements": [],
+  "simulation_profiles": {
+    "analog_only": {
+      "backends": [
+        "ngspice"
+      ],
+      "default": true,
+      "id": "analog_only",
+      "included_subsystems": [
+        "analog_core"
+      ],
+      "properties": {},
+      "tests": [
+        "divider_with_load"
+      ]
+    }
+  },
+  "tests": {
+    "divider_with_load": {
+      "assertions": [
+        {
+          "max": "2.55V",
+          "min": "2.45V",
+          "net": "mid",
+          "op": "assert_voltage"
+        },
+        {
+          "component": "LOAD_A",
+          "max": "12mA",
+          "op": "assert_current"
+        }
+      ],
+      "description": "",
+      "duration": "5ms",
+      "id": "divider_with_load",
+      "setup": {
+        "load_step:LOAD_A": "2mA,10mA,1ms,1us"
+      }
+    }
+  }
+}

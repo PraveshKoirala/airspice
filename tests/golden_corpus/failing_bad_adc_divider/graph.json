@@ -1,0 +1,188 @@
+{
+  "edges": [
+    {
+      "data": {
+        "net": "battery_sense",
+        "pin": "1"
+      },
+      "id": "R_BOTTOM:1->battery_sense",
+      "label": "1",
+      "source": "R_BOTTOM",
+      "sourceHandle": "pin:1",
+      "target": "net:battery_sense",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "2"
+      },
+      "id": "R_BOTTOM:2->gnd",
+      "label": "2",
+      "source": "R_BOTTOM",
+      "sourceHandle": "pin:2",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "bat",
+        "pin": "1"
+      },
+      "id": "R_TOP:1->bat",
+      "label": "1",
+      "source": "R_TOP",
+      "sourceHandle": "pin:1",
+      "target": "net:bat",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "battery_sense",
+        "pin": "2"
+      },
+      "id": "R_TOP:2->battery_sense",
+      "label": "2",
+      "source": "R_TOP",
+      "sourceHandle": "pin:2",
+      "target": "net:battery_sense",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "bat",
+        "pin": "3V3"
+      },
+      "id": "U_MCU:3V3->bat",
+      "label": "3V3",
+      "source": "U_MCU",
+      "sourceHandle": "pin:3V3",
+      "target": "net:bat",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "GND"
+      },
+      "id": "U_MCU:GND->gnd",
+      "label": "GND",
+      "source": "U_MCU",
+      "sourceHandle": "pin:GND",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "battery_sense",
+        "pin": "GPIO4"
+      },
+      "id": "U_MCU:GPIO4->battery_sense",
+      "label": "GPIO4",
+      "source": "U_MCU",
+      "sourceHandle": "pin:GPIO4",
+      "target": "net:battery_sense",
+      "targetHandle": "net"
+    }
+  ],
+  "nodes": [
+    {
+      "data": {
+        "label": "R_BOTTOM",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "1",
+            "net": "battery_sense"
+          },
+          {
+            "function": "",
+            "name": "2",
+            "net": "gnd"
+          }
+        ],
+        "spice_model": "",
+        "type": "resistor",
+        "value": "1M"
+      },
+      "id": "R_BOTTOM",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "R_TOP",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "1",
+            "net": "bat"
+          },
+          {
+            "function": "",
+            "name": "2",
+            "net": "battery_sense"
+          }
+        ],
+        "spice_model": "",
+        "type": "resistor",
+        "value": "100k"
+      },
+      "id": "R_TOP",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "U_MCU",
+        "part": "ESP32-C3",
+        "pins": [
+          {
+            "function": "",
+            "name": "3V3",
+            "net": "bat"
+          },
+          {
+            "function": "",
+            "name": "GND",
+            "net": "gnd"
+          },
+          {
+            "function": "ADC1_CH4",
+            "name": "GPIO4",
+            "net": "battery_sense"
+          }
+        ],
+        "spice_model": "",
+        "type": "mcu",
+        "value": ""
+      },
+      "id": "U_MCU",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "bat",
+        "role": "power"
+      },
+      "id": "net:bat",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "battery_sense",
+        "role": "analog_signal"
+      },
+      "id": "net:battery_sense",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "gnd",
+        "role": "ground"
+      },
+      "id": "net:gnd",
+      "type": "net"
+    }
+  ]
+}

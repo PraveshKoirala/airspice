@@ -1,0 +1,55 @@
+<?xml version="1.0" ?>
+<system ir_version="0.1" name="bad_adc_divider">
+  <metadata>
+    <title>Bad ADC Divider</title>
+  </metadata>
+  <nets>
+    <net id="bat" nominal_voltage="4.2V" role="power"/>
+    <net id="battery_sense" role="analog_signal"/>
+    <net id="gnd" role="ground"/>
+  </nets>
+  <components>
+    <component id="R_BOTTOM" type="resistor">
+      <value>1M</value>
+      <pin name="1" net="battery_sense"/>
+      <pin name="2" net="gnd"/>
+    </component>
+    <component id="R_TOP" type="resistor">
+      <value>100k</value>
+      <pin name="1" net="bat"/>
+      <pin name="2" net="battery_sense"/>
+    </component>
+    <component id="U_MCU" part="ESP32-C3" type="mcu">
+      <pin name="3V3" net="bat"/>
+      <pin name="GND" net="gnd"/>
+      <pin function="ADC1_CH4" name="GPIO4" net="battery_sense"/>
+    </component>
+  </components>
+  <firmware>
+    <project framework="platformio" id="fw_main" language="cpp" target="U_MCU">
+      <board>esp32-c3-devkitm-1</board>
+    </project>
+    <binding id="battery_adc_binding">
+      <signal name="battery_voltage"/>
+      <component ref="U_MCU"/>
+      <peripheral>ADC1</peripheral>
+      <channel>ADC1_CH4</channel>
+      <net>battery_sense</net>
+    </binding>
+  </firmware>
+  <tests>
+    <test id="battery_adc_nominal">
+      <setup>
+        <set_voltage net="bat" value="4.2V"/>
+      </setup>
+      <run duration="10ms"/>
+      <assert_voltage max="1.06V" min="1.02V" net="battery_sense"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile default="true" id="analog_only">
+      <backend type="ngspice"/>
+      <run test="battery_adc_nominal"/>
+    </profile>
+  </simulation_profiles>
+</system>

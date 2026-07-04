@@ -1,0 +1,332 @@
+{
+  "edges": [
+    {
+      "data": {
+        "net": "v_bat",
+        "pin": "p"
+      },
+      "id": "L_LOAD:p->v_bat",
+      "label": "p",
+      "source": "L_LOAD",
+      "sourceHandle": "pin:p",
+      "target": "net:v_bat",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "load_low",
+        "pin": "n"
+      },
+      "id": "L_LOAD:n->load_low",
+      "label": "n",
+      "source": "L_LOAD",
+      "sourceHandle": "pin:n",
+      "target": "net:load_low",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gate_drive",
+        "pin": "G"
+      },
+      "id": "Q_SWITCH:G->gate_drive",
+      "label": "G",
+      "source": "Q_SWITCH",
+      "sourceHandle": "pin:G",
+      "target": "net:gate_drive",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "load_low",
+        "pin": "D"
+      },
+      "id": "Q_SWITCH:D->load_low",
+      "label": "D",
+      "source": "Q_SWITCH",
+      "sourceHandle": "pin:D",
+      "target": "net:load_low",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "S"
+      },
+      "id": "Q_SWITCH:S->gnd",
+      "label": "S",
+      "source": "Q_SWITCH",
+      "sourceHandle": "pin:S",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "3v3",
+        "pin": "3V3"
+      },
+      "id": "U_MCU:3V3->3v3",
+      "label": "3V3",
+      "source": "U_MCU",
+      "sourceHandle": "pin:3V3",
+      "target": "net:3v3",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "GND"
+      },
+      "id": "U_MCU:GND->gnd",
+      "label": "GND",
+      "source": "U_MCU",
+      "sourceHandle": "pin:GND",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gate_drive",
+        "pin": "GPIO2"
+      },
+      "id": "U_MCU:GPIO2->gate_drive",
+      "label": "GPIO2",
+      "source": "U_MCU",
+      "sourceHandle": "pin:GPIO2",
+      "target": "net:gate_drive",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "load_low",
+        "pin": "GPIO0"
+      },
+      "id": "U_MCU:GPIO0->load_low",
+      "label": "GPIO0",
+      "source": "U_MCU",
+      "sourceHandle": "pin:GPIO0",
+      "target": "net:load_low",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "3v3",
+        "pin": "p"
+      },
+      "id": "V_3V3:p->3v3",
+      "label": "p",
+      "source": "V_3V3",
+      "sourceHandle": "pin:p",
+      "target": "net:3v3",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "n"
+      },
+      "id": "V_3V3:n->gnd",
+      "label": "n",
+      "source": "V_3V3",
+      "sourceHandle": "pin:n",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "v_bat",
+        "pin": "p"
+      },
+      "id": "V_BAT:p->v_bat",
+      "label": "p",
+      "source": "V_BAT",
+      "sourceHandle": "pin:p",
+      "target": "net:v_bat",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "n"
+      },
+      "id": "V_BAT:n->gnd",
+      "label": "n",
+      "source": "V_BAT",
+      "sourceHandle": "pin:n",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    }
+  ],
+  "nodes": [
+    {
+      "data": {
+        "label": "L_LOAD",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "n",
+            "net": "load_low"
+          },
+          {
+            "function": "",
+            "name": "p",
+            "net": "v_bat"
+          }
+        ],
+        "spice_model": "",
+        "type": "generic_load",
+        "value": "100mA"
+      },
+      "id": "L_LOAD",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "Q_SWITCH",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "D",
+            "net": "load_low"
+          },
+          {
+            "function": "",
+            "name": "G",
+            "net": "gate_drive"
+          },
+          {
+            "function": "",
+            "name": "S",
+            "net": "gnd"
+          }
+        ],
+        "spice_model": "",
+        "type": "mosfet",
+        "value": ""
+      },
+      "id": "Q_SWITCH",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "U_MCU",
+        "part": "ESP32-C3",
+        "pins": [
+          {
+            "function": "",
+            "name": "3V3",
+            "net": "3v3"
+          },
+          {
+            "function": "",
+            "name": "GND",
+            "net": "gnd"
+          },
+          {
+            "function": "ADC1_CH0",
+            "name": "GPIO0",
+            "net": "load_low"
+          },
+          {
+            "function": "GPIO_OUT",
+            "name": "GPIO2",
+            "net": "gate_drive"
+          }
+        ],
+        "spice_model": "",
+        "type": "mcu",
+        "value": ""
+      },
+      "id": "U_MCU",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "V_3V3",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "n",
+            "net": "gnd"
+          },
+          {
+            "function": "",
+            "name": "p",
+            "net": "3v3"
+          }
+        ],
+        "spice_model": "",
+        "type": "voltage_source",
+        "value": "3.3V"
+      },
+      "id": "V_3V3",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "V_BAT",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "n",
+            "net": "gnd"
+          },
+          {
+            "function": "",
+            "name": "p",
+            "net": "v_bat"
+          }
+        ],
+        "spice_model": "",
+        "type": "voltage_source",
+        "value": "3.7V"
+      },
+      "id": "V_BAT",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "3v3",
+        "role": "power"
+      },
+      "id": "net:3v3",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "gate_drive",
+        "role": "digital_signal"
+      },
+      "id": "net:gate_drive",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "gnd",
+        "role": "ground"
+      },
+      "id": "net:gnd",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "load_low",
+        "role": "analog_signal"
+      },
+      "id": "net:load_low",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "v_bat",
+        "role": "power"
+      },
+      "id": "net:v_bat",
+      "type": "net"
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "artifacts": [
+    "spice/main.cir",
+    "spice/probes.json",
+    "waveforms/rail_startup_3v3.csv",
+    "waveforms/rail_startup_battery_sense.csv"
+  ],
+  "backend": "ngspice",
+  "diagnostics": [],
+  "measurement_stats": {
+    "3v3": {
+      "final": "3.3V",
+      "max": "3.3V",
+      "min": "3.3V",
+      "time_of_max": "0s",
+      "time_of_min": "0s"
+    },
+    "bat": {
+      "final": "3.7V",
+      "max": "3.7V",
+      "min": "3.7V",
+      "time_of_max": "0s",
+      "time_of_min": "0s"
+    },
+    "battery_sense": {
+      "final": "918.045mV",
+      "max": "918.045mV",
+      "min": "918.045mV",
+      "time_of_max": "0s",
+      "time_of_min": "0s"
+    },
+    "gnd": {
+      "final": "0V",
+      "max": "0V",
+      "min": "0V",
+      "time_of_max": "0s",
+      "time_of_min": "0s"
+    }
+  },
+  "measurements": {
+    "3v3": "3.3V",
+    "bat": "3.7V",
+    "battery_sense": "918.045mV",
+    "gnd": "0V"
+  },
+  "profile": "analog_only",
+  "status": "passed",
+  "test": "rail_startup"
+}

@@ -1,0 +1,143 @@
+<system name="esp32_battery_sensor" ir_version="0.1">
+  <metadata>
+    <title>ESP32 Battery Sensor</title>
+    <description>Battery-powered ESP32-C3 sensor node with ADC battery measurement.</description>
+    <author>AI</author>
+    <created_at>2026-06-05T00:00:00Z</created_at>
+  </metadata>
+  <requirements>
+    <requirement id="req_3v3_rail" type="power_rail">
+      <rail name="3v3"/>
+      <voltage nominal="3.3V" min="3.0V" max="3.6V"/>
+      <current peak="700mA" continuous="250mA"/>
+    </requirement>
+    <requirement id="req_battery_adc" type="measurement">
+      <signal name="battery_voltage"/>
+      <range min="3.0V" max="4.2V"/>
+      <accuracy max_error="100mV"/>
+    </requirement>
+  </requirements>
+  <nets>
+    <net id="gnd" role="ground"/>
+    <net id="bat" role="power" nominal_voltage="3.7V"/>
+    <net id="3v3" role="power" nominal_voltage="3.3V"/>
+    <net id="battery_sense" role="analog_signal"/>
+    <net id="i2c_sda" role="digital_signal"/>
+    <net id="i2c_scl" role="digital_signal"/>
+  </nets>
+  <power_domains>
+    <domain id="bat_domain" net="bat" nominal="3.7V"/>
+    <domain id="logic_3v3" net="3v3" nominal="3.3V" source="U_REG.out"/>
+  </power_domains>
+  <components>
+    <component id="R_BAT_TOP" type="resistor">
+      <value>1M</value>
+      <pin name="1" net="bat"/>
+      <pin name="2" net="battery_sense"/>
+    </component>
+    <component id="R_BAT_BOTTOM" type="resistor">
+      <value>330k</value>
+      <pin name="1" net="battery_sense"/>
+      <pin name="2" net="gnd"/>
+    </component>
+    <component id="C_BAT_SENSE" type="capacitor">
+      <value>100nF</value>
+      <pin name="1" net="battery_sense"/>
+      <pin name="2" net="gnd"/>
+    </component>
+    <component id="U_REG" type="ldo" part="generic_ldo_3v3">
+      <pin name="in" net="bat"/>
+      <pin name="out" net="3v3"/>
+      <pin name="gnd" net="gnd"/>
+      <property name="vout" value="3.3V"/>
+      <property name="iout_max" value="700mA"/>
+      <property name="v_dropout" value="200mV"/>
+      <property name="iq" value="10uA"/>
+    </component>
+    <component id="U_MCU" type="mcu" part="ESP32-C3">
+      <pin name="3V3" net="3v3"/>
+      <pin name="GND" net="gnd"/>
+      <pin name="GPIO4" net="battery_sense" function="ADC1_CH4"/>
+      <pin name="GPIO8" net="i2c_sda" function="I2C_SDA"/>
+      <pin name="GPIO9" net="i2c_scl" function="I2C_SCL"/>
+    </component>
+  </components>
+  <interfaces>
+    <interface id="i2c0" type="i2c">
+      <controller component="U_MCU" peripheral="I2C0"/>
+      <sda net="i2c_sda"/>
+      <scl net="i2c_scl"/>
+      <pullup net="i2c_sda" value="4.7k" to="3v3"/>
+      <pullup net="i2c_scl" value="4.7k" to="3v3"/>
+    </interface>
+  </interfaces>
+  <analog>
+    <subsystem id="battery_measurement">
+      <uses component="R_BAT_TOP"/>
+      <uses component="R_BAT_BOTTOM"/>
+      <uses component="C_BAT_SENSE"/>
+      <probe id="probe_battery_sense" net="battery_sense" quantity="voltage"/>
+    </subsystem>
+  </analog>
+  <digital/>
+  <firmware>
+    <project id="fw_main" target="U_MCU" framework="platformio" language="cpp">
+      <board>esp32-c3-devkitm-1</board>
+      <source_tree path="firmware/"/>
+      <generated_file path="include/air_pinmap.h"/>
+    </project>
+    <binding id="battery_adc_binding">
+      <signal name="battery_voltage"/>
+      <component ref="U_MCU"/>
+      <peripheral>ADC1</peripheral>
+      <channel>ADC1_CH4</channel>
+      <net>battery_sense</net>
+    </binding>
+    <task id="read_battery" target="fw_main">
+      <period>60s</period>
+      <read_adc binding="battery_adc_binding" into="battery_raw"/>
+      <convert expr="battery_raw_to_mv(battery_raw)" into="battery_mv"/>
+      <log value="battery_mv"/>
+    </task>
+  </firmware>
+  <bridges>
+    <bridge id="battery_adc_bridge" type="adc">
+      <analog_source net="battery_sense"/>
+      <digital_target component="U_MCU" peripheral="ADC1" channel="ADC1_CH4"/>
+      <conversion bits="12" reference_voltage="3.3V"/>
+      <sampling sample_time="10us" sample_rate="1kHz"/>
+    </bridge>
+  </bridges>
+  <tests>
+    <test id="battery_adc_nominal">
+      <description>Verify ADC voltage for full battery.</description>
+      <setup>
+        <set_voltage net="bat" value="4.2V"/>
+      </setup>
+      <run duration="500ms"/>
+      <assert_voltage net="battery_sense" min="1.02V" max="1.06V"/>
+    </test>
+    <test id="rail_startup">
+      <setup>
+        <set_voltage net="bat" value="3.7V"/>
+      </setup>
+      <run duration="100ms"/>
+      <assert_voltage net="3v3" min="3.0V" max="3.6V"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="analog_only" default="true">
+      <backend type="ngspice"/>
+      <include subsystem="battery_measurement"/>
+      <run test="battery_adc_nominal"/>
+      <run test="rail_startup"/>
+    </profile>
+  </simulation_profiles>
+  <exports>
+    <export target="spice" enabled="true"/>
+    <export target="firmware" enabled="true"/>
+    <export target="renode" enabled="false"/>
+    <export target="kicad" enabled="false"/>
+  </exports>
+  <gui/>
+</system>
