@@ -880,18 +880,28 @@ def load_diff(args: argparse.Namespace) -> str:
 def detect_pr_context(args: argparse.Namespace) -> bool:
     """Decide whether this run has PR context (a label could waive R6).
 
+    PAYLOAD-FIRST (PR #70 verifier hardening): a readable event payload that
+    contains a `pull_request` object is AUTHORITATIVE -- the run is PR context
+    regardless of `--push-event`. Otherwise the flag would outrank the payload,
+    and a PR that edits guardrails.yml to pass `--push-event` to its own
+    checker run would demote R6 to informational on a real PR event (the
+    verifier reproduced exactly that masquerade). With payload-first ordering
+    the flag only applies where it is legitimate: local runs with no event
+    payload at all.
+
     FAIL-CLOSED: the default is True (full R6 enforcement). The run is treated
     as a push (non-PR) event ONLY when explicitly identified as one:
-      * `--push-event` was passed (local reproduction of the push behavior), or
-      * an event payload was provided (--event-path) and it contains no
-        `pull_request` object -- exactly how the workflow's push-to-main runs
-        look, and the same payload shape load_labels/load_pr_body already key
-        off. An unreadable payload counts as PR context (fail closed).
-    Local runs without an event payload therefore always enforce R6 fully --
-    the own-diff check in DEVELOPMENT.md keeps failing without the label.
+      * an event payload was provided (--event-path), is readable, and
+        contains no `pull_request` object -- exactly how the workflow's
+        push-to-main runs look, and the same payload shape
+        load_labels/load_pr_body already key off (an unreadable payload counts
+        as PR context, fail closed); or
+      * NO event payload exists and `--push-event` was passed (local
+        reproduction of the push behavior).
+    Local runs without an event payload or the flag therefore always enforce
+    R6 fully -- the own-diff check in DEVELOPMENT.md keeps failing without the
+    label.
     """
-    if getattr(args, "push_event", False):
-        return False
     if args.event_path and os.path.exists(args.event_path):
         try:
             with open(args.event_path, encoding="utf-8") as fh:
@@ -899,6 +909,8 @@ def detect_pr_context(args: argparse.Namespace) -> bool:
         except (OSError, json.JSONDecodeError):
             return True
         return bool(event.get("pull_request"))
+    if getattr(args, "push_event", False):
+        return False
     return True
 
 
@@ -929,8 +941,12 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--push-event", action="store_true",
                         help="Treat the run as a push (non-PR) event: R6 reports "
                              "informationally and does not fail (issue #69). "
-                             "Without this flag or a label-less event payload, "
-                             "R6 enforces fully (fail-closed).")
+                             "Applies ONLY when no event payload exists; a "
+                             "readable payload containing a pull_request object "
+                             "is authoritative and forces PR context regardless "
+                             "of this flag (payload-first, PR #70 hardening). "
+                             "Without this flag or a pull_request-less event "
+                             "payload, R6 enforces fully (fail-closed).")
     parser.add_argument("--tree-root", default=".",
                         help="Filesystem root for whole-tree/corpus checks (default: cwd).")
     parser.add_argument("--no-tree", action="store_true",
@@ -1483,9 +1499,16 @@ def run_self_tests() -> int:
         ns = argparse.Namespace(push_event=False, event_path=None)
         st.check("detect_pr_context: no event payload -> PR context (fail-closed)",
                  detect_pr_context(ns) is True)
-        ns = argparse.Namespace(push_event=True, event_path=str(pr_event))
-        st.check("detect_pr_context: --push-event flag forces push context",
+        ns = argparse.Namespace(push_event=True, event_path=None)
+        st.check("detect_pr_context: --push-event (no payload) forces push context",
                  detect_pr_context(ns) is False)
+        # PAYLOAD-FIRST hardening (PR #70 verifier): a real PR payload is
+        # authoritative and CANNOT be demoted by --push-event -- otherwise a PR
+        # editing guardrails.yml to pass the flag to its own checker run would
+        # get R6 informational on a genuine PR event (reproduced masquerade).
+        ns = argparse.Namespace(push_event=True, event_path=str(pr_event))
+        st.check("detect_pr_context: PR payload beats --push-event (payload-first)",
+                 detect_pr_context(ns) is True)
 
     # ---- Override path --------------------------------------------------- #
     # A violation waived by the guardrails-override label + a justification.
