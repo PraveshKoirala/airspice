@@ -44,6 +44,26 @@ class CliFlowTests(unittest.TestCase):
             report = result["reports"][0]
             self.assertEqual(report["measurements"]["battery_sense"], "1.04211V")
 
+    def test_missing_ngspice_reports_actionable_diagnostic_not_traceback(self) -> None:
+        # Hermetic: force the ngspice-MISSING path by patching resolution to None,
+        # so this passes identically in CI where ngspice IS installed. The
+        # simulation must still succeed on the DC fallback (graceful degradation),
+        # produce no traceback, and carry a clear NGSPICE_NOT_FOUND info diagnostic
+        # with install guidance rather than silently degrading.
+        with mock.patch("air.tools.ngspice_path", return_value=None):
+            with tempfile.TemporaryDirectory() as tmp:
+                ir, _ = parse_file(EXAMPLE)
+                result = simulate_analog(ir, "analog_only", Path(tmp) / "generated")
+        self.assertEqual(result["status"], "passed")
+        report = result["reports"][0]
+        self.assertEqual(report["backend"], "builtin_dc_fallback")
+        codes = {d["code"] for d in report["diagnostics"]}
+        self.assertIn("NGSPICE_NOT_FOUND", codes)
+        diag = next(d for d in report["diagnostics"] if d["code"] == "NGSPICE_NOT_FOUND")
+        self.assertEqual(diag["severity"], "info")
+        self.assertIn("ngspice not found", diag["message"])
+        self.assertIn("AIR_NGSPICE", diag["message"])
+
     def test_cli_compile_spice(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             rc = main(["compile", str(EXAMPLE), "--target", "spice", "--out-dir", str(Path(tmp) / "generated")])

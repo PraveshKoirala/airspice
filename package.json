@@ -1,0 +1,16 @@
+{
+  "name": "airspice",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Convenience scripts for the AirSpice reference engine (see docs/DEVELOPMENT.md). Not a published package.",
+  "scripts": {
+    "dev": "concurrently -n api,ui -c blue,green \"npm run dev:api\" \"npm run dev:ui\"",
+    "dev:api": "air serve --host 127.0.0.1 --port 8000",
+    "dev:ui": "npm --prefix packages/ui run dev",
+    "test:py": "python -m pytest tests/",
+    "build:ui": "npm --prefix packages/ui run build"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

@@ -32,21 +32,26 @@ packages/core (Python)  Reference oracle: source of golden fixtures,
 
 ## Running the reference engine (development)
 
-```powershell
-# Backend API
-$env:PYTHONPATH = "packages/core/src"
-python -m air.cli serve --host 127.0.0.1 --port 8000
+Full setup, run, test, lint, and the environment-variable reference live in
+**[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** — per-OS prerequisites, a
+one-command bootstrap, and what degrades when each optional tool is missing.
 
-# Frontend
-cd packages/ui
-npm install
-npm run dev
+The short version, from a clone with Python 3.12+ and Node 22+:
 
-# Tests
-python -m pytest tests/
+```bash
+python -m venv .venv && source .venv/bin/activate   # PowerShell: .venv\Scripts\Activate.ps1
+pip install -e ".[dev]"          # engine + test deps
+cd packages/ui && npm ci && cd ../..
+npm install                       # convenience scripts (concurrently)
+npm run dev                       # API on :8000 + Vite UI together
+python -m pytest tests/           # full suite
 ```
 
-External tool overrides (ngspice, Renode, PlatformIO) are read from `.env` — see `air/tools.py`.
+Everything works with only Python and Node installed. External tool overrides
+(ngspice, Renode, PlatformIO) and `GEMINI_API_KEY` are read from `.env` (start
+from [`.env.example`](.env.example)); missing tools degrade gracefully with
+actionable diagnostics rather than crashing. See
+[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the details.
 
 ## Roadmap
 
