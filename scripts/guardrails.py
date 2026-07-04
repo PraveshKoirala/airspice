@@ -7,12 +7,14 @@ that every failure is explainable, reproducible, and stable across runs and
 platforms (it is expected to run on ubuntu CI and locally on Windows, pure
 stdlib, no third-party deps).
 
-Rules implemented (issue #42):
+Rules implemented (issue #42, #56):
   R1 fixture-port-separation  AGENTS.md rule (fixture/port separation, ADR 0009)
   R2 test-weakening           AGENTS.md rule 2
   R3 wall-clock-ban           AGENTS.md rules 9 / 22
   R4 fixture-special-casing   AGENTS.md rule 13
   R5 secret-hygiene           AGENTS.md rule 15
+  R6 guardrails-self-protection  issue #56 (any PR touching the enforcement
+                              layer must carry the override label + section)
 
 Two entry modes:
   * CI / local diff check (default): reconstruct the change under review from a
@@ -132,6 +134,32 @@ OVERRIDE_SECTION_RE = re.compile(
     r"^#{1,6}\s*guardrails[\s_-]*override\b", re.IGNORECASE | re.MULTILINE
 )
 
+# R6 self-protection (issue #56): the enforcement layer's own files. ANY diff
+# that touches one of these -- add, modify, rename, OR pure deletion -- must
+# carry the override label + justification section, reusing the general
+# override machinery but making it MANDATORY here rather than optional. This is
+# path-based, not token-based: unlike R2/R5 (which scan '+' lines and so are
+# blind to deletions), R6 keys off the touched-file list, so gutting the
+# checker or ripping out the self-test step by DELETION alone still fires it.
+# That deletion blind spot -- residual risk 1 from PR #52 round-2 -- is the hole
+# this rule closes. Do NOT add a content exemption for these paths: a path-based
+# rule needs none, and any such exemption would recreate the SELF_DEFINITION_PATHS
+# self-exemption hole that PR #52 removed.
+#
+# Closed hole (PR #66 rework round 1, disclosed): the first revision of R6 was
+# defeated by a RENAME. parse_unified_diff recorded only the destination path
+# of a rename, so `git mv scripts/guardrails.py scripts/checks.py` (likewise
+# the workflow file) plus gutting the rules at the new paths left neither
+# guarded path in changed_files -- R6 stayed silent and CI passed with no
+# override. The parser now records BOTH sides of a rename (the diff --git
+# a/-side and the explicit `rename from` header), so renaming an enforcement
+# file away fires R6 like any other touch. The verifier's rename-and-gut
+# attack is a permanent self-test below.
+GUARDRAILS_SELF_PATHS = (
+    ".github/workflows/guardrails.yml",
+    "scripts/guardrails.py",
+)
+
 # R2 exemption model (PR #52 rework round 1 -- the ONLY exemption):
 #
 # Markdown documentation (*.md) is exempt from the R2 token scan, because
@@ -212,7 +240,10 @@ def parse_unified_diff(diff_text: str) -> tuple[list[str], list[AddedLine]]:
 
     Handles renames, new/deleted files, and multiple hunks. Added lines carry
     their post-image (new-file) line numbers. The `+++ b/<path>` header wins for
-    the current file path (covers renames and 'a/dev/null' new files).
+    the current file path (covers renames and 'a/dev/null' new files). For a
+    rename, changed_files contains BOTH the source and the destination path
+    (source from the `diff --git` header and the `rename from` line), so
+    path-keyed rules see a renamed-away file as touched.
     """
     changed: list[str] = []
     added: list[AddedLine] = []
@@ -223,12 +254,38 @@ def parse_unified_diff(diff_text: str) -> tuple[list[str], list[AddedLine]]:
     for raw in diff_text.splitlines():
         m = _DIFF_GIT_RE.match(raw)
         if m:
-            # New file section. Default path from the a/ b/ header; the +++
-            # line may refine it (rename target / /dev/null handling).
-            cur_path = m.group(2)
+            # New file section. Record BOTH sides of the header: for a RENAME
+            # the a/<old> and b/<new> paths differ, and the source path must
+            # enter changed_files too -- otherwise a `git mv` of a guarded
+            # path escapes every path-keyed rule (verifier attack on PR #66
+            # round 1: rename both enforcement files, gut the rules at the new
+            # paths, and R6 stays silent; `git diff BASE HEAD` emits renames
+            # by default, so this was the live CI diff path). For ordinary
+            # add/modify/delete sections a/ == b/, so recording both is a
+            # no-op there and R1-R5 behavior on non-rename diffs is unchanged.
+            old_path, new_path = m.group(1), m.group(2)
+            for p in (old_path, new_path):
+                if p not in changed:
+                    changed.append(p)
+            cur_path = new_path
             in_hunk = False
-            if cur_path not in changed:
-                changed.append(cur_path)
+            continue
+        if not in_hunk and raw.startswith("rename from "):
+            # Belt-and-suspenders: git's explicit rename header names the
+            # source path unambiguously (the `diff --git a/... b/...` split is
+            # a heuristic that can misparse exotic paths containing ' b/').
+            # Extended headers appear only between the diff --git line and the
+            # first hunk; the not-in_hunk guard keeps file CONTENT that starts
+            # with this text (which appears as ' rename from ...' / '+rename
+            # from ...' inside hunks anyway) from being misread.
+            p = raw[len("rename from "):].strip()
+            if p and p not in changed:
+                changed.append(p)
+            continue
+        if not in_hunk and raw.startswith("rename to "):
+            p = raw[len("rename to "):].strip()
+            if p and p not in changed:
+                changed.append(p)
             continue
         if raw.startswith("+++ "):
             p = raw[4:].strip()
@@ -460,6 +517,67 @@ def rule_secret_hygiene(change: Change) -> list[Violation]:
     return out
 
 
+def _normalize_repo_path(path: str) -> str:
+    """Normalize a diff path for matching: forward slashes, no leading './'.
+
+    git itself emits forward-slash, './'-free paths, but hand-built or
+    tool-mangled diffs may not, and R6 must not be evadable by cosmetic path
+    spelling (verifier root-cause note on PR #66 round 1: brittle exact-match).
+    Case is deliberately NOT folded: CI runs on case-sensitive Linux, where
+    'Scripts/Guardrails.py' genuinely is a different path than the guarded one.
+    """
+    p = path.replace("\\", "/")
+    while p.startswith("./"):
+        p = p[2:]
+    return p
+
+
+def rule_guardrails_self_protection(change: Change) -> list[Violation]:
+    """R6: PRs touching the enforcement layer must be explicitly overridden.
+
+    Any change to the guardrails checker or its workflow -- including a pure
+    DELETION that removes rules or the self-test step, which R2/R5 cannot see
+    because they only scan added lines, and a RENAME that moves an enforcement
+    file away (the parser records both sides of a rename, so the guarded
+    source path still appears in changed_files) -- must carry the
+    `guardrails-override` label AND the justification section. That
+    combination is exactly the override machinery (checked once, centrally,
+    in run_all_rules): when it is present it waives ALL violations, R6's
+    included, so a properly-justified edit to this file passes; when it is
+    absent R6's violation stands and the job fails. A label WITHOUT the
+    section does not activate the override, so R6 (like every other rule)
+    still fails -- there is no half-open path.
+
+    Path-based by construction. R6 does NOT exempt its own definition or the
+    guardrails paths from any content scan; it only reports the touch. That is
+    why it needs no allowlist and cannot reintroduce the SELF_DEFINITION_PATHS
+    hole PR #52 closed. Paths are normalized (separators, leading './') before
+    matching; see _normalize_repo_path.
+    """
+    touched = [
+        f for f in change.changed_files
+        if _normalize_repo_path(f) in GUARDRAILS_SELF_PATHS
+    ]
+    if not touched:
+        return []
+    return [
+        Violation(
+            rule="R6:guardrails-self-protection",
+            message=(
+                "PR modifies the enforcement layer (" + ", ".join(sorted(touched))
+                + "). Changes here -- including deletions that strip rules or "
+                "the self-test step, and renames that move an enforcement file "
+                f"away -- require the '{OVERRIDE_LABEL}' label AND a "
+                "'## Guardrails override' section justifying the change "
+                "(issue #56). This gate is path-based, deletion-aware, and "
+                "rename-aware; it cannot be satisfied by keeping the diff "
+                "token-clean."
+            ),
+            location=touched[0],
+        )
+    ]
+
+
 # --------------------------------------------------------------------------- #
 # Corpus discovery: read design names from the corpus itself.
 # --------------------------------------------------------------------------- #
@@ -519,6 +637,7 @@ def run_all_rules(change: Change, tree_root: Optional[Path]) -> Report:
     r4, corpus_present = rule_fixture_special_casing(change, corpus_names)
     violations += r4
     violations += rule_secret_hygiene(change)
+    violations += rule_guardrails_self_protection(change)
 
     override_active = False
     justification = ""
@@ -753,6 +872,58 @@ def _diff_for(path: str, added: list[str]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _deletion_diff_for(path: str, removed: list[str]) -> str:
+    """Build a minimal unified diff that DELETES `path` entirely.
+
+    Mirrors what `git diff` emits for a full file removal (`+++ /dev/null`, only
+    '-' body lines, no '+' lines). Used to prove R6 catches the deletion attack
+    that R2/R5's added-line scans are blind to.
+    """
+    lines = [
+        f"diff --git a/{path} b/{path}",
+        "deleted file mode 100644",
+        "index 1111111..0000000",
+        f"--- a/{path}",
+        "+++ /dev/null",
+        f"@@ -1,{len(removed)} +0,0 @@",
+    ]
+    lines += ["-" + r for r in removed]
+    return "\n".join(lines) + "\n"
+
+
+def _rename_diff_for(
+    old: str, new: str,
+    removed: Optional[list[str]] = None,
+    added: Optional[list[str]] = None,
+) -> str:
+    """Build a unified diff that RENAMES `old` -> `new`, optionally with edits.
+
+    Mirrors what `git diff` emits for a rename (`similarity index`,
+    `rename from` / `rename to`); a pure rename (100% similarity) has NO
+    ---/+++/hunk lines at all. Used to prove the rename-evasion attack
+    (verifier, PR #66 rework round 1) now fires R6.
+    """
+    with_edits = bool(removed or added)
+    lines = [
+        f"diff --git a/{old} b/{new}",
+        "similarity index 90%" if with_edits else "similarity index 100%",
+        f"rename from {old}",
+        f"rename to {new}",
+    ]
+    if with_edits:
+        removed = removed or []
+        added = added or []
+        lines += [
+            "index 1111111..2222222 100644",
+            f"--- a/{old}",
+            f"+++ b/{new}",
+            f"@@ -1,{len(removed)} +1,{len(added)} @@",
+        ]
+        lines += ["-" + r for r in removed]
+        lines += ["+" + a for a in added]
+    return "\n".join(lines) + "\n"
+
+
 def _change_from_diff(diff: str, labels: Optional[list[str]] = None, body: str = "") -> Change:
     files, added = parse_unified_diff(diff)
     return Change(changed_files=files, added_lines=added,
@@ -965,6 +1136,181 @@ def run_self_tests() -> int:
         "docs/DEVELOPMENT.md", ['example: "sk-' + "Q" * 40 + '"']))
     st.check("R5 secret in markdown still fires",
              len(rule_secret_hygiene(ch)) == 1)
+
+    # ---- R6 guardrails self-protection (issue #56) ---------------------- #
+    # The rule is path-based, so its unit-level checks assert on the touch, and
+    # the label+section waiver is exercised end-to-end through run_all_rules
+    # below (the override machinery it reuses).
+    #
+    # Violating: touch scripts/guardrails.py (ordinary modification) with no
+    # override in place -> R6 fires.
+    ch = _change_from_diff(_diff_for(
+        "scripts/guardrails.py", ["    # a harmless-looking edit"]))
+    st.check("R6 violating (touch guardrails.py, no override) fires",
+             len(rule_guardrails_self_protection(ch)) == 1,
+             detail=f"got {rule_guardrails_self_protection(ch)}")
+    # Violating: touch the workflow file too.
+    ch = _change_from_diff(_diff_for(
+        ".github/workflows/guardrails.yml", ["      - name: something"]))
+    st.check("R6 violating (touch guardrails.yml, no override) fires",
+             len(rule_guardrails_self_protection(ch)) == 1,
+             detail=f"got {rule_guardrails_self_protection(ch)}")
+    # THE NAMED ATTACK (issue #56 / PR #52 residual risk 1): a deletion-only
+    # diff that rips checker logic out of guardrails.py adds NO banned token, so
+    # R2/R5 stay silent -- but R6 keys off the touched path and fires. This is
+    # the blind spot being closed; prove both halves.
+    del_diff = _deletion_diff_for(
+        "scripts/guardrails.py",
+        ["def rule_secret_hygiene(change):", "    return []  # gutted"])
+    ch = _change_from_diff(del_diff)
+    st.check("R6 DELETION ATTACK (gut guardrails.py) fires",
+             len(rule_guardrails_self_protection(ch)) == 1,
+             detail=f"got {rule_guardrails_self_protection(ch)}")
+    st.check("R6 DELETION ATTACK: R2/R5 are blind to it (no added tokens)",
+             rule_test_weakening(ch) == [] and rule_secret_hygiene(ch) == [],
+             detail=f"R2={rule_test_weakening(ch)} R5={rule_secret_hygiene(ch)}")
+    # And a deletion that removes the self-test step from the workflow: same.
+    del_wf = _deletion_diff_for(
+        ".github/workflows/guardrails.yml",
+        ["      - name: Guardrails checker self-test",
+         "        run: python scripts/guardrails.py --self-test"])
+    ch = _change_from_diff(del_wf)
+    st.check("R6 DELETION ATTACK (remove self-test step from workflow) fires",
+             len(rule_guardrails_self_protection(ch)) == 1,
+             detail=f"got {rule_guardrails_self_protection(ch)}")
+    # Clean A: an unrelated PR (no enforcement-layer path) is unaffected.
+    ch = _change_from_diff(_diff_for(
+        "packages/core/src/emit.py", ["    return netlist"]))
+    st.check("R6 clean (unrelated PR) passes",
+             rule_guardrails_self_protection(ch) == [])
+    # Clean B: a same-named file in a DIFFERENT directory must NOT fire
+    # (exact-path match, not a substring/basename match).
+    ch = _change_from_diff(_diff_for(
+        "vendor/scripts/guardrails.py", ["x = 1"]))
+    st.check("R6 clean (same basename, different path) passes",
+             rule_guardrails_self_protection(ch) == [],
+             detail=f"got {rule_guardrails_self_protection(ch)}")
+    # End-to-end via run_all_rules (reusing the override machinery):
+    override_body = (
+        "## What was done\nEdit the checker.\n\n"
+        "## Guardrails override\n"
+        "Touches scripts/guardrails.py to add R6 self-protection per issue #56.\n"
+    )
+    touch_diff = _diff_for("scripts/guardrails.py", ["    # add R6"])
+    # Without the label -> R6 stands, run fails.
+    rep = run_all_rules(_change_from_diff(touch_diff), None)
+    st.check("R6 e2e: touch without override label -> run fails",
+             rep.failed is True and any(
+                 v.rule.startswith("R6") for v in rep.violations),
+             detail=f"failed={rep.failed} viols={[v.rule for v in rep.violations]}")
+    # With label + section -> override machinery waives it, run passes, and the
+    # justification is captured for the report.
+    rep = run_all_rules(_change_from_diff(
+        touch_diff, labels=["guardrails-override"], body=override_body), None)
+    st.check("R6 e2e: touch WITH label+section -> run passes (waived)",
+             rep.failed is False and rep.override_active,
+             detail=f"failed={rep.failed} override={rep.override_active}")
+    st.check("R6 e2e: justification captured for the report",
+             "issue #56" in rep.override_justification,
+             detail=f"got {rep.override_justification!r}")
+    # With the label but NO section -> override does not activate; R6 still
+    # fails (no half-open path; consistent with the general override contract).
+    rep = run_all_rules(_change_from_diff(
+        touch_diff, labels=["guardrails-override"],
+        body="no override section here"), None)
+    st.check("R6 e2e: label but no section -> run still fails",
+             rep.failed is True,
+             detail=f"failed={rep.failed}")
+    # The deletion attack, end-to-end: fails without override, waived with it.
+    rep = run_all_rules(_change_from_diff(del_diff), None)
+    st.check("R6 e2e: deletion attack without override -> run fails",
+             rep.failed is True and any(
+                 v.rule.startswith("R6") for v in rep.violations),
+             detail=f"failed={rep.failed} viols={[v.rule for v in rep.violations]}")
+    rep = run_all_rules(_change_from_diff(
+        del_diff, labels=["guardrails-override"], body=override_body), None)
+    st.check("R6 e2e: deletion attack WITH label+section -> waived, passes",
+             rep.failed is False and rep.override_active)
+
+    # ---- R6 rename evasion (PR #66 rework round 1) ----------------------- #
+    # THE VERIFIER'S ATTACK: `git mv` the enforcement files and gut the rules
+    # at the NEW paths. The first R6 revision recorded only the rename
+    # DESTINATION in changed_files, so neither guarded path appeared and R6
+    # stayed silent -- CI green, no override. The parser now records BOTH
+    # sides of a rename; prove it at every level.
+    #
+    # Parser level: a rename-with-edits diff records source AND destination.
+    ren = _rename_diff_for(
+        "scripts/guardrails.py", "scripts/checks.py",
+        removed=["def rule_secret_hygiene(change):"],
+        added=["def rule_secret_hygiene(change):  # gutted"])
+    files, added_lines = parse_unified_diff(ren)
+    st.check("RENAME parser: records BOTH sides of a rename",
+             "scripts/guardrails.py" in files and "scripts/checks.py" in files,
+             detail=f"got {files}")
+    st.check("RENAME parser: added lines attributed to the NEW path",
+             added_lines and all(a.path == "scripts/checks.py" for a in added_lines),
+             detail=f"got {[a.path for a in added_lines]}")
+    # Parser level: a PURE rename (100% similarity, no hunks at all) too.
+    files, _ = parse_unified_diff(_rename_diff_for(
+        "scripts/guardrails.py", "scripts/checks.py"))
+    st.check("RENAME parser: pure rename (no hunks) records both sides",
+             "scripts/guardrails.py" in files and "scripts/checks.py" in files,
+             detail=f"got {files}")
+    # Rule level: rename-only of one enforcement file fires R6.
+    ch = _change_from_diff(_rename_diff_for(
+        "scripts/guardrails.py", "scripts/checks.py"))
+    st.check("R6 RENAME ATTACK (rename guardrails.py away) fires",
+             len(rule_guardrails_self_protection(ch)) == 1,
+             detail=f"got {rule_guardrails_self_protection(ch)}")
+    # The FULL attack: rename BOTH enforcement files and gut a rule at the new
+    # path (the exact reproducer from the verifier's REQUEST CHANGES).
+    full_attack = (
+        _rename_diff_for(
+            ".github/workflows/guardrails.yml", ".github/workflows/gr.yml",
+            removed=["          python scripts/guardrails.py --self-test"],
+            added=["          python scripts/checks.py --self-test"])
+        + _rename_diff_for(
+            "scripts/guardrails.py", "scripts/checks.py",
+            removed=["            if rex.search(al.text):"],
+            added=["            if False:  # gutted"])
+    )
+    ch = _change_from_diff(full_attack)
+    st.check("R6 RENAME ATTACK (rename both + gut rules) fires",
+             len(rule_guardrails_self_protection(ch)) == 1,
+             detail=f"got {rule_guardrails_self_protection(ch)}")
+    rep = run_all_rules(ch, None)
+    st.check("R6 e2e: rename attack without override -> run fails",
+             rep.failed is True and any(
+                 v.rule.startswith("R6") for v in rep.violations),
+             detail=f"failed={rep.failed} viols={[v.rule for v in rep.violations]}")
+    rep = run_all_rules(_change_from_diff(
+        full_attack, labels=["guardrails-override"], body=override_body), None)
+    st.check("R6 e2e: rename attack WITH label+section -> waived, passes",
+             rep.failed is False and rep.override_active)
+    # No false positive: renaming an UNPROTECTED file must not fire R6.
+    ch = _change_from_diff(_rename_diff_for(
+        "packages/core/src/emit.py", "packages/core/src/emitter.py"))
+    st.check("R6 clean (rename of unprotected file) passes",
+             rule_guardrails_self_protection(ch) == [],
+             detail=f"got {rule_guardrails_self_protection(ch)}")
+    # Path normalization (same rework, verifier root-cause note): cosmetic
+    # spellings of a guarded path must still match...
+    ch = _change_from_diff(_diff_for("./scripts/guardrails.py", ["# x"]))
+    st.check("R6 normalization: './'-prefixed guarded path fires",
+             len(rule_guardrails_self_protection(ch)) == 1,
+             detail=f"got {rule_guardrails_self_protection(ch)}")
+    ch = _change_from_diff(_diff_for("scripts\\guardrails.py", ["# x"]))
+    st.check("R6 normalization: backslash-separated guarded path fires",
+             len(rule_guardrails_self_protection(ch)) == 1,
+             detail=f"got {rule_guardrails_self_protection(ch)}")
+    # ...but case variants deliberately do NOT (case-sensitive Linux CI: a
+    # different-case path IS a different file, and folding would create false
+    # positives without closing any hole on the real CI path).
+    ch = _change_from_diff(_diff_for("Scripts/Guardrails.py", ["# x"]))
+    st.check("R6 normalization: case variant is a different path (no fire)",
+             rule_guardrails_self_protection(ch) == [],
+             detail=f"got {rule_guardrails_self_protection(ch)}")
 
     # ---- Override path --------------------------------------------------- #
     # A violation waived by the guardrails-override label + a justification.

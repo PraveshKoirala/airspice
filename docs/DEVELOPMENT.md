@@ -248,10 +248,34 @@ explainable and reproducible.
 | R3 | Wall-clock ban | `Date.now`, `performance.now`, `setTimeout`, `setInterval` anywhere under `packages/{mpy-wasm,cosim}/src` (whole-tree) fail. Only `*.progress.ts` files are exempt. |
 | R4 | Fixture special-casing | Golden-corpus design names (read from the corpus itself) referenced in product source outside `tests/`, `bench/`, `examples/` fail. Degrades gracefully: when the corpus is absent the check is skipped and passes, activating automatically once the corpus lands. |
 | R5 | Secret hygiene | Obvious API-key/secret patterns in any added line fail. The offending value is redacted in the message. |
+| R6 | Guardrails self-protection | Any PR whose diff **touches** `.github/workflows/guardrails.yml` or `scripts/guardrails.py` fails unless it carries the `guardrails-override` label **and** a `## Guardrails override` justification section. Path-based, deletion-aware, and rename-aware — a diff that only *removes* rules or the self-test step still fires it, and so does a `git mv` that renames an enforcement file away (issue #56). |
 
 R1, R2, R5 are **diff-aware** (they inspect the `+` lines / touched paths of the
 change). R3 is **whole-tree** (a pre-existing violation is still caught). R4 is
-diff-aware for the reference but reads the design-name list from the corpus.
+diff-aware for the reference but reads the design-name list from the corpus. R6
+is **path-based**: it keys off the touched-file list (not the `+` lines), so
+unlike R2/R5 it sees deletions and renames. The diff parser records **both
+sides of a rename** (source and destination) in the touched-file list — this is
+what makes R6 rename-aware, and it applies to every path-keyed rule (R1
+included). Guarded-path matching normalizes separators and leading `./`; case
+is deliberately not folded (CI is case-sensitive Linux, where a different-case
+path genuinely is a different file).
+
+**R6 self-protection (issue #56).** R2/R5 scan only ADDED lines, so a PR could
+*delete* rules or the self-test step from `scripts/guardrails.py` /
+`.github/workflows/guardrails.yml` without adding any banned token, and the
+checker would pass it — residual risk 1 from PR #52 round-2 verification. R6
+closes that deletion blind spot: it reports a violation whenever the diff
+touches either enforcement-layer path (add, modify, rename, or pure deletion),
+and that violation can only be cleared through the visible override — the
+`guardrails-override` label **plus** the `## Guardrails override` section, which
+here is **mandatory rather than optional**. It reuses the general override
+machinery centrally (a label-without-section still fails, exactly as everywhere
+else), so there is no half-open path. R6 is **path-based, not token-based**: it
+takes no content exemption for its own definition or for the guardrails paths —
+doing so would recreate the `SELF_DEFINITION_PATHS` self-exemption hole PR #52
+removed. (This PR, which itself edits `scripts/guardrails.py`, therefore carries
+the override label and section as a live demonstration of the recursion.)
 
 **Exemption model (narrow by construction).** The ONLY exemption anywhere in
 the checker: markdown documentation (`*.md`) is exempt from the **R2** token
@@ -280,12 +304,30 @@ skipped. The blanket exemption was removed; all three attacks are now
 permanent self-tests that must FAIL the checker, and CI-weakening tokens fire
 in every workflow file with no exception.
 
+**Closed hole (PR #66 rework round 1, disclosed).** The first revision of R6
+was defeated by a **rename**. The diff parser recorded only the *destination*
+path of a rename (from the `+++ b/` header), so
+`git mv scripts/guardrails.py scripts/checks.py` plus
+`git mv .github/workflows/guardrails.yml .github/workflows/gr.yml`, rewiring
+the renamed workflow to call the renamed checker and gutting the rules at the
+new paths, left **neither** protected path in the touched-file list — R6
+stayed silent and CI passed with no override. The independent verifier
+reproduced this with real `git diff` output on the live CI diff path (rename
+detection is on by default in `git diff BASE HEAD`). The parser now records
+**both sides** of a rename — the `a/` source from the `diff --git` header and
+the explicit `rename from` line — so renaming an enforcement file away fires
+R6 like any other touch, and guarded-path matching normalizes separators and
+leading `./` so cosmetic path spellings cannot dodge the exact match. The
+rename-and-gut attack (parser level, rule level, and end-to-end with and
+without the override) is a permanent self-test that must FAIL the checker.
+
 ### Running the checker locally
 
 ```
 # Self-tests (one violating + one clean synthetic diff per rule, the override
-# path, corpus present/absent states, and the three PR #52 attack reproducers
-# that must always FAIL the checker):
+# path, corpus present/absent states, the three PR #52 attack reproducers, and
+# the R6 deletion-attack and rename-attack reproducers — all of which must
+# always FAIL the checker):
 python scripts/guardrails.py --self-test
 
 # Check your current branch against main:
