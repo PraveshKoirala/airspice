@@ -1,0 +1,1 @@
+<system name="s" ir_version="0.1"><components><component id="V1" type="voltage_source"><value>5V</value><pins><pin name="p" net="a"/><pin name="n" net="b"/></pins></component></components></system>

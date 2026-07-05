@@ -1,0 +1,4 @@
+<patch id="remove_component">
+  <reason>Drop R2 entirely.</reason>
+  <remove path="/system/components/component[@id='R2']"/>
+</patch>

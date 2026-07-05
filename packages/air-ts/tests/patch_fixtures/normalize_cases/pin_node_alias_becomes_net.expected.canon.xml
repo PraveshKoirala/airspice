@@ -1,0 +1,10 @@
+<?xml version="1.0" ?>
+<system ir_version="0.1" name="s">
+  <components>
+    <component id="R1" type="resistor">
+      <value>1k</value>
+      <pin name="1" net="a" node="a"/>
+      <pin name="2" net="b" ref="b"/>
+    </component>
+  </components>
+</system>

@@ -1,0 +1,6 @@
+<patch id="add_component">
+  <reason>Add a decoupling capacitor across nets 2 and 10.</reason>
+  <add path="/system/components">
+    <component id="C1" type="capacitor"><value>100nF</value><pin name="1" net="2"/><pin name="2" net="10"/></component>
+  </add>
+</patch>

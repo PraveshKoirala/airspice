@@ -1,0 +1,3 @@
+<patch id="err_add_nopayload">
+  <add path="/system/components"></add>
+</patch>

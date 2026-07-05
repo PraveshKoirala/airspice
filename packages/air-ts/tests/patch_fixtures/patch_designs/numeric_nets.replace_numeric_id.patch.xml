@@ -1,0 +1,6 @@
+<patch id="replace_numeric_id">
+  <reason>Retarget the resistor whose net id is the numeric-looking "10".</reason>
+  <replace path="/system/components/component[@id='R2']/value">
+    <value>3k3</value>
+  </replace>
+</patch>
