@@ -10,6 +10,9 @@
  * reference side of the differential probe; if the oracle changes, they change.
  */
 
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   applyPatch,
@@ -20,6 +23,8 @@ import {
   parseXml,
 } from "../src/index.js";
 import type { XmlElement } from "../src/xml.js";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
 
 const DESIGN = `<system name="s" ir_version="0.1">
   <nets>
@@ -130,6 +135,43 @@ describe("patch differential probes vs the live oracle", () => {
     applyPatchTree(designRoot, patchRoot);
     const after = JSON.stringify(serialize(designRoot));
     expect(after).toBe(before);
+  });
+
+  // PROBE 8 (PR #87 rework r1, F2 -- DOCUMENTED DIVERGENCE, both sides pinned):
+  // a `/` inside a predicate value defeats the quote-blind rsplit/lastIndexOf
+  // parent-path split in _find_parent_required (both engines mangle the parent
+  // path identically), but the engines then DIVERGE on the mangled input:
+  //   ORACLE (live, captured):  TypeError: 'NoneType' object is not callable
+  //     -- CPython's ElementPath compiler crashes internally on the
+  //     unterminated predicate `nets/net[@id='a`. Recorded by gen-patch-refs.py
+  //     in slash_predicate.err_slash.error.txt (oracle-provenance bytes).
+  //   AIR-TS: clean PatchError("Element.remove(x): element not found") -- our
+  //     tokenizer treats the unterminated bracket as predicate-less, resolves
+  //     the first <net> as "parent", and the remove misses.
+  // Both engines REJECT the patch (no wrong output escapes). Mimicking an
+  // interpreter-internal TypeError is deliberately not attempted.
+  it("probe 8: slash-in-predicate remove -- oracle crashes internally, air-ts rejects cleanly (documented divergence)", () => {
+    const design =
+      `<system name="s" ir_version="0.1"><nets>` +
+      `<net id="x" role="power"/><net id="a/b" role="ground"/>` +
+      `</nets></system>`;
+    const patch = `<patch><remove path="nets/net[@id='a/b']"/></patch>`;
+    let thrown: unknown;
+    try {
+      applyPatch(design, patch);
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).toBeInstanceOf(PatchError);
+    expect((thrown as PatchError).message).toBe(
+      "Element.remove(x): element not found",
+    );
+    // The oracle-side expectation is the recorded fixture bytes:
+    const recorded = readFileSync(
+      join(HERE, "patch_fixtures", "patch_designs", "slash_predicate.err_slash.error.txt"),
+      "utf-8",
+    );
+    expect(recorded).toBe("TypeError: 'NoneType' object is not callable\n");
   });
 });
 

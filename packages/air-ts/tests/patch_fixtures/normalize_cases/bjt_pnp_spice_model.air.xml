@@ -1,0 +1,1 @@
+<system name="s" ir_version="0.1"><components><component id="Q2" type="bjt"><parameter name="type" value="PNP"/><pin name="b" net="base"/><pin name="c" net="col"/><pin name="e" net="vcc"/></component></components></system>

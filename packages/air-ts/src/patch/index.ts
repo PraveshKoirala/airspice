@@ -142,6 +142,21 @@ function findRequired(root: XmlElement, path: string): XmlElement {
  * patches.py `_find_parent_required`: resolve the parent by stripping the last
  * `/`-segment of the NORMALIZED path (falling back to `.`), and the target by
  * the full normalized path. Raise not-found if either is missing.
+ *
+ * PARITY -- DOCUMENTED DIVERGENCE (PR #87 rework r1, F2): like the oracle's
+ * `rsplit("/", 1)`, the split below is quote-blind, so a `/` INSIDE a predicate
+ * value (e.g. remove path="nets/net[@id='a/b']") mangles the parent path to
+ * `nets/net[@id='a`. From that same mangled input the two engines part ways:
+ * CPython's ElementPath compiler CRASHES INTERNALLY on the unterminated
+ * predicate (`TypeError: 'NoneType' object is not callable` out of
+ * xml.etree.ElementPath), while our tokenizer treats the unterminated bracket
+ * as predicate-less, resolves some parent, and the remove fails cleanly with
+ * PatchError("Element.remove(x): element not found"). BOTH engines reject the
+ * patch -- no wrong output escapes -- but the error TYPE and MESSAGE differ on
+ * this input. Mimicking an interpreter-internal TypeError message is
+ * deliberately NOT attempted; the divergence is pinned by the
+ * `slash_predicate.err_slash` fixture (oracle side recorded by
+ * gen-patch-refs.py) and probe 8 in patch_probes.test.ts.
  */
 function findParentRequired(
   root: XmlElement,

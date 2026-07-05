@@ -79,11 +79,12 @@ function discoverPatchCases(): PatchCase[] {
 
 const cases = discoverPatchCases();
 
-/** The message body of a `ValueError: <message>` line (strip the type prefix). */
-function messageOf(errorText: string): string {
+/** Parse a recorded `<Type>: <message>` oracle-error line into its parts. */
+function parseRecordedError(errorText: string): { type: string; message: string } {
   const line = errorText.replace(/\r?\n$/, "");
   const idx = line.indexOf(": ");
-  return idx === -1 ? line : line.slice(idx + 2);
+  if (idx === -1) return { type: "", message: line };
+  return { type: line.slice(0, idx), message: line.slice(idx + 2) };
 }
 
 describe("patch engine parity vs the live oracle", () => {
@@ -94,10 +95,10 @@ describe("patch engine parity vs the live oracle", () => {
 
   for (const c of cases) {
     if (c.isError) {
-      it(`${c.stem}: applyPatch throws the oracle's ValueError message`, () => {
+      it(`${c.stem}: applyPatch rejects like the oracle`, () => {
         const design = readFileSync(c.designPath, "utf-8");
         const patch = readFileSync(c.patchPath, "utf-8");
-        const expectedMsg = messageOf(readFileSync(c.errorPath, "utf-8"));
+        const recorded = parseRecordedError(readFileSync(c.errorPath, "utf-8"));
         let thrown: unknown;
         try {
           applyPatch(design, patch);
@@ -107,7 +108,20 @@ describe("patch engine parity vs the live oracle", () => {
         expect(thrown, `${c.stem}: expected applyPatch to throw`).toBeInstanceOf(
           PatchError,
         );
-        expect((thrown as PatchError).message).toBe(expectedMsg);
+        if (recorded.type === "ValueError") {
+          // The contract class: patches.py raises ValueError; PatchError must
+          // carry the byte-identical message.
+          expect((thrown as PatchError).message).toBe(recorded.message);
+        } else {
+          // DOCUMENTED DIVERGENCE class (PR #87 rework r1, F2): the oracle
+          // crashed INTERNALLY (e.g. ElementPath's TypeError on a mangled
+          // predicate from the quote-blind rsplit). Both engines must REJECT,
+          // but air-ts raises a clean PatchError instead of mimicking an
+          // interpreter-internal message. The air-ts message for the known
+          // slash-predicate case is pinned in patch_probes.test.ts (probe 8);
+          // here we assert the rejection class only.
+          expect(recorded.type.length).toBeGreaterThan(0);
+        }
       });
       continue;
     }

@@ -1,0 +1,20 @@
+<?xml version="1.0" ?>
+<system ir_version="0.1" name="s">
+  <components>
+    <component id="M1" type="mosfet">
+      <pin name="G" net="gate"/>
+      <pin name="D" net="drain"/>
+      <pin name="S" net="gnd"/>
+    </component>
+    <component id="Q1" type="bjt">
+      <pin name="B" net="base"/>
+      <pin name="C" net="col"/>
+      <pin name="E" net="gnd"/>
+    </component>
+    <component id="R1" type="resistor">
+      <value>1k</value>
+      <pin name="a" net="x"/>
+      <pin name="b" net="y"/>
+    </component>
+  </components>
+</system>

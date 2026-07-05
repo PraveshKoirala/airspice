@@ -119,8 +119,19 @@ export function serializeMinidomStyle(root: XmlElement): string {
   const lines: string[] = [];
   lines.push('<?xml version="1.0" ?>');
   writeElement(root, 0, lines);
-  // Drop blank lines (Python: keep lines whose strip() is truthy), join, add \n.
-  const kept = lines.filter((line) => line.trim() !== "");
+  // Drop blank lines (Python: `pretty.splitlines()` keeps lines whose strip()
+  // is truthy), join, add \n. The split must run over the FULL pretty string,
+  // not the pushed chunks: a text run containing embedded newlines (from &#10;
+  // char refs) creates interior lines inside a single chunk, and Python's
+  // splitlines sees -- and drops -- a blank interior line there (live oracle:
+  // <title>a&#10;  &#10;b</title> canonicalizes to "a\nb"). After
+  // escapeText's line-ending normalization no \r survives in text, and control
+  // chars in attributes are char-ref-escaped, so "\n" is the only separator --
+  // split("\n") is then equivalent to Python's splitlines (PR #87 rework r1, F1).
+  const kept = lines
+    .join("\n")
+    .split("\n")
+    .filter((line) => line.trim() !== "");
   return kept.join("\n") + "\n";
 }
 
@@ -184,25 +195,53 @@ function openTag(el: XmlElement): string {
 
 /**
  * Text escaping as minidom emits it: & < > escaped; quotes and apostrophes are
- * left literal in text content.
+ * left literal in text content; TAB stays literal.
+ *
+ * LINE-ENDING NORMALIZATION (PR #87 rework r1, F1 "pin the text path"): the
+ * oracle pipeline serializes the tree with ET.tostring (which writes \r in text
+ * LITERALLY) and re-parses through minidom, where expat applies XML 1.0
+ * line-ending normalization to character data: \r\n -> \n, then lone \r -> \n.
+ * A \r that entered text via a &#13; char ref therefore leaves the canonical
+ * form as a plain newline (live oracle: <title>cr&#13;end</title> canonicalizes
+ * to "cr\nend"). We reproduce that spec algorithm here, BEFORE escaping. This
+ * is canonicalizer-only: serialize.ts (the ET.tostring mirror used for patch
+ * preview payloads) keeps \r literal in text, matching ITS oracle stage.
  */
 function escapeText(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return s
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
 /**
  * Attribute-value escaping as minidom emits it: & < > and the double quote are
- * escaped; single quotes stay literal (minidom always quotes attrs with ").
- * (Tabs/newlines inside attribute values are normalized to spaces by the XML
- * parser at parse time; the corpus has none, and FXP does not reproduce that
- * expat normalization -- documented as a pre-#43 edge, out of corpus scope.)
+ * escaped; single quotes stay literal (minidom always quotes attrs with ");
+ * literal TAB/LF/CR are escaped as UNPADDED numeric char refs &#9; &#10; &#13;
+ * (PR #87 rework r1, F1). Captured from the live oracle:
+ *   note="tab&#9;lf&#10;cr&#13;end"  (canonicalize_tree round-trip)
+ * NOTE the form difference vs serialize.ts's ET.tostring mirror, which emits
+ * ET's PADDED &#09; for TAB -- each serializer matches its own oracle stage.
+ * Char refs in attribute values BYPASS expat's whitespace normalization on the
+ * oracle's minidom re-parse, so the value survives verbatim and this escaping
+ * keeps the canonical output reparse-stable (a literal newline in an attribute
+ * would be normalized to a space on the next parse).
+ * (Literal tabs/newlines in the ORIGINAL input's attributes are normalized to
+ * spaces by expat at parse time; FXP does not reproduce that -- the pre-#43
+ * parse-time edge, out of corpus scope. This function handles the chars that
+ * reach the tree via char refs, which both parsers preserve.)
  */
 function escapeAttr(s: string): string {
   return s
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/"/g, "&quot;")
+    .replace(/\r/g, "&#13;")
+    .replace(/\n/g, "&#10;")
+    .replace(/\t/g, "&#9;");
 }
 
 // --- small utilities -------------------------------------------------------- #
