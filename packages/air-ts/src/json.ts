@@ -14,9 +14,18 @@
  *   3. Its indent/separator details differ slightly from `indent=2`.
  *
  * Only the value kinds the typed model uses are supported: string, number,
- * boolean, null, plain object, array. (`number` is included for #9/#10 reuse;
- * it is rendered with formatNumber to match CPython's float repr, and integers
- * are rendered as plain integers.)
+ * boolean, null, plain object, Map, array. (`number` is included for #9/#10
+ * reuse; it is rendered with formatNumber to match CPython's float repr, and
+ * integers are rendered as plain integers.)
+ *
+ * Map<string, JsonValue> is serialized exactly like an object (keys sorted by
+ * code point). The model layer uses Maps for its dict-mirroring collections
+ * because plain JS objects iterate integer-like keys ("1", "2", "10") in
+ * ascending numeric order rather than insertion order -- a divergence from
+ * Python dicts that is invisible here (sort_keys) but observable wherever
+ * document-order iteration matters (issue #8 rework: validation emission
+ * order). Supporting Map in the one serializer keeps that fix out of every
+ * call site.
  */
 
 import { formatNumber } from "./format.js";
@@ -27,7 +36,8 @@ export type JsonValue =
   | boolean
   | null
   | JsonValue[]
-  | { [key: string]: JsonValue };
+  | { [key: string]: JsonValue }
+  | Map<string, JsonValue>;
 
 /** Serialize like `json.dumps(obj, indent=2, sort_keys=True) + "\n"`. */
 export function dumps(obj: JsonValue): string {
@@ -41,6 +51,7 @@ function encodeValue(value: JsonValue, depth: number): string {
   if (t === "boolean") return value ? "true" : "false";
   if (t === "number") return encodeNumber(value as number);
   if (Array.isArray(value)) return encodeArray(value, depth);
+  if (value instanceof Map) return encodeMap(value, depth);
   if (t === "object") return encodeObject(value as Record<string, JsonValue>, depth);
   // Should be unreachable for JsonValue inputs.
   throw new TypeError(`Cannot serialize value of type ${t}`);
@@ -77,6 +88,22 @@ function encodeObject(obj: Record<string, JsonValue>, depth: number): string {
       encodeString(k) +
       ": " +
       encodeValue(obj[k] as JsonValue, depth + 1),
+  );
+  return "{\n" + parts.join(",\n") + "\n" + outer + "}";
+}
+
+/** A Map serializes exactly like an object: keys sorted by code point. */
+function encodeMap(map: Map<string, JsonValue>, depth: number): string {
+  const keys = [...map.keys()].sort(compareCodeUnits);
+  if (keys.length === 0) return "{}";
+  const inner = "  ".repeat(depth + 1);
+  const outer = "  ".repeat(depth);
+  const parts = keys.map(
+    (k) =>
+      inner +
+      encodeString(k) +
+      ": " +
+      encodeValue(map.get(k) as JsonValue, depth + 1),
   );
   return "{\n" + parts.join(",\n") + "\n" + outer + "}";
 }

@@ -37,14 +37,20 @@ export function buildTreeSchemaView(root: XmlElement): TreeSchemaView {
     if (find(root, section) !== null) presentSections.add(section);
   }
 
-  // ./<parent>/<child> path queries: children of the (first) parent section.
-  const countIds = (parentTag: string, childTag: string): Record<string, number> => {
-    const counts: Record<string, number> = {};
-    const parent = find(root, parentTag);
-    if (parent === null) return counts;
-    for (const element of findAll(parent, childTag)) {
-      const id = element.attrib.get("id");
-      if (id) counts[id] = (counts[id] ?? 0) + 1;
+  // ./<parent>/<child> path queries. PARITY (rework round 1, root cause B):
+  // ElementTree `root.findall("./nets/net")` spans EVERY <nets> section under
+  // the root, not just the first -- a duplicate id split across two <nets>
+  // sections must still be counted. So iterate ALL matching parent sections
+  // (findAll), exactly like parser.ts's findAllPath. Counts are a Map so ids
+  // report in FIRST-SEEN document order (integer-like ids would numerically
+  // reorder in a plain object -- probe A3).
+  const countIds = (parentTag: string, childTag: string): Map<string, number> => {
+    const counts = new Map<string, number>();
+    for (const parent of findAll(root, parentTag)) {
+      for (const element of findAll(parent, childTag)) {
+        const id = element.attrib.get("id");
+        if (id) counts.set(id, (counts.get(id) ?? 0) + 1);
+      }
     }
     return counts;
   };

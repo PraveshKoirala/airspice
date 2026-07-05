@@ -5,9 +5,14 @@
  * Every rule is a direct, line-by-line mirror of the oracle: same diagnostic
  * code, severity, domain, message text, related_elements, observed/expected
  * payloads, and -- critically -- the same EMISSION ORDER. Python emits in
- * document order (iterating dicts/lists in insertion order); JS objects and
- * arrays preserve insertion order for these string-keyed maps, so a faithful
- * transcription of the control flow reproduces the order for free.
+ * document order (iterating dicts/lists in insertion order). The model stores
+ * every dict-mirroring collection as a Map, whose iteration order is insertion
+ * order for ALL key types. Plain JS objects would NOT preserve it: integer-like
+ * keys ("1", "2", "10" -- the norm for passive pin names, legal for any id)
+ * iterate in ascending numeric order first, which diverged from the oracle in
+ * emission order, in `list(pins)[0]` positional access (load budget), and in
+ * float accumulation order (issue #8 rework round 1, root cause A). See
+ * model.ts; iterating the Maps reproduces the oracle exactly.
  *
  * PARITY notes are inline where the oracle does something surprising that must
  * be replicated rather than "corrected" (AGENTS.md rule 11 / issue guardrail).
@@ -73,12 +78,17 @@ export interface TreeSchemaView {
   rootTag: string;
   rootAttribs: Record<string, string>;
   presentSections: ReadonlySet<string>;
-  /** id -> count, per collection kind, for the DUPLICATE_ID check. */
+  /**
+   * id -> count, per collection kind, for the DUPLICATE_ID check. Maps, not
+   * Records: the oracle's `ids: dict[str, int]` iterates in FIRST-SEEN order,
+   * which a plain object breaks for integer-like ids (rework round 1, probe A3:
+   * duplicate net ids "10","2" must report "10" first).
+   */
   idCounts: {
-    net: Record<string, number>;
-    component: Record<string, number>;
-    test: Record<string, number>;
-    profile: Record<string, number>;
+    net: Map<string, number>;
+    component: Map<string, number>;
+    test: Map<string, number>;
+    profile: Map<string, number>;
   };
 }
 
@@ -112,7 +122,7 @@ export function validateTree(view: TreeSchemaView): Diagnostic[] {
   }
   for (const tag of DUP_ID_ORDER) {
     const counts = view.idCounts[tag];
-    for (const [elementId, count] of Object.entries(counts)) {
+    for (const [elementId, count] of counts) {
       if (count > 1) {
         diagnostics.push(
           builder.make("error", "schema", "DUPLICATE_ID", `Duplicate ${tag} id '${elementId}'.`, {
@@ -133,10 +143,10 @@ export function validateIr(ir: SystemIR): Diagnostic[] {
   const builder = new DiagnosticBuilder();
   const diagnostics: Diagnostic[] = [];
 
-  if (Object.keys(ir.nets).length === 0) {
+  if (ir.nets.size === 0) {
     diagnostics.push(builder.make("error", "semantic", "NO_NETS", "Design must define at least one net."));
   }
-  const groundNets = Object.values(ir.nets)
+  const groundNets = [...ir.nets.values()]
     .filter((net) => net.role === "ground")
     .map((net) => net.id);
   if (groundNets.length === 0) {
@@ -144,14 +154,14 @@ export function validateIr(ir: SystemIR): Diagnostic[] {
   }
 
   // component_ids = [cid for cid in ir.components if cid] -- keys, filtering falsy.
-  const componentIds = Object.keys(ir.components).filter((cid) => cid);
+  const componentIds = [...ir.components.keys()].filter((cid) => cid);
   if (componentIds.length !== new Set(componentIds).size) {
     diagnostics.push(
       builder.make("error", "semantic", "DUPLICATE_COMPONENT_ID", "Component IDs must be unique."),
     );
   }
 
-  for (const component of Object.values(ir.components)) {
+  for (const component of ir.components.values()) {
     if (!component.id) {
       diagnostics.push(builder.make("error", "semantic", "MISSING_COMPONENT_ID", "A component is missing an id."));
     }
@@ -164,8 +174,8 @@ export function validateIr(ir: SystemIR): Diagnostic[] {
     }
     for (const d of validateComponentRegistryRules(component, builder)) diagnostics.push(d);
     for (const d of validateSpiceModels(component, builder)) diagnostics.push(d);
-    for (const pin of Object.values(component.pins)) {
-      if (!(pin.net in ir.nets)) {
+    for (const pin of component.pins.values()) {
+      if (!ir.nets.has(pin.net)) {
         diagnostics.push(
           builder.make(
             "error",
@@ -178,13 +188,13 @@ export function validateIr(ir: SystemIR): Diagnostic[] {
       }
     }
     if (!PASSIVE_TYPES.has(component.type)) {
-      const pinNets = new Set(Object.values(component.pins).map((pin) => pin.net));
+      const pinNets = new Set([...component.pins.values()].map((pin) => pin.net));
       const hasGround = [...pinNets].some((netId) => {
-        const net = ir.nets[netId];
+        const net = ir.nets.get(netId);
         return net !== undefined && net.role === "ground";
       });
       const hasPower = [...pinNets].some((netId) => {
-        const net = ir.nets[netId];
+        const net = ir.nets.get(netId);
         return net !== undefined && net.role === "power";
       });
       if ((component.type === "mcu" || component.type === "ldo") && (!hasGround || !hasPower)) {
@@ -218,8 +228,8 @@ export function validateIr(ir: SystemIR): Diagnostic[] {
     }
   }
 
-  for (const domain of Object.values(ir.power_domains)) {
-    if (!(domain.net in ir.nets)) {
+  for (const domain of ir.power_domains.values()) {
+    if (!ir.nets.has(domain.net)) {
       diagnostics.push(
         builder.make(
           "error",
@@ -235,7 +245,7 @@ export function validateIr(ir: SystemIR): Diagnostic[] {
 
   for (const subsystem of ir.analog) {
     for (const componentId of subsystem.uses) {
-      if (!(componentId in ir.components)) {
+      if (!ir.components.has(componentId)) {
         diagnostics.push(
           builder.make(
             "error",
@@ -248,7 +258,7 @@ export function validateIr(ir: SystemIR): Diagnostic[] {
       }
     }
     for (const probe of subsystem.probes) {
-      if (!(probe.net in ir.nets)) {
+      if (!ir.nets.has(probe.net)) {
         diagnostics.push(
           builder.make("error", "analog", "UNKNOWN_PROBE_NET", `Probe ${probe.id} references undefined net '${probe.net}'.`, {
             relatedElements: [probe.id, probe.net],
@@ -258,14 +268,14 @@ export function validateIr(ir: SystemIR): Diagnostic[] {
     }
   }
 
-  for (const iface of Object.values(ir.interfaces)) {
+  for (const iface of ir.interfaces.values()) {
     if (iface.type === "i2c") {
       for (const d of validateI2c(ir, iface, builder)) diagnostics.push(d);
     }
   }
 
-  for (const project of Object.values(ir.firmware_projects)) {
-    if (!(project.target in ir.components)) {
+  for (const project of ir.firmware_projects.values()) {
+    if (!ir.components.has(project.target)) {
       diagnostics.push(
         builder.make(
           "error",
@@ -277,8 +287,8 @@ export function validateIr(ir: SystemIR): Diagnostic[] {
       );
     }
   }
-  for (const binding of Object.values(ir.firmware_bindings)) {
-    if (!(binding.component in ir.components)) {
+  for (const binding of ir.firmware_bindings.values()) {
+    if (!ir.components.has(binding.component)) {
       diagnostics.push(
         builder.make(
           "error",
@@ -289,7 +299,7 @@ export function validateIr(ir: SystemIR): Diagnostic[] {
         ),
       );
     }
-    if (!(binding.net in ir.nets)) {
+    if (!ir.nets.has(binding.net)) {
       diagnostics.push(
         builder.make(
           "error",
@@ -302,8 +312,8 @@ export function validateIr(ir: SystemIR): Diagnostic[] {
     }
     for (const d of validateAdcBinding(ir, binding, builder)) diagnostics.push(d);
   }
-  for (const task of Object.values(ir.firmware_tasks)) {
-    if (!(task.target in ir.firmware_projects)) {
+  for (const task of ir.firmware_tasks.values()) {
+    if (!ir.firmware_projects.has(task.target)) {
       diagnostics.push(
         builder.make(
           "error",
@@ -316,11 +326,11 @@ export function validateIr(ir: SystemIR): Diagnostic[] {
     }
   }
 
-  for (const test of Object.values(ir.tests)) {
-    for (const netId of Object.keys(test.setup)) {
+  for (const test of ir.tests.values()) {
+    for (const netId of test.setup.keys()) {
       if (netId.startsWith("current:") || netId.startsWith("load_step:")) {
         const componentId = netId.split(":").slice(1).join(":");
-        if (!(componentId in ir.components)) {
+        if (!ir.components.has(componentId)) {
           diagnostics.push(
             builder.make(
               "error",
@@ -331,7 +341,7 @@ export function validateIr(ir: SystemIR): Diagnostic[] {
             ),
           );
         }
-      } else if (!(netId in ir.nets)) {
+      } else if (!ir.nets.has(netId)) {
         diagnostics.push(
           builder.make("error", "test", "TEST_SETUP_UNKNOWN_NET", `Test ${test.id} sets undefined net ${netId}.`, {
             relatedElements: [test.id, netId],
@@ -341,7 +351,7 @@ export function validateIr(ir: SystemIR): Diagnostic[] {
     }
     for (const assertion of test.assertions) {
       const netId = assertion["net"];
-      if (netId && !(netId in ir.nets)) {
+      if (netId && !ir.nets.has(netId)) {
         diagnostics.push(
           builder.make("error", "test", "ASSERT_UNKNOWN_NET", `Test ${test.id} asserts undefined net ${netId}.`, {
             relatedElements: [test.id, netId],
@@ -349,7 +359,7 @@ export function validateIr(ir: SystemIR): Diagnostic[] {
         );
       }
       const componentId = assertion["component"];
-      if (componentId && !(componentId in ir.components)) {
+      if (componentId && !ir.components.has(componentId)) {
         diagnostics.push(
           builder.make(
             "error",
@@ -363,7 +373,7 @@ export function validateIr(ir: SystemIR): Diagnostic[] {
     }
   }
 
-  for (const profile of Object.values(ir.simulation_profiles)) {
+  for (const profile of ir.simulation_profiles.values()) {
     for (const backend of profile.backends) {
       if (backend !== "ngspice" && backend !== "renode") {
         diagnostics.push(
@@ -378,7 +388,7 @@ export function validateIr(ir: SystemIR): Diagnostic[] {
       }
     }
     for (const testId of profile.tests) {
-      if (!(testId in ir.tests)) {
+      if (!ir.tests.has(testId)) {
         diagnostics.push(
           builder.make(
             "error",
@@ -437,7 +447,7 @@ function validateI2c(ir: SystemIR, iface: Interface, builder: DiagnosticBuilder)
     // isinstance(entry, dict) and entry.get("net") not in ir.nets
     if (isDict(entry)) {
       const net = entry["net"];
-      if (!(typeof net === "string" && net in ir.nets)) {
+      if (!(typeof net === "string" && ir.nets.has(net))) {
         diagnostics.push(
           builder.make(
             "error",
@@ -467,7 +477,7 @@ function validateI2c(ir: SystemIR, iface: Interface, builder: DiagnosticBuilder)
   for (const pullup of pullups) {
     const pullupNet = pullup["net"] ?? "";
     const rail = pullup["to"] ?? "";
-    if (!(pullupNet in ir.nets)) {
+    if (!ir.nets.has(pullupNet)) {
       diagnostics.push(
         builder.make(
           "error",
@@ -478,7 +488,7 @@ function validateI2c(ir: SystemIR, iface: Interface, builder: DiagnosticBuilder)
         ),
       );
     }
-    if (!(rail in ir.nets)) {
+    if (!ir.nets.has(rail)) {
       diagnostics.push(
         builder.make(
           "error",
@@ -488,7 +498,7 @@ function validateI2c(ir: SystemIR, iface: Interface, builder: DiagnosticBuilder)
           { relatedElements: [iface.id, rail] },
         ),
       );
-    } else if ((ir.nets[rail] as Net).role !== "power") {
+    } else if ((ir.nets.get(rail) as Net).role !== "power") {
       diagnostics.push(
         builder.make(
           "error",
@@ -504,9 +514,9 @@ function validateI2c(ir: SystemIR, iface: Interface, builder: DiagnosticBuilder)
   // controller_info = data.get("controller", {})
   const controllerInfo = isDict(data["controller"]) ? data["controller"] : {};
   const mcuId = String(controllerInfo["component"] ?? "");
-  const mcu = ir.components[mcuId];
+  const mcu = ir.components.get(mcuId);
   if (mcu && mcu.type === "mcu") {
-    const mcuRailPin = mcu.pins["3V3"]; // Heuristic: check 3V3 rail
+    const mcuRailPin = mcu.pins.get("3V3"); // Heuristic: check 3V3 rail
     if (mcuRailPin) {
       for (const pullup of pullups) {
         const rail = pullup["to"];
@@ -585,8 +595,13 @@ function validateMcu(component: Component, builder: DiagnosticBuilder): Diagnost
     return diagnostics;
   }
   const registry = MCUS[component.part] as McuSpec;
+  // Registry power_pins stays a plain object: its keys are rail names ("3V3",
+  // "GND", "VDD"...), never pure integers, so object iteration == JSON file
+  // order == Python dict order. gen-registry.mjs enforces the "never pure
+  // integers" invariant at generation time (it errors on an integer-like key),
+  // so this iteration cannot silently reorder like component/pin Maps could.
   for (const requiredPin of Object.keys(registry.power_pins)) {
-    if (!(requiredPin in component.pins)) {
+    if (!component.pins.has(requiredPin)) {
       diagnostics.push(
         builder.make("error", "pin", "MISSING_MCU_POWER_PIN", `MCU ${component.id} is missing required pin ${requiredPin}.`, {
           relatedElements: [component.id],
@@ -594,7 +609,7 @@ function validateMcu(component: Component, builder: DiagnosticBuilder): Diagnost
       );
     }
   }
-  for (const pin of Object.values(component.pins)) {
+  for (const pin of component.pins.values()) {
     if (pin.name in registry.power_pins) continue;
     const supported = registry.pins[pin.name];
     if (supported === undefined) {
@@ -687,7 +702,7 @@ function validateComponentRegistryRules(component: Component, builder: Diagnosti
   const spec = COMPONENT_SPECS[component.type];
   if (!spec) return diagnostics;
   for (const pinName of spec.required_pins ?? []) {
-    if (!(pinName in component.pins)) {
+    if (!component.pins.has(pinName)) {
       diagnostics.push(
         builder.make("error", "registry", "MISSING_REQUIRED_PIN", `Component ${component.id} is missing required pin ${pinName}.`, {
           relatedElements: [component.id, pinName],
@@ -703,7 +718,7 @@ function validateComponentRegistryRules(component: Component, builder: Diagnosti
     );
   }
   for (const propertyName of spec.required_properties ?? []) {
-    if (!(propertyName in component.properties)) {
+    if (!component.properties.has(propertyName)) {
       diagnostics.push(
         builder.make(
           "error",
@@ -718,7 +733,7 @@ function validateComponentRegistryRules(component: Component, builder: Diagnosti
   const requiredAny = spec.required_any ?? [];
   if (requiredAny.length > 0) {
     const satisfied = requiredAny.some(
-      (name) => (name === "value" && component.value) || name in component.properties,
+      (name) => (name === "value" && component.value) || component.properties.has(name),
     );
     if (!satisfied) {
       diagnostics.push(
@@ -741,7 +756,7 @@ function validateComponentRegistryRules(component: Component, builder: Diagnosti
 
 function validateGenericLoad(component: Component, builder: DiagnosticBuilder): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  if (!component.value && !("current" in component.properties)) {
+  if (!component.value && !component.properties.has("current")) {
     diagnostics.push(
       builder.make(
         "warning",
@@ -761,15 +776,21 @@ function validateGenericLoad(component: Component, builder: DiagnosticBuilder): 
 
 function validateLoadBudget(ir: SystemIR, builder: DiagnosticBuilder): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
+  // net -> total current draw. Lookup-only (never iterated), so a plain object
+  // cannot reorder anything observable.
   const netLoads: Record<string, number> = {};
 
-  // Initialize loads from generic_load components.
-  for (const load of Object.values(ir.components)) {
+  // Initialize loads from generic_load components. pins[0] is POSITIONAL
+  // (Python `list(load.pins.values())[0]`): document order, which the pins Map
+  // preserves for integer-like names like "2","1" (rework round 1 probe A4 --
+  // a plain object would resolve pin "1" first and attribute the load to the
+  // wrong net, silently suppressing RAIL_LOAD/SOURCE_OVERLOADED).
+  for (const load of ir.components.values()) {
     if (load.type !== "generic_load") continue;
-    const pins = Object.values(load.pins);
+    const pins = [...load.pins.values()];
     if (pins.length === 0) continue;
     const net = pins[0]!.net;
-    const currentStr = load.properties["current"] || load.value;
+    const currentStr = load.properties.get("current") || load.value;
     if (currentStr) {
       try {
         const current = parseQuantity(currentStr, "A");
@@ -781,14 +802,14 @@ function validateLoadBudget(ir: SystemIR, builder: DiagnosticBuilder): Diagnosti
   }
 
   // Propagate loads through regulators (LDOs).
-  const regulators = Object.values(ir.components).filter((c) => c.type === "ldo");
+  const regulators = [...ir.components.values()].filter((c) => c.type === "ldo");
   for (const regulator of regulators) {
-    const outPin = regulator.pins["out"];
-    const inPin = regulator.pins["in"];
+    const outPin = regulator.pins.get("out");
+    const inPin = regulator.pins.get("in");
     if (!outPin || !inPin) continue;
 
     const outCurrent = netLoads[outPin.net] ?? 0.0;
-    const maxCurrentStr = regulator.properties["iout_max"];
+    const maxCurrentStr = regulator.properties.get("iout_max");
     if (maxCurrentStr) {
       try {
         const maxCurrent = parseQuantity(maxCurrentStr, "A");
@@ -813,7 +834,7 @@ function validateLoadBudget(ir: SystemIR, builder: DiagnosticBuilder): Diagnosti
     }
 
     // Add output current + IQ to input net load.
-    const iqStr = regulator.properties["iq"] ?? "0";
+    const iqStr = regulator.properties.get("iq") ?? "0";
     try {
       const iq = parseQuantity(iqStr, "A");
       const totalIn = outCurrent + iq;
@@ -823,13 +844,13 @@ function validateLoadBudget(ir: SystemIR, builder: DiagnosticBuilder): Diagnosti
     }
   }
 
-  // Validate against voltage sources.
-  for (const source of Object.values(ir.components).filter((c) => c.type === "voltage_source")) {
-    const pins = Object.values(source.pins);
+  // Validate against voltage sources. pins[0] positional again (see above).
+  for (const source of [...ir.components.values()].filter((c) => c.type === "voltage_source")) {
+    const pins = [...source.pins.values()];
     if (pins.length === 0) continue;
     const net = pins[0]!.net; // Usually the positive terminal
     const totalDraw = netLoads[net] ?? 0.0;
-    const imaxStr = source.properties["i_max"];
+    const imaxStr = source.properties.get("i_max");
     if (imaxStr) {
       try {
         const imax = parseQuantity(imaxStr, "A");
@@ -863,7 +884,7 @@ function validateLoadBudget(ir: SystemIR, builder: DiagnosticBuilder): Diagnosti
 
 function validateAdcBinding(ir: SystemIR, binding: FirmwareBinding, builder: DiagnosticBuilder): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  const component = ir.components[binding.component];
+  const component = ir.components.get(binding.component);
   if (!component || component.type !== "mcu" || !component.part || !(component.part in MCUS)) {
     return diagnostics;
   }
@@ -875,7 +896,7 @@ function validateAdcBinding(ir: SystemIR, binding: FirmwareBinding, builder: Dia
   } catch {
     return diagnostics;
   }
-  const net = ir.nets[binding.net];
+  const net = ir.nets.get(binding.net);
   if (!net) return diagnostics;
   const estimated = estimateNetVoltage(ir, binding.net);
   if (estimated !== null && estimated > vref) {
@@ -899,8 +920,11 @@ function validateAdcBinding(ir: SystemIR, binding: FirmwareBinding, builder: Dia
 }
 
 function estimateNetVoltage(ir: SystemIR, netId: string): number | null {
+  // `known` is lookup-only (never iterated), so a plain object is safe here;
+  // the component iteration below is Map-ordered because float ACCUMULATION
+  // order (conductanceSum += ...) must match Python's document-order sum.
   const known: Record<string, number> = {};
-  for (const net of Object.values(ir.nets)) {
+  for (const net of ir.nets.values()) {
     if (net.role === "ground") {
       known[net.id] = 0.0;
     } else if (net.nominal_voltage) {
@@ -911,11 +935,11 @@ function estimateNetVoltage(ir: SystemIR, netId: string): number | null {
       }
     }
   }
-  for (const component of Object.values(ir.components)) {
-    const outPin = component.pins["out"];
-    if (component.type === "ldo" && outPin && component.properties["vout"]) {
+  for (const component of ir.components.values()) {
+    const outPin = component.pins.get("out");
+    if (component.type === "ldo" && outPin && component.properties.get("vout")) {
       try {
-        known[outPin.net] = parseQuantity(component.properties["vout"] as string, "V");
+        known[outPin.net] = parseQuantity(component.properties.get("vout") as string, "V");
       } catch {
         // pass
       }
@@ -925,11 +949,11 @@ function estimateNetVoltage(ir: SystemIR, netId: string): number | null {
   // One-node divider estimate, enough for the MVP battery-sense case.
   let conductanceSum = 0.0;
   let weightedVoltage = 0.0;
-  for (const component of Object.values(ir.components)) {
-    if (component.type !== "resistor" || !component.value || Object.keys(component.pins).length < 2) {
+  for (const component of ir.components.values()) {
+    if (component.type !== "resistor" || !component.value || component.pins.size < 2) {
       continue;
     }
-    const pins = Object.values(component.pins);
+    const pins = [...component.pins.values()];
     const nets = [pins[0]!.net, pins[1]!.net];
     if (!nets.includes(netId)) continue;
     const other = nets[0] === netId ? nets[1]! : nets[0]!;

@@ -77,7 +77,25 @@ function buildComponentSpecs() {
 function buildMcus() {
   const files = readRegistryDir("mcu");
   const mcus = {};
-  for (const { data } of files) {
+  for (const { name, data } of files) {
+    // ORDER GUARD (issue #8 rework round 1): `power_pins` is the ONE registry
+    // map the validator ITERATES (MISSING_MCU_POWER_PIN emission order). It is
+    // stored as a plain object, which is only order-safe while no key is a pure
+    // integer ("1", "42"): both JSON.parse here and the emitted TS literal
+    // would reorder integer-like keys numerically, diverging from Python's
+    // file-order dict. Rail names are never bare integers today; if one ever
+    // appears, fail the generation loudly instead of silently reordering.
+    for (const key of Object.keys(data.power_pins ?? {})) {
+      if (/^\d+$/.test(key)) {
+        console.error(
+          `gen-registry: ${name}: power_pins key '${key}' is a pure integer. ` +
+            "Plain-object storage would reorder it (JS integer-like key rule); " +
+            "convert the generated power_pins to an ordered structure before " +
+            "admitting integer rail names.",
+        );
+        process.exit(1);
+      }
+    }
     mcus[data.part] = data;
   }
   return mcus;

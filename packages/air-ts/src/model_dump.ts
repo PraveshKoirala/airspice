@@ -32,16 +32,18 @@ function byCodePoint(a: string, b: string): number {
 
 /** Build the deterministically-ordered plain object (model_to_dict). */
 export function modelToObject(ir: SystemIR): JsonValue {
+  // Model collections are Maps (insertion-ordered; see model.ts). `dumps` sorts
+  // Map keys exactly like object keys, so serialization output is unchanged.
   const components: Record<string, JsonValue> = {};
-  for (const cid of Object.keys(ir.components).sort(byCodePoint)) {
-    const comp = ir.components[cid];
+  for (const cid of [...ir.components.keys()].sort(byCodePoint)) {
+    const comp = ir.components.get(cid);
     if (comp === undefined) continue;
     // _plain(comp) then explicitly re-set pins/properties as sorted maps. Since
     // our `dumps` sorts every object's keys, plain object copies suffice; the
     // ordering is applied at serialization time.
     const pins: Record<string, JsonValue> = {};
-    for (const pinName of Object.keys(comp.pins).sort(byCodePoint)) {
-      const pin = comp.pins[pinName];
+    for (const pinName of [...comp.pins.keys()].sort(byCodePoint)) {
+      const pin = comp.pins.get(pinName);
       if (pin === undefined) continue;
       pins[pinName] = {
         name: pin.name,
@@ -50,8 +52,8 @@ export function modelToObject(ir: SystemIR): JsonValue {
       };
     }
     const properties: Record<string, JsonValue> = {};
-    for (const propName of Object.keys(comp.properties).sort(byCodePoint)) {
-      properties[propName] = comp.properties[propName] as string;
+    for (const propName of [...comp.properties.keys()].sort(byCodePoint)) {
+      properties[propName] = comp.properties.get(propName) as string;
     }
     components[cid] = {
       id: comp.id,
@@ -113,14 +115,11 @@ export function serializeModel(ir: SystemIR): string {
 }
 
 /**
- * Copy a Record<string, T> into a plain JsonValue object. Keys are emitted in
- * sorted order by `dumps`, so we do not pre-sort here. Values are structurally
- * cloned via JSON-compatible spread (the model holds only JSON-native data).
+ * Pass a model Map through as a JsonValue. `dumps` serializes a Map exactly
+ * like an object with sorted keys, and it recurses into nested Maps (a Test's
+ * `setup`, a SimulationProfile's `properties`), so no per-field conversion is
+ * needed and the emitted bytes are identical to the previous Record layout.
  */
-function mapValues<T>(m: Record<string, T>): JsonValue {
-  const out: Record<string, JsonValue> = {};
-  for (const [k, v] of Object.entries(m)) {
-    out[k] = v as unknown as JsonValue;
-  }
-  return out;
+function mapValues<T>(m: Map<string, T>): JsonValue {
+  return m as unknown as JsonValue;
 }

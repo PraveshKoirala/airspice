@@ -117,7 +117,25 @@ describe("serializeDiagnostics shape", () => {
   });
   it("success is false when any error is present", () => {
     const root = parseXml('<system name="x" ir_version="0.1"><metadata/><nets><net id="g" role="signal"/></nets><components/><tests/><simulation_profiles/></system>');
-    const diags = validateAll(root, { nets: {}, components: {}, power_domains: {}, analog: [], interfaces: {}, firmware_projects: {}, firmware_bindings: {}, firmware_tasks: {}, tests: {}, simulation_profiles: {}, bridges: [], exports: [], requirements: [], name: "x", ir_version: "0.1", metadata: { title: "", description: "", author: "", created_at: "" } });
+    // Hand-built minimal IR (model collections are Maps; see model.ts).
+    const diags = validateAll(root, {
+      nets: new Map(),
+      components: new Map(),
+      power_domains: new Map(),
+      analog: [],
+      interfaces: new Map(),
+      firmware_projects: new Map(),
+      firmware_bindings: new Map(),
+      firmware_tasks: new Map(),
+      tests: new Map(),
+      simulation_profiles: new Map(),
+      bridges: [],
+      exports: [],
+      requirements: [],
+      name: "x",
+      ir_version: "0.1",
+      metadata: { title: "", description: "", author: "", created_at: "" },
+    });
     // No nets in the (hand-built minimal) ir -> NO_NETS + MISSING_GROUND errors.
     expect(hasErrors(diags)).toBe(true);
     expect(serializeDiagnostics(diags)).toContain('"success": false');

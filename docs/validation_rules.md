@@ -115,3 +115,19 @@ faithfully in `packages/air-ts/src/validate/rules.ts`.
 - **`UNSUPPORTED_PIN_FUNCTION`** stores `expected.supported = sorted(...)`. The
   registry keeps pin functions as arrays; the port applies `sorted()` at the emit
   site (code-point order) exactly where the oracle does.
+- **Insertion-ordered collections (rework round 1).** Python dicts iterate in
+  insertion (document) order for every key; plain JS objects iterate
+  integer-like keys ("1", "2", "10" — the norm for passive pin names, legal for
+  any id) in ascending numeric order first. That reordered diagnostic emission,
+  flipped `list(pins)[0]` positional access (silently suppressing
+  `RAIL_LOAD_EXCEEDS_REGULATOR_LIMIT` / `SOURCE_OVERLOADED` when a
+  `generic_load`'s pins were named "2","1" in that document order), and changed
+  float accumulation order. Every dict-mirroring model collection is therefore a
+  `Map` (`packages/air-ts/src/model.ts`); `model.json` bytes are unaffected (its
+  serializer sorts keys). Locked by `tests/ordering_regression.test.ts` with
+  oracle-generated fixtures.
+- **Multi-section scans (rework round 1).** ElementTree `findall("./nets/net")`
+  spans EVERY `<nets>` section under the root; the `DUPLICATE_ID` count scan and
+  the parser's `test.findall("./setup/*")` were first-section-only and are fixed
+  to span all matching sections. Section PRESENCE (`root.find(section)`) is
+  first-match in the oracle too and stays `find`.
