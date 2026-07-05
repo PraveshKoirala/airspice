@@ -8,7 +8,7 @@
     "declarationMap": false,
     "types": ["vitest/importMeta", "node"]
   },
-  "//exclude-note": "bench/run.ts is the standalone CLI entry — it imports air-ts by relative SOURCE path (not the bare specifier), which would pull air-ts's source tree into THIS program and break rootDir. It is typechecked under bench/tsconfig.bench.json (the same config tsx uses), not here. The other bench modules consume air-ts only via ../src (through the runtime's EngineHooks seam), so they typecheck cleanly here.",
+  "//exclude-note": "bench/run.ts and bench/build/run.ts are the standalone CLI entries — they import air-ts by relative SOURCE path (not the bare specifier), which would pull air-ts's source tree into THIS program and break rootDir. They are typechecked under bench/tsconfig.check.json (the same resolution tsx uses), not here. The other bench modules consume air-ts only via ../src (through the runtime's EngineHooks seam), so they typecheck cleanly here.",
   "include": ["src/**/*.ts", "tests/**/*.ts", "bench/**/*.ts"],
-  "exclude": ["dist", "node_modules", "bench/run.ts"]
+  "exclude": ["dist", "node_modules", "bench/run.ts", "bench/build/run.ts"]
 }

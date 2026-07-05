@@ -22,8 +22,9 @@
     "build": "tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc -b && tsc -p tsconfig.test.json",
-    "bench": "tsx --tsconfig ./bench/tsconfig.bench.json ./bench/run.ts"
+    "typecheck": "tsc -b && tsc -p tsconfig.test.json && tsc -p bench/tsconfig.check.json",
+    "bench": "tsx --tsconfig ./bench/tsconfig.bench.json ./bench/run.ts",
+    "build-bench": "tsx --tsconfig ./bench/tsconfig.bench.json ./bench/build/run.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.0",

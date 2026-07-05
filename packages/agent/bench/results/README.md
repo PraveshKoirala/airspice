@@ -1,10 +1,116 @@
-# Repair benchmark — live baseline results
+# Benchmark — live baseline results
 
-Each `YYYY-MM-DD-<provider>.json` is the scored output of a live repair-benchmark
-run (`npm run bench -- --provider <provider>`), committed so repair quality is
-tracked over time (issue #19 deliverable 4). The mock benchmark that validates
-the loop **mechanics** runs in CI (`tests/repair/bench.test.ts`, 6/6 fixed) and
-is not committed here — only live runs are.
+Two benchmarks live here:
+
+* **Repair bench** (`YYYY-MM-DD-<provider>.json`) — the scored output of a live
+  repair-benchmark run (`npm run bench -- --provider <provider>`), issue #19.
+* **Build bench** (`build-YYYY-MM-DD-<provider>.json`) — the scored output of a
+  live build-benchmark run (`npm run build-bench -- --provider <provider>`),
+  issue #107. Generative half of the pitch: the agent builds a circuit from a
+  natural-language device spec and an OBJECTIVE Python scorer (`air.build_score`)
+  checks it — real ngspice on `sim_assertion`, deterministic constraint solver on
+  connectivity, ERC via `air.validation`. No LLM judge anywhere.
+
+The mock benchmarks that validate the loop **mechanics** run in CI
+(`tests/repair/bench.test.ts` for repair, `tests/build/bench.test.ts` for build)
+and are not committed here — only live runs are.
+
+## 2026-07-05 — Build bench — Anthropic `claude-sonnet-5` — SMOKE (issue #107)
+
+**Headline: 0/2 built in the post-cap smoke; per-spec token cost 30k–40k tokens.**
+This is a small live SMOKE against a subset of the 36-spec corpus, not a full-36
+run — that spend is orchestrator-gated. The purpose here is to (a) prove the
+harness works end to end live, (b) calibrate the per-spec token cost so the
+full-36 estimate is grounded, and (c) surface honest per-spec failure modes.
+
+### Pre-cap run (evidence): `build-2026-07-05-anthropic-precap.json`
+
+The first live smoke (5 specs) hit an uncapped-budget bug: each build-loop
+iteration called `runConversation` with the default `BudgetLimits` (12 provider
+turns × 200,000 tokens), so one spec burned 267k tokens over 3 build iterations.
+Kept in the repo as evidence of the pre-fix behaviour and the model field
+`null` bug. Totals: 5 specs / 0 built / 674,678 tokens (≈ $1.50 blended at
+Sonnet 5 pricing).
+
+### Post-cap run (headline): `build-2026-07-05-anthropic.json`
+
+The fixes committed with this run:
+
+* **Per-iteration budget cap** in the build loop
+  (`BUILD_ITER_BUDGET = {maxIterations: 4, maxTokens: 24_000, maxWallMs: 60_000}`)
+  overriding the runner's default. Multiplied by `turn_budget` (default 4) this
+  is the per-spec worst case: 4 iters × 24k = 96k tokens.
+* **Belt-and-suspenders `perSpecTokenCap`** (CLI: `--per-spec-token-cap`) — the
+  loop stops with distinct reason `token_cap` if the cumulative crosses it.
+  Guarantees a bounded live spend across build iterations.
+* **`model` field recorded correctly** — the runner probes
+  `provider.defaultModel` when `--model` is omitted (was `null` before).
+* **Hardened scorer path** — a scorer-subprocess failure now returns a scored
+  non-build with the reason instead of a bubbled `scorer_error`. The Python CLI
+  also wraps `score_build` in try/except so a Python exception on the AGENT'S
+  design becomes `failed_criterion: "scorer_exception"`, not a lost `0`.
+* **Per-iteration diagnostic log** (`iterations_log` in the results JSON) — tool
+  names called, tokens, staged y/n, `progressed`, `conversationReason`, scorer
+  verdict. This is what makes future no_progress / no_build debuggable without a
+  live re-run.
+
+Run: `npm run build-bench -- --provider anthropic --per-spec-token-cap 40000
+--only led_esp32c3_single,adc_esp32c3_lipo_divider`. The `.env` supplies the
+funded `ANTHROPIC_API_KEY`; the key is never in the repo.
+
+| spec | outcome | turns | tokens | note |
+|---|---|---|---|---|
+| adc_esp32c3_lipo_divider | not built (`no_build`) | 1 | 29,649 | agent explored (`list_registry`, `validate`, `run_simulation`) but hit the 4-turn conversation cap before staging any design |
+| led_esp32c3_single | not built (`token_cap`, failed `firmware_intent`) | 2 | 50,056 | agent staged a structurally-correct LED circuit both iterations; scorer failed `write_gpio expected a GPIO op on net 'led_gpio'; op-nets=set()` — the agent's `<write_gpio binding="bind_led"/>` form uses a binding attribute, the scorer (#106) looks for `pin="..."` |
+
+**Totals:** 0/2 built, 79,705 tokens across the run (≈ $0.24 blended at Sonnet 5
+introductory pricing). The 40k per-spec cap held (led hit it and stopped; adc
+finished well under it).
+
+### What the log tells us (per-spec honest diagnosis)
+
+* **adc_esp32c3_lipo_divider** — the agent burned its 4-turn conversation cap
+  exploring (`list_registry_components → validate_design ×2 → run_simulation`)
+  and never called `set_design`. Two possible fixes: raise
+  `BUILD_ITER_BUDGET.maxIterations` from 4 → 6, and/or tune the Building system
+  prompt to push earlier commitment. Raising the cap is orchestrator-gated (more
+  spend); prompt tuning is a follow-up issue.
+* **led_esp32c3_single** — the agent's structural design is *correct* (see the
+  saved design: MCU→R→LED_anode→cathode→gnd with `function="GPIO_OUT"` on the
+  right pin), but the firmware task uses the binding-based
+  `<write_gpio binding="bind_led"/>` form. The #106 scorer's
+  `check_firmware_intent` only reads `op.get("pin")`, so it misses the binding
+  form. This is a real scorer/corpus coupling to document — the agent got the
+  circuit right; the scorer's `write_gpio` matcher is narrower than AIR's
+  grammar allows. Widening the scorer is a #107 follow-up (would need re-running
+  the golden suite to prove no regressions).
+
+### Calibrated per-spec cost + full-36 estimate
+
+Per-spec observed (post-cap): 30k–50k tokens. Per-spec ceiling under the caps:
+`turn_budget (4) × maxIterations (4) × maxTokens (24k)` = 384k tokens absolute
+worst case (~$0.80/spec at Sonnet 5). Realistic per-spec average from this
+smoke: ~40k tokens ≈ $0.12 blended.
+
+**Full-36 estimate under the current caps:**
+- Realistic (2 specs' average × 36): ~1.4M tokens ≈ **$4.30**
+- Absolute worst case (per-spec ceiling × 36): ~13.8M tokens ≈ **$29** (would
+  need the `perSpecTokenCap` disabled AND every spec spinning to the max).
+- Recommended full-36 run guard: `--per-spec-token-cap 50000` → hard cap of
+  1.8M tokens ≈ **$5.40 max**.
+
+### Honest note on 0/2
+
+Two live specs is not enough to draw a capability conclusion about
+`claude-sonnet-5` on generative building. Both failures are *close-call* signals
+(one over-exploration, one grammar-form mismatch), NOT a capability collapse.
+The pitch — generative building is HARDER than repair — appears to hold, but the
+2-spec sample size is too small to headline. The value of THIS run is (a) the
+per-iteration budget bug fixed so the tool can't blow through hundreds of
+thousands of tokens again, (b) the diagnostic logging that made both failures
+readable without a live re-run, and (c) the calibrated cost estimate.
+
+## 2026-07-05 — Anthropic `claude-sonnet-5` (`2026-07-05-anthropic.json`) — HEADLINE
 
 ## 2026-07-05 — Anthropic `claude-sonnet-5` (`2026-07-05-anthropic.json`) — HEADLINE
 

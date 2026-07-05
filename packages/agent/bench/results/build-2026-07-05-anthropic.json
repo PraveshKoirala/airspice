@@ -1,0 +1,84 @@
+{
+  "provider": "anthropic",
+  "model": "claude-sonnet-5",
+  "mode": "live",
+  "date": "2026-07-05",
+  "totalSpecs": 2,
+  "builtCount": 0,
+  "cases": [
+    {
+      "id": "adc_esp32c3_lipo_divider",
+      "category": "adc_frontend",
+      "fidelity": "faithful",
+      "built": false,
+      "stopReason": "no_build",
+      "failedCriterion": null,
+      "turns": 1,
+      "tokens": 29649,
+      "simBackend": null,
+      "simValue": null,
+      "message": "Stopped: the model staged no design that passed the gate after 1 iteration(s).",
+      "iterations_log": [
+        {
+          "index": 0,
+          "toolCalls": [
+            "list_registry_components",
+            "validate_design",
+            "validate_design",
+            "run_simulation"
+          ],
+          "tokens": 29649,
+          "staged": false,
+          "stageSummary": "",
+          "progressed": false,
+          "conversationReason": "budget_iterations",
+          "scoreSummary": null
+        }
+      ]
+    },
+    {
+      "id": "led_esp32c3_single",
+      "category": "led_driver",
+      "fidelity": "faithful",
+      "built": false,
+      "stopReason": "token_cap",
+      "failedCriterion": "firmware_intent",
+      "turns": 2,
+      "tokens": 50056,
+      "simBackend": null,
+      "simValue": null,
+      "message": "Stopped: the per-spec token cap was hit after 2 iteration(s) (belt-and-suspenders spend guard).",
+      "iterations_log": [
+        {
+          "index": 0,
+          "toolCalls": [
+            "list_registry_components",
+            "set_design",
+            "run_simulation",
+            "get_design"
+          ],
+          "tokens": 24253,
+          "staged": true,
+          "stageSummary": "Proposed design",
+          "progressed": true,
+          "conversationReason": "budget_iterations",
+          "scoreSummary": "not-built failed=firmware_intent: write_gpio expected a GPIO op on net 'led_gpio'; op-nets=set()"
+        },
+        {
+          "index": 1,
+          "toolCalls": [
+            "validate_design",
+            "run_simulation",
+            "set_design"
+          ],
+          "tokens": 25803,
+          "staged": true,
+          "stageSummary": "ESP32-C3 status LED driven directly from GPIO2 through a 330Ω series resistor to ground; firmware task toggles the GPIO via write_gpio every 500ms.",
+          "progressed": true,
+          "conversationReason": "budget_tokens",
+          "scoreSummary": "not-built failed=firmware_intent: write_gpio expected a GPIO op on net 'led_gpio'; op-nets=set()"
+        }
+      ]
+    }
+  ]
+}
