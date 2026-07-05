@@ -5,31 +5,31 @@
   "date": "2026-07-05",
   "maxIterations": 5,
   "totalCases": 6,
-  "fixedCount": 5,
+  "fixedCount": 6,
   "cases": [
     {
       "name": "bad_adc_divider",
       "fixed": true,
       "iterations": 1,
-      "tokens": 6601,
+      "tokens": 12978,
       "stopReason": "fixed",
       "appliedPatches": 1,
       "message": "All constraints pass after 1 iteration(s)."
     },
     {
       "name": "i2c_without_pullups",
-      "fixed": false,
+      "fixed": true,
       "iterations": 1,
-      "tokens": 5917,
-      "stopReason": "provider_error",
-      "appliedPatches": 0,
-      "message": "Stopped: the provider errored (auth / quota / network) after 1 iteration(s)."
+      "tokens": 73972,
+      "stopReason": "fixed",
+      "appliedPatches": 1,
+      "message": "All constraints pass after 1 iteration(s)."
     },
     {
       "name": "invalid_pin_function",
       "fixed": true,
       "iterations": 1,
-      "tokens": 5419,
+      "tokens": 16527,
       "stopReason": "fixed",
       "appliedPatches": 1,
       "message": "All constraints pass after 1 iteration(s)."
@@ -38,7 +38,7 @@
       "name": "missing_ground",
       "fixed": true,
       "iterations": 1,
-      "tokens": 5411,
+      "tokens": 11132,
       "stopReason": "fixed",
       "appliedPatches": 1,
       "message": "All constraints pass after 1 iteration(s)."
@@ -47,7 +47,7 @@
       "name": "overloaded_3v3_rail",
       "fixed": true,
       "iterations": 1,
-      "tokens": 5729,
+      "tokens": 11633,
       "stopReason": "fixed",
       "appliedPatches": 1,
       "message": "All constraints pass after 1 iteration(s)."
@@ -56,7 +56,7 @@
       "name": "phase3_failure",
       "fixed": true,
       "iterations": 1,
-      "tokens": 6569,
+      "tokens": 21259,
       "stopReason": "fixed",
       "appliedPatches": 1,
       "message": "All constraints pass after 1 iteration(s)."
