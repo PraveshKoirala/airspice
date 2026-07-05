@@ -1,0 +1,118 @@
+name: sim-wasm
+
+# CI for the ngspice-WASM analog engine (packages/sim-wasm, issue #13). A
+# SEPARATE workflow from ci.yml / air-ts.yml by design (the orchestrator asked
+# for a new file). Two jobs:
+#   sim-wasm-unit    -- typecheck + Vitest (protocol/diagnostics/result/client/
+#                       netlist logic against a stub worker; no WASM, fast).
+#   sim-wasm-browser -- Playwright in the official Microsoft container (so the
+#                       Chromium + Firefox binaries and all their system deps are
+#                       present) runs the REAL WASM engine in a REAL Web Worker:
+#                       corpus parity, cancellation, main-thread non-blocking,
+#                       and error mapping. jsdom cannot run a WASM worker, so this
+#                       tier MUST be a real browser (issue deliverable 8/9).
+#
+# No ngspice apt install: the ngspice used here is the one compiled INTO
+# eecircuit-engine's WASM (45.2), not the host's. No COOP/COEP headers: the
+# single-threaded build needs none (epic #12 binding decision 2).
+#
+# Maintainer note: once green, add `sim-wasm-unit` and `sim-wasm-browser` to the
+# required status checks for `main`.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: sim-wasm-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  sim-wasm-unit:
+    name: sim-wasm (typecheck + vitest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/sim-wasm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: packages/sim-wasm/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck (src + tests, strict)
+        run: npm run typecheck
+
+      - name: Build (tsc -b)
+        run: npm run build
+
+      - name: Unit tests (vitest, stub worker)
+        run: npm test
+
+  sim-wasm-browser:
+    name: sim-wasm (playwright, real WASM worker)
+    runs-on: ubuntu-latest
+    # Official Playwright container: Chromium + Firefox + all system libraries
+    # are preinstalled and version-matched to @playwright/test. This is the
+    # supported way to run Playwright in CI without a separate browser-install
+    # step failing on missing OS deps.
+    container:
+      # Pin the image to the EXACT @playwright/test version (1.58.2) so the
+      # container's pre-installed Chromium + Firefox match the library — a
+      # version skew makes Playwright fail with "Executable doesn't exist".
+      # The browsers live at the image's default /ms-playwright path, which
+      # Playwright finds automatically; do NOT set PLAYWRIGHT_BROWSERS_PATH=0
+      # (that forces a node_modules lookup where nothing is installed).
+      image: mcr.microsoft.com/playwright:v1.58.2-noble
+      # Firefox's sandbox needs unprivileged user namespaces
+      # (CanCreateUserNamespace clone()), which the default container seccomp
+      # profile blocks -> "Failed to launch the browser process ... EPERM".
+      # seccomp=unconfined lets Firefox launch in the container. Chromium already
+      # runs fine (Playwright auto-adds --no-sandbox in containers).
+      options: --security-opt seccomp=unconfined
+    defaults:
+      run:
+        working-directory: packages/sim-wasm
+    env:
+      # GitHub Actions runs the container as root, but the Playwright image's
+      # $HOME (/github/home) is owned by the image user (pwuser). Firefox refuses
+      # to run as root when HOME is owned by another user ("Running ... as root in
+      # a regular user's session is not supported"). Point HOME at a root-owned
+      # dir so Firefox launches. Chromium is unaffected.
+      HOME: /root
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: packages/sim-wasm/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Real Chromium + Firefox, real Web Worker, real WASM ngspice: corpus
+      # parity (3 designs), cancellation, main-thread <50ms, error mapping.
+      - name: Playwright tests (Chromium + Firefox)
+        run: npx playwright test
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: packages/sim-wasm/playwright-report
+          retention-days: 7

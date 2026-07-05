@@ -26,7 +26,9 @@
     "paths": {
       "air-ts": ["../air-ts/src/index.ts"],
       "agent": ["../agent/src/index.ts"],
-      "fast-xml-parser": ["./node_modules/fast-xml-parser"]
+      "fast-xml-parser": ["./node_modules/fast-xml-parser"],
+      "sim-wasm": ["../sim-wasm/src/index.ts"],
+      "eecircuit-engine": ["./node_modules/eecircuit-engine"]
     },
 
     /* Linting */

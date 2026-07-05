@@ -1,0 +1,8 @@
+node_modules/
+dist/
+# Playwright + Vite generated artifacts (never source of truth)
+test-results/
+playwright-report/
+playwright/.cache/
+tests/browser/dist/
+*.tsbuildinfo

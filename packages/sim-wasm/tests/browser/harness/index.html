@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>sim-wasm Playwright harness</title>
+  </head>
+  <body>
+    <h1>sim-wasm test harness</h1>
+    <pre id="status">idle</pre>
+    <!--
+      Dev-only harness that exposes the SimClient on window for Playwright to
+      drive against the REAL WASM engine in a REAL Web Worker. This is not a
+      product surface; it exists solely so the browser tests can call run()/
+      cancel()/preload() and assert results. The /sim-lab product route lives in
+      packages/ui.
+    -->
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

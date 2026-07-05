@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import type { Node, Edge } from 'reactflow';
@@ -681,6 +681,11 @@ function EmptyState({ icon, title, text }: { icon: React.ReactNode; title: strin
   );
 }
 
+// Dev-only integration surface for the WASM analog engine (issue #13). Lazily
+// imported AND guarded by import.meta.env.DEV so neither SimLab nor its sim-wasm
+// dependency (and its ~20MB WASM chunk) are pulled into the production build.
+const SimLab = import.meta.env.DEV ? lazy(() => import('./pages/SimLab')) : null;
+
 function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 
@@ -693,6 +698,16 @@ function App() {
       <Routes>
         <Route path="/" element={<LandingWrapper />} />
         <Route path="/project" element={<ProjectWorkspace theme={theme} toggleTheme={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')} />} />
+        {SimLab && (
+          <Route
+            path="/sim-lab"
+            element={
+              <Suspense fallback={<div style={{ padding: 24 }}>Loading sim-lab…</div>}>
+                <SimLab />
+              </Suspense>
+            }
+          />
+        )}
       </Routes>
     </BrowserRouter>
   );
