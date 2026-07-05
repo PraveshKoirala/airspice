@@ -74,13 +74,14 @@ describe("SPICE refusal gate: error-severity designs emit NO netlist", () => {
 });
 
 describe("SPICE parity: corpus inventory is pinned (fixtures cannot silently vanish)", () => {
-  // These counts reflect the committed corpus at issue #9 time: the 5 valid
-  // designs the oracle compiled (analog_primitives, complex_bms,
-  // esp32_battery_sensor, mixed_signal_switch, stm32_demo) and the 4 of those
-  // whose default profile carries an ngspice backend (all but stm32_demo).
-  // They are asserted dynamically -- not by name -- so this stays a tripwire,
-  // not a hard-coded fixture list (guardrails R4). If the corpus legitimately
-  // grows via an oracle change, bump these numbers in the same oracle-first PR.
+  // These counts reflect the committed corpus at issue #9 time: the valid
+  // designs the exporter compiled (a netlist.cir each), and the subset of those
+  // whose default simulation profile carries an ngspice backend (a probes.json
+  // each). The specific design names are intentionally NOT written here -- the
+  // counts are asserted dynamically off `discoverDesigns()`, so this stays a
+  // tripwire, not a hard-coded fixture list (guardrails R4). If the corpus
+  // legitimately grows via an oracle change, bump these numbers in the same
+  // oracle-first PR.
   it("exactly 5 designs have a netlist and 4 have a probes descriptor", () => {
     expect(withNetlist.length).toBe(5);
     expect(withProbes.length).toBe(4);

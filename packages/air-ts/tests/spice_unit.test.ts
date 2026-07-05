@@ -141,7 +141,7 @@ describe("PWM PULSE emission (post-#59, byte-exact vs oracle)", () => {
     expect(pwmStimCard("5us", "10us")).toBe("PULSE(0 3.3 0 1us 1us 4us 10us)");
   });
 
-  it("50% duty low frequency: 5ms/10ms -> PW 4.999ms (corpus mixed_signal_switch)", () => {
+  it("50% duty low frequency: 5ms/10ms -> PW 4.999ms (a corpus switch design's case)", () => {
     expect(pwmStimCard("5ms", "10ms")).toBe("PULSE(0 3.3 0 1us 1us 4.999ms 10ms)");
   });
 
