@@ -1,0 +1,22 @@
+{
+  "//": "Typecheck-only config for the standalone bench CLI (bench/run.ts), which imports air-ts by RELATIVE SOURCE path (so it runs under tsx without the agent's ambient air-ts.d.ts). It cannot be typechecked by the agent's tsconfig.test.json (that would pull air-ts source under the agent rootDir). Run: tsc -p bench/tsconfig.check.json.",
+  "compilerOptions": {
+    "noEmit": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM"],
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "verbatimModuleSyntax": true,
+    "types": ["node"],
+    "baseUrl": "..",
+    "paths": {
+      "air-ts": ["../air-ts/src/index.ts"],
+      "fast-xml-parser": ["./node_modules/fast-xml-parser"]
+    }
+  },
+  "include": ["run.ts", "runner.ts", "engine.ts", "cases.ts"]
+}

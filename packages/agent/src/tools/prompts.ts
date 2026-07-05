@@ -217,3 +217,54 @@ export function chatSystemInstruction(): string {
     airContract()
   );
 }
+
+// PORT: prompts.py _PATCH_FORMAT — the shared AIR <patch> grammar, verbatim. A
+// patch is a diff of replace/add/remove ops keyed by XPath; far cheaper to
+// generate than a full design. (Same tuned text the Python repair/edit prompts
+// attach; not a language edit.)
+const PATCH_FORMAT =
+  "AIR <patch> FORMAT - patch_xml is a small diff document:\n" +
+  '<patch id="fix">\n' +
+  "  <reason>why</reason>\n" +
+  "  <replace path=\"/system/components/component[@id='R_BOT']/value\"><value>4.7k</value></replace>\n" +
+  '  <add path="/system/components"><component id="C1" type="capacitor"><value>100nF</value>' +
+  '<pin name="1" net="sense"/><pin name="2" net="gnd"/></component></add>\n' +
+  "  <remove path=\"/system/components/component[@id='OLD']\"/>\n" +
+  "</patch>\n" +
+  "Rules: ops are replace/add/remove; a `path` must already exist unless the op is 'add' " +
+  "(whose path is the PARENT element to append into); use @id predicates to target elements; " +
+  "make the SMALLEST change that satisfies the request and keep everything else intact.";
+
+/**
+ * The repair system instruction for the autonomous repair loop (issue #19).
+ *
+ * PORT: prompts.py repair_prompt() — verbatim tuned language. The Python
+ * `repair_prompt` was written for a single JSON-response call: it prepends the
+ * repair instruction + `air_contract()` + `_PATCH_FORMAT`, then asks for a JSON
+ * object `{patch_xml, reason}` and appends the CURRENT DESIGN + VALIDATION
+ * DIAGNOSTICS (+ SIMULATION REPORT / prior-error) inline. The browser repair
+ * loop instead drives the SAME contract through the tool runtime, so this
+ * function returns only the STABLE, per-run system half — the repair
+ * instruction + contract + patch format — and the per-ITERATION dynamic half
+ * (current design, diagnostics, report, prior-attempt history) is assembled
+ * fresh each iteration by `buildRepairContext` (loop.ts) and sent as the user
+ * message. This is the SAME faithful adaptation `chatSystemInstruction` makes
+ * (JSON-response → tool calls); the tuned prompt TEXT is unchanged. The one
+ * response-format line points at the browser tools (`propose_patch` /
+ * `set_design`), which run the gate and stage the fix, instead of a JSON
+ * envelope.
+ */
+export function repairSystemInstruction(): string {
+  return (
+    "You are repairing an AIR circuit design. Return the SMALLEST AIR <patch> that makes " +
+    "the design validate and pass its tests.\n\n" +
+    airContract() +
+    "\n\n" +
+    PATCH_FORMAT +
+    "\n\nStage your fix with the 'propose_patch' tool (a small AIR <patch> diff) — or " +
+    "'set_design' for a full rewrite. Both run the validation gate: if the fix still has " +
+    "errors you receive the diagnostics back and NOTHING is applied, so re-check against " +
+    "the contract and try a better patch. Use 'validate_design' / 'run_simulation' to " +
+    "confirm before proposing."
+  );
+}

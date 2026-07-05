@@ -1,0 +1,4 @@
+# Mock-mode results are deterministic and validated in CI
+# (tests/repair/bench.test.ts) — no need to commit them. Only LIVE-provider
+# results are tracked here (issue #19 deliverable 4: track quality over time).
+*-mock.json
