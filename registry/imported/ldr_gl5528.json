@@ -1,0 +1,28 @@
+{
+  "part": "LDR_GL5528",
+  "type": "resistor",
+  "model_class": "photoresistor_ldr",
+  "abstraction": "behavioral_parameterized_resistor",
+  "spice_supported": true,
+  "required_pins": ["1", "2"],
+  "value_required": true,
+  "nominal": {
+    "r_10lux_ohm_range": [8000, 20000],
+    "r_10lux_ohm_typ": 10000,
+    "r_dark_ohm_min": 1000000,
+    "gamma_100_10lux": 0.7,
+    "peak_response_nm": 540,
+    "pmax_mw": 100
+  },
+  "resistance_model": {
+    "law": "R(E) = R_10lux * (E / 10lux)^(-gamma), gamma ~ 0.7 (log-log slope over 10..100 lux); dark (0 lux) R >= 1 MOhm",
+    "worked_points_ohm": {
+      "dark": 1000000,
+      "10lux": 10000,
+      "100lux": 2000
+    },
+    "note": "CdS cells are specified as a resistance range at 10 lux, not a single value; the gamma slope characterises the log-log R-vs-illuminance curve between 10 and 100 lux. In a build spec, the LDR is emitted as an ordinary resistor whose <value> is the resistance at the illuminance under test (read the range/gamma above). The 10 lux typical (10 kOhm) is used for the divider micro-verification."
+  },
+  "source": "Senba/Shenzhen GL5528 CdS photoresistor datasheet (GL55 series): 10 lux resistance 8-20 kOhm, dark resistance >= 1 MOhm, gamma100 ~ 0.7, peak 540 nm. https://www.handsontec.com/dataspecs/sensor/GL55-LDR.pdf",
+  "provenance_note": "Behavioral, NOT a datasheet-exact photodiode/optical SPICE model. It is a parameterized resistor: the emitter produces a plain R card from <value>, and the divider math is what a build spec asserts. No light port, no spectral model -- illuminance is chosen by the spec author as the <value> at that illuminance."
+}

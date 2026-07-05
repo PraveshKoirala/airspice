@@ -1,0 +1,70 @@
+<system name="gt_atmega328_adc_divider" ir_version="0.1">
+  <metadata>
+    <title>Ground truth: ATmega328 + resistive divider on A0 ADC</title>
+    <description>ATmega328P (Arduino Uno) reading a 5V-referenced resistive divider on the A0 ADC pin. R_top=10k (5V rail -&gt; a0_sense), R_bottom=10k (a0_sense -&gt; gnd) taps exactly half the rail (2.500V), safely under the 5.0V ADC reference. Proves an ATmega328 design validates, the ADC binding on A0 passes the vref check, and the divider simulates to the hand-derived tap. All values hand-derived in derivation.md.</description>
+    <author>issue-105</author>
+  </metadata>
+  <nets>
+    <net id="gnd" role="ground"/>
+    <net id="vcc" role="power" nominal_voltage="5V"/>
+    <net id="a0_sense" role="analog_signal"/>
+  </nets>
+  <components>
+    <component id="R_TOP" type="resistor">
+      <value>10k</value>
+      <pin name="1" net="vcc"/>
+      <pin name="2" net="a0_sense"/>
+    </component>
+    <component id="R_BOTTOM" type="resistor">
+      <value>10k</value>
+      <pin name="1" net="a0_sense"/>
+      <pin name="2" net="gnd"/>
+    </component>
+    <component id="U_MCU" type="mcu" part="ATmega328P">
+      <pin name="VCC" net="vcc"/>
+      <pin name="GND" net="gnd"/>
+      <pin name="A0" net="a0_sense" function="ADC1_CH0"/>
+    </component>
+  </components>
+  <analog>
+    <subsystem id="divider">
+      <uses component="R_TOP"/>
+      <uses component="R_BOTTOM"/>
+      <probe id="probe_a0" net="a0_sense" quantity="voltage"/>
+    </subsystem>
+  </analog>
+  <firmware>
+    <project id="fw_main" target="U_MCU" framework="platformio" language="cpp">
+      <board>uno</board>
+      <source_tree path="firmware/"/>
+    </project>
+    <binding id="a0_adc_binding">
+      <signal name="a0_voltage"/>
+      <component ref="U_MCU"/>
+      <peripheral>ADC1</peripheral>
+      <channel>ADC1_CH0</channel>
+      <net>a0_sense</net>
+    </binding>
+    <task id="read_a0" target="fw_main">
+      <period>1s</period>
+      <read_adc binding="a0_adc_binding" into="a0_raw"/>
+      <log value="a0_raw"/>
+    </task>
+  </firmware>
+  <tests>
+    <test id="a0_divider_ratio">
+      <setup>
+        <set_voltage net="vcc" value="5V"/>
+      </setup>
+      <run duration="1ms"/>
+      <assert_voltage net="a0_sense" min="2.475V" max="2.525V"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="analog_only" default="true">
+      <backend type="ngspice"/>
+      <include subsystem="divider"/>
+      <run test="a0_divider_ratio"/>
+    </profile>
+  </simulation_profiles>
+</system>

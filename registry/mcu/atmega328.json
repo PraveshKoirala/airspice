@@ -1,0 +1,64 @@
+{
+  "part": "ATmega328P",
+  "type": "mcu",
+  "renode_model": "ATmega328P",
+  "platformio": {
+    "platform": "atmelavr",
+    "framework": "arduino",
+    "board": "uno"
+  },
+  "cpu": {
+    "model": "AVR8",
+    "address": "0x0"
+  },
+  "memory": [
+    { "name": "flash", "address": "0x0000", "size": "0x8000" },
+    { "name": "sram", "address": "0x0100", "size": "0x0800" }
+  ],
+  "power_pins": {
+    "VCC": "power",
+    "GND": "ground"
+  },
+  "pins": {
+    "A0": ["GPIO", "ADC0", "ADC1_CH0"],
+    "A1": ["GPIO", "ADC1", "ADC1_CH1"],
+    "A2": ["GPIO", "ADC2", "ADC1_CH2"],
+    "A3": ["GPIO", "ADC3", "ADC1_CH3"],
+    "A4": ["GPIO", "ADC4", "ADC1_CH4", "I2C_SDA"],
+    "A5": ["GPIO", "ADC5", "ADC1_CH5", "I2C_SCL"],
+    "D0": ["GPIO", "UART_RX"],
+    "D1": ["GPIO", "UART_TX"],
+    "D2": ["GPIO", "GPIO_OUT"],
+    "D3": ["GPIO", "GPIO_OUT", "PWM"],
+    "D4": ["GPIO", "GPIO_OUT"],
+    "D5": ["GPIO", "GPIO_OUT", "PWM"],
+    "D6": ["GPIO", "GPIO_OUT", "PWM"],
+    "D7": ["GPIO", "GPIO_OUT"],
+    "D8": ["GPIO", "GPIO_OUT"],
+    "D9": ["GPIO", "GPIO_OUT", "PWM"],
+    "D10": ["GPIO", "GPIO_OUT", "PWM", "SPI_SS"],
+    "D11": ["GPIO", "GPIO_OUT", "PWM", "SPI_MOSI"],
+    "D12": ["GPIO", "GPIO_OUT", "SPI_MISO"],
+    "D13": ["GPIO", "GPIO_OUT", "SPI_SCK"],
+    "AREF": ["ADC_VREF"]
+  },
+  "peripherals": {
+    "ADC1": {
+      "resolution_bits": 10,
+      "vref": "5.0V"
+    },
+    "I2C0": {
+      "supported": true
+    },
+    "SPI0": {
+      "supported": true
+    },
+    "UART0": {
+      "supported": true
+    }
+  },
+  "provenance": {
+    "source": "Microchip ATmega328P datasheet (DS40002061B), Arduino Uno Rev3 pin mapping (arduino.cc/en/Reference/PinMapping168to328)",
+    "notes": "Pin names use the Arduino Uno silkscreen convention (A0-A5, D0-D13). ADC channel functions are given both as datasheet names (ADC0-ADC5) and as the engine's generic 'ADC1_CH<n>' function tokens so ADC bindings validate identically to the ESP32/STM32 entries. ADC is 10-bit with AVCC (5.0 V) as the default reference; AREF selects an external reference. PWM-capable pins (D3,D5,D6,D9,D10,D11) are the Timer0/1/2 analogWrite() pins. I2C is on A4 (SDA) / A5 (SCL); hardware SPI on D10-D13; UART0 on D0/D1."
+  }
+}

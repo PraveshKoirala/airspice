@@ -1,0 +1,18 @@
+{
+  "part": "I2C_SENSOR_STUB",
+  "type": "generic_load",
+  "model_class": "i2c_sensor_electrical_stub",
+  "abstraction": "electrical_only_generic_load",
+  "spice_supported": true,
+  "required_pins": ["p", "n"],
+  "required_any": ["value", "current"],
+  "electrical_interface": {
+    "power_pins": { "VCC": "power", "GND": "ground" },
+    "bus_pins": { "SDA": "i2c_data", "SCL": "i2c_clock" },
+    "pattern": "VCC->GND supply current modelled as a generic_load between the rail and ground; SDA/SCL are open-drain and REQUIRE external pull-ups to the sensor rail (declare an <interface type=\"i2c\"> with two <pullup> to the rail, per the engine's I2C validation). The generic_load current is the sensor's typical active supply draw.",
+    "typical_supply_current": "1mA",
+    "typical_pullup_ohm": 4700
+  },
+  "source": "Generic I2C peripheral electrical envelope: 3.3 V / 5 V rail, open-drain SDA/SCL with 2.2k-10k pull-ups (I2C-bus specification UM10204), typical active supply current 0.1-2 mA for a small MEMS/environmental sensor (e.g. Bosch BME280 datasheet lists ~0.7 mA active). Representative, not a specific part.",
+  "provenance_note": "ELECTRICAL-ONLY stub. It models ONLY the sensor's electrical envelope on the bus -- supply current (a generic_load) and the SDA/SCL pull-up topology. It is NOT a datasheet part and carries NO register map, protocol, or measured data value; the sensor's 'reading' is out of analog scope and belongs to executable firmware (epic M8). Use it in a build spec tagged 'abstracted' to test that the agent wires an I2C device correctly (rail, ground, pull-ups, bus routing), not that it models the sensor's physics."
+}

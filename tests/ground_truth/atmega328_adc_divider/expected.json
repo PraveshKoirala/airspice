@@ -1,0 +1,17 @@
+{
+  "circuit": "atmega328_adc_divider",
+  "profile": "analog_only",
+  "test": "a0_divider_ratio",
+  "outcome": "pass",
+  "require_backend": "ngspice",
+  "checks": [
+    {
+      "net": "a0_sense",
+      "nominal_v": 2.5,
+      "min_v": 2.475,
+      "max_v": 2.525,
+      "basis": "V(a0_sense) = 5V * R_BOTTOM/(R_TOP+R_BOTTOM) = 5 * 10k/20k = 2.500V exact; under the 5.0V ATmega328 ADC reference. Window +/-0.5% absorbs solver reltol only. Also proves part=ATmega328P validates and the A0 ADC binding passes the vref check."
+    }
+  ],
+  "issue": null
+}

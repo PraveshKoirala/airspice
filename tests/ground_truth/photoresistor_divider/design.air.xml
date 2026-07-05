@@ -1,0 +1,48 @@
+<system name="gt_photoresistor_divider" ir_version="0.1">
+  <metadata>
+    <title>Ground truth: LDR (photoresistor) divider at 10 lux and in the dark</title>
+    <description>GL5528 CdS photoresistor modelled as a parameterized resistor in the top leg of a divider off a 5V rail with a fixed 10k lower leg. The LDR value is its resistance at the illuminance under test. At the 10 lux typical (10k) the tap is 2.500V; in the dark (over 1M) the tap collapses toward ~0.05V. Two illuminances, two tests, both hand-derived. BEHAVIORAL parameterized-resistor stand-in, not a datasheet optical SPICE model.</description>
+    <author>issue-105</author>
+  </metadata>
+  <nets>
+    <net id="gnd" role="ground"/>
+    <net id="vcc" role="power" nominal_voltage="5V"/>
+    <net id="ldr_sense" role="analog_signal"/>
+  </nets>
+  <components>
+    <component id="R_LDR" type="resistor" part="LDR_GL5528">
+      <value>10k</value>
+      <pin name="1" net="vcc"/>
+      <pin name="2" net="ldr_sense"/>
+    </component>
+    <component id="R_FIXED" type="resistor">
+      <value>10k</value>
+      <pin name="1" net="ldr_sense"/>
+      <pin name="2" net="gnd"/>
+    </component>
+  </components>
+  <analog>
+    <subsystem id="divider">
+      <uses component="R_LDR"/>
+      <uses component="R_FIXED"/>
+      <probe id="probe_ldr" net="ldr_sense" quantity="voltage"/>
+    </subsystem>
+  </analog>
+  <tests>
+    <test id="ldr_10lux">
+      <description>LDR at 10 lux (typical): R ~ 10k, tap = 2.500V.</description>
+      <setup>
+        <set_voltage net="vcc" value="5V"/>
+      </setup>
+      <run duration="1ms"/>
+      <assert_voltage net="ldr_sense" min="2.475V" max="2.525V"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="analog_only" default="true">
+      <backend type="ngspice"/>
+      <include subsystem="divider"/>
+      <run test="ldr_10lux"/>
+    </profile>
+  </simulation_profiles>
+</system>

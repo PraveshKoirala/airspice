@@ -1,0 +1,48 @@
+<system name="gt_thermistor_divider_hot" ir_version="0.1">
+  <metadata>
+    <title>Ground truth: NTC thermistor divider at 50 C (R-vs-T shift)</title>
+    <description>The same NTC 10k / fixed 10k divider off a 5V rail as thermistor_divider, but the NTC value is now its resistance at 50 C (3.563k from the Beta model). The tap rises from 2.500V at 25 C to ~3.686V at 50 C, demonstrating the negative-temperature-coefficient behavior. The window is +/-2% to absorb the documented Beta-vs-datasheet divergence away from 25 C. Behavioral parameterized-resistor stand-in.</description>
+    <author>issue-105</author>
+  </metadata>
+  <nets>
+    <net id="gnd" role="ground"/>
+    <net id="vcc" role="power" nominal_voltage="5V"/>
+    <net id="therm_sense" role="analog_signal"/>
+  </nets>
+  <components>
+    <component id="R_THERM" type="resistor" part="NTC_10K_3977">
+      <value>3563</value>
+      <pin name="1" net="vcc"/>
+      <pin name="2" net="therm_sense"/>
+    </component>
+    <component id="R_FIXED" type="resistor">
+      <value>10k</value>
+      <pin name="1" net="therm_sense"/>
+      <pin name="2" net="gnd"/>
+    </component>
+  </components>
+  <analog>
+    <subsystem id="divider">
+      <uses component="R_THERM"/>
+      <uses component="R_FIXED"/>
+      <probe id="probe_therm" net="therm_sense" quantity="voltage"/>
+    </subsystem>
+  </analog>
+  <tests>
+    <test id="therm_50c">
+      <description>Thermistor at 50 C: R ~ 3.563k (Beta model), tap ~ 3.686V.</description>
+      <setup>
+        <set_voltage net="vcc" value="5V"/>
+      </setup>
+      <run duration="1ms"/>
+      <assert_voltage net="therm_sense" min="3.61V" max="3.76V"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="analog_only" default="true">
+      <backend type="ngspice"/>
+      <include subsystem="divider"/>
+      <run test="therm_50c"/>
+    </profile>
+  </simulation_profiles>
+</system>

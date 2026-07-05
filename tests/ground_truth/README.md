@@ -37,8 +37,14 @@ ground-truth evidence — see #55).
 | `led_forward_drop` | red LED Vf | **1.8–2.2 V (want)** | LED datasheet | **expected-fail: validation-blocked `UNDEFINED_SPICE_MODEL` (#55 fixed; pass via #60)** |
 | `zener_clamp` | clamp V | **5.1 V (want)** | Zener BV | **expected-fail: validation-blocked `UNDEFINED_SPICE_MODEL` (#55 fixed; pass via #60)** |
 | `inverting_opamp_gain` | Vout | **−2.200 V (want)** | −Rf/Rin·Vin | **expected-fail: validation-blocked `UNDEFINED_SPICE_MODEL` (#55 fixed; pass via #60)** |
+| `atmega328_adc_divider` | A0 tap | 2.500 V | 5·10k/20k; ATmega328 validates + ADC vref check | pass (#105) |
+| `thermistor_divider` | NTC tap @25C | 2.500 V | R25=10k exact; 5·10k/20k | pass (#105) |
+| `thermistor_divider_hot` | NTC tap @50C | 3.686 V | R(50C)≈3.563k (Beta); ±2% for datasheet divergence | pass (#105) |
+| `photoresistor_divider` | LDR tap @10lux | 2.500 V | GL5528 ~10k typ; 5·10k/20k | pass (#105) |
+| `photoresistor_divider_dark` | LDR tap dark | 0.0495 V | GL5528 ≥1M dark; 5·10k/1.01M | pass (#105) |
+| `i2c_sensor_stub` | idle SDA/SCL | 5.000 V | open-drain pull-ups hold bus at rail | pass (#105) |
 
-10 passing + 4 documented expected-failures = 14 circuits.
+10 passing + 4 documented expected-failures + 6 build-benchmark parts (#105) = 20 circuits.
 
 ## Findings (oracle disagreements → filed issues)
 

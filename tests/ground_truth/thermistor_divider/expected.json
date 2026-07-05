@@ -1,0 +1,17 @@
+{
+  "circuit": "thermistor_divider",
+  "profile": "analog_only",
+  "test": "therm_25c",
+  "outcome": "pass",
+  "require_backend": "ngspice",
+  "checks": [
+    {
+      "net": "therm_sense",
+      "nominal_v": 2.5,
+      "min_v": 2.475,
+      "max_v": 2.525,
+      "basis": "NTC at 25 C: R = R25 = 10 kOhm exact (R/R25 = 1 by definition of R25). Tap = 5V * R_FIXED/(R_THERM + R_FIXED) = 5 * 10k/20k = 2.500V exact. Behavioral parameterized-resistor model (Vishay NTCLE100E3103, R25=10k +/-5%). Window +/-0.5% absorbs solver reltol only."
+    }
+  ],
+  "issue": null
+}

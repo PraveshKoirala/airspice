@@ -1,0 +1,24 @@
+{
+  "circuit": "i2c_sensor_stub",
+  "profile": "analog_only",
+  "test": "i2c_idle_high",
+  "outcome": "pass",
+  "require_backend": "ngspice",
+  "checks": [
+    {
+      "net": "i2c_sda",
+      "nominal_v": 5.0,
+      "min_v": 4.95,
+      "max_v": 5.05,
+      "basis": "Idle (undriven) open-drain SDA: the 4.7k pull-up ties SDA to the 5V rail and no device pulls it low, so no current flows through the pull-up and V(SDA) = V(rail) = 5.000V. Electrical-only I2C sensor stub."
+    },
+    {
+      "net": "i2c_scl",
+      "nominal_v": 5.0,
+      "min_v": 4.95,
+      "max_v": 5.05,
+      "basis": "Idle (undriven) open-drain SCL: same as SDA, the 4.7k pull-up holds SCL at the 5V rail (5.000V). The sensor's supply draw is modelled by a 1mA generic_load between rail and ground; its data value is out of analog scope (M8)."
+    }
+  ],
+  "issue": null
+}
