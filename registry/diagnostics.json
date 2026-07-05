@@ -719,6 +719,30 @@
       "remediation": "Remove the numeric character reference to a control/surrogate/out-of-range code point; expat rejects these and both engines must agree.",
       "source": "packages/core/src/air/xml_security.py:enforce_xml_security",
       "grandfathered": false
+    },
+    {
+      "code": "XML_PARSE_ERROR",
+      "namespace": "agent",
+      "owner": "agent",
+      "severity": "error",
+      "message_template": "{error}",
+      "parameters": ["error"],
+      "remediation": "",
+      "source": "packages/core/src/air/agent.py:validate_design_xml",
+      "grandfathered": true,
+      "notes": "Emitted as a raw diagnostic dict (not via DiagnosticBuilder): {\"severity\": \"error\", \"code\": \"XML_PARSE_ERROR\", \"message\": str(exc)} when normalize/parse of the AIR XML raises. The message is the raw exception text (str(exc)), captured here as the {error} placeholder. The raw dict carries no 'domain' field, so the emitted diagnostic has no domain; namespace records the owning subsystem. Predates the namespaced scheme; grandfathered verbatim (issue #67 inventory)."
+    },
+    {
+      "code": "PATCH_APPLY_ERROR",
+      "namespace": "agent",
+      "owner": "agent",
+      "severity": "error",
+      "message_template": "{error}",
+      "parameters": ["error"],
+      "remediation": "",
+      "source": "packages/core/src/air/agent.py:run_ai_repair",
+      "grandfathered": true,
+      "notes": "Emitted as a raw diagnostic dict (not via DiagnosticBuilder): {\"severity\": \"error\", \"code\": \"PATCH_APPLY_ERROR\", \"message\": str(exc)} in the deterministic repair loop when a proposed patch cannot be applied. The message is the raw exception text (str(exc)), captured here as the {error} placeholder. The raw dict carries no 'domain' field, so the emitted diagnostic has no domain; namespace records the owning subsystem. Predates the namespaced scheme; grandfathered verbatim (issue #67 inventory)."
     }
   ],
   "pending": {

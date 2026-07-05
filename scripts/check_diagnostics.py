@@ -19,10 +19,23 @@ drifting, in BOTH directions:
            (they are codes in flight in another PR, recorded so the racing PRs
            don't break each other's CI -- see docs/diagnostics_spec.md).
 
-Codes are discovered from three places (see the collectors below):
+  check 3  (source-emit registration, issue #67): every diagnostic code emitted
+           DIRECTLY IN THE ORACLE SOURCE (packages/core/src/air/**.py) must have
+           a registry entry (active OR pending). This closes the gap the #65
+           verifier found: checks 1 and 2 only see codes that reach a corpus
+           fixture or a test, so a NEW emit site whose code is not yet in any
+           fixture/test was invisible to CI (two agent.py codes shipped that
+           way -- XML_PARSE_ERROR, PATCH_APPLY_ERROR). Check 3 makes the
+           "no code without a registry entry" rule mechanical AT THE EMIT SITE.
+           Unlike check 1's heuristic test-token scan, check 3 is an exact AST
+           scan of the emit patterns, so an unregistered emitted code fails the
+           build directly instead of relying on it later reaching a fixture.
+
+Codes are discovered from four places (see the collectors below):
   * registry/diagnostics.json                -- the registered codes
   * tests/golden_corpus/**/*.json            -- corpus "code" fields (exact)
   * tests/**/*.py                            -- code identifiers named in tests
+  * packages/core/src/air/**.py              -- codes emitted at the source (AST)
 
 The corpus collector is exact: it reads the ``"code"`` fields, so every code a
 fixture froze must be registered (check 1) with no ambiguity. The test-source
@@ -34,14 +47,35 @@ token that is not a registered code is not treated as a diagnostic reference.
 That makes test tokens a reliable "this registered code is exercised" signal
 (check 2 credit) without demanding registry entries for every env var a test
 happens to mention. A genuinely-emitted unregistered code still cannot hide:
-emitted codes flow into the corpus / report fixtures, where the exact collector
-catches them for check 1.
+check 3 AST-scans the emit sites directly (below), and emitted codes also flow
+into the corpus / report fixtures where the exact collector catches them.
+
+The source-emit collector (check 3) is an AST scan of the emit patterns the
+oracle actually uses (enumerated from the source, not assumed):
+  1. ``builder.make(sev, domain, "CODE", ...)`` / ``DiagnosticBuilder().make(
+     ...)`` -- ANY ``*.make(...)`` call; the code is the 3rd positional arg
+     (index 2) or a ``code=`` kwarg. String literal -> collected.
+  2. ``code = "SIM-010"; builder.make(sev, dom, code, ...)`` -- the 3rd arg is a
+     local name bound to a string literal in the same function; resolved and
+     collected (simulator.py emits SIM-010 this way).
+  3. raw diagnostic dict literals ``{"severity": ..., "code": "CODE", ...}`` --
+     an ``ast.Dict`` with a string-literal ``"code"`` key AND a diagnostic-shape
+     sibling (severity/message/domain); this catches the agent.py raw-dict emits
+     that never went through DiagnosticBuilder. The ``Diagnostic.to_dict()``
+     serializer (``"code": self.code``) is a passthrough, NOT an emit site (it
+     re-serializes an already-minted code), so a dict whose code is ``self.code``
+     is excluded by construction.
+Codes the AST cannot resolve statically (a code built dynamically, e.g. from an
+f-string or a non-local variable) are reported as a warning with their location
+rather than silently dropped -- see EMIT_DYNAMIC handling. There are none today.
 
 Design notes:
   * Dependency-free stdlib only (matches scripts/guardrails.py). Deterministic.
   * --self-test proves the checker has teeth: an unregistered code makes check 1
-    fail, an unexercised active entry makes check 2 flag an orphan, and a
-    pending-only code is exempt from check 2 but still satisfies check 1.
+    fail, an unexercised active entry makes check 2 flag an orphan, a
+    pending-only code is exempt from check 2 but still satisfies check 1, and an
+    unregistered SOURCE-EMITTED code makes check 3 fail (both the builder.make
+    and the raw-dict emit patterns).
   * Orphan policy: check 2 fails on orphans by default. Codes that are known to
     be legitimately hard to exercise in the committed suite can be listed in
     KNOWN_ORPHAN_ISSUES (mapping code -> tracking issue), which downgrades them
@@ -52,6 +86,7 @@ Design notes:
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import re
 import sys
@@ -61,6 +96,14 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 REGISTRY_PATH = REPO_ROOT / "registry" / "diagnostics.json"
 CORPUS_DIR = REPO_ROOT / "tests" / "golden_corpus"
 TESTS_DIR = REPO_ROOT / "tests"
+# The oracle source tree scanned by the source-emit collector (check 3, #67).
+SRC_DIR = REPO_ROOT / "packages" / "core" / "src" / "air"
+
+# When a raw diagnostic dict literal carries a "code" key, we only treat it as an
+# emit site if it also carries one of these diagnostic-shape sibling keys. This
+# distinguishes a genuine emit ({"severity": "error", "code": "X", "message":...})
+# from an unrelated dict that happens to use a "code" key for something else.
+_DICT_DIAGNOSTIC_SIBLINGS = frozenset({"severity", "message", "domain"})
 
 # A diagnostic code token: SCREAMING_SNAKE_CASE, at least one underscore, no
 # lowercase. Used to pull code identifiers out of test source. The underscore
@@ -189,16 +232,171 @@ def test_source_codes(registered: set[str], tests_dir: Path = TESTS_DIR) -> set[
 
 
 # --------------------------------------------------------------------------- #
+# Source-emit collector (check 3, issue #67)
+# --------------------------------------------------------------------------- #
+def _string_literal(node: ast.AST | None) -> str | None:
+    """Return the value if ``node`` is a string-literal constant, else None."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    return None
+
+
+def _is_self_attr(node: ast.AST, attr: str) -> bool:
+    """True for ``self.<attr>`` -- the Diagnostic.to_dict() passthrough shape."""
+    return (
+        isinstance(node, ast.Attribute)
+        and node.attr == attr
+        and isinstance(node.value, ast.Name)
+        and node.value.id == "self"
+    )
+
+
+class _EmitCollector(ast.NodeVisitor):
+    """Collect every diagnostic code emitted in one source file.
+
+    Emission patterns (all enumerated from packages/core/src/air/**.py, #67):
+
+      * ``*.make(sev, domain, code, ...)`` -- ANY attribute call named ``make``
+        (``builder.make(...)``, ``DiagnosticBuilder().make(...)``); the code is
+        the 3rd positional arg (index 2) or a ``code=`` kwarg.
+      * a local name bound to a string literal in the enclosing function and
+        passed as that code arg (``code = "SIM-010"; builder.make(..., code,
+        ...)``) is resolved to its literal.
+      * raw diagnostic dict literals ``{"severity": ..., "code": "CODE", ...}``
+        -- an ``ast.Dict`` whose ``"code"`` key maps to a string literal and
+        that also has a diagnostic-shape sibling key. ``Diagnostic.to_dict()``'s
+        ``"code": self.code`` passthrough is excluded (its code is not a literal
+        AND is ``self.code``), so the serializer is never mistaken for an emit.
+
+    ``codes`` holds every statically-resolved code. ``dynamic`` holds
+    (function, lineno, description) for an emit whose code the AST cannot resolve
+    statically -- reported, never silently dropped.
+    """
+
+    def __init__(self, filename: str) -> None:
+        self.filename = filename
+        self.codes: set[str] = set()
+        self.dynamic: list[tuple[str, int, str]] = []
+        self._locals: dict[str, str] = {}
+        self._func = "<module>"
+
+    def _visit_function(self, node: ast.AST) -> None:
+        saved_locals, saved_func = self._locals, self._func
+        # Collect simple ``name = "LITERAL"`` bindings anywhere in this function
+        # so a code passed by local name (SIM-010) resolves to its literal. We do
+        # not track reassignment order (a code var is assigned once); if a name
+        # were bound to two different literals we would over-collect, which is
+        # safe (both would need to be registered anyway).
+        self._locals = {}
+        self._func = getattr(node, "name", self._func)
+        for stmt in ast.walk(node):
+            if isinstance(stmt, ast.Assign) and len(stmt.targets) == 1:
+                target = stmt.targets[0]
+                literal = _string_literal(stmt.value)
+                if isinstance(target, ast.Name) and literal is not None:
+                    self._locals[target.id] = literal
+        self.generic_visit(node)
+        self._locals, self._func = saved_locals, saved_func
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:  # noqa: N802
+        self._visit_function(node)
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:  # noqa: N802
+        self._visit_function(node)
+
+    def _record_code_node(self, code_node: ast.AST) -> None:
+        literal = _string_literal(code_node)
+        if literal is not None:
+            self.codes.add(literal)
+        elif isinstance(code_node, ast.Name) and code_node.id in self._locals:
+            self.codes.add(self._locals[code_node.id])
+        else:
+            self.dynamic.append(
+                (self._func, getattr(code_node, "lineno", -1), ast.dump(code_node)[:80])
+            )
+
+    def visit_Call(self, node: ast.Call) -> None:  # noqa: N802
+        func = node.func
+        if isinstance(func, ast.Attribute) and func.attr == "make":
+            code_node: ast.AST | None = None
+            if len(node.args) >= 3:
+                code_node = node.args[2]
+            for keyword in node.keywords:
+                if keyword.arg == "code":
+                    code_node = keyword.value
+            if code_node is not None:
+                self._record_code_node(code_node)
+        self.generic_visit(node)
+
+    def visit_Dict(self, node: ast.Dict) -> None:  # noqa: N802
+        literal_keys: dict[str, ast.AST] = {}
+        for key_node, value_node in zip(node.keys, node.values):
+            key = _string_literal(key_node) if key_node is not None else None
+            if key is not None:
+                literal_keys[key] = value_node
+        if "code" in literal_keys and (_DICT_DIAGNOSTIC_SIBLINGS & literal_keys.keys()):
+            code_value = literal_keys["code"]
+            # The Diagnostic.to_dict() serializer -- {"code": self.code, ...} --
+            # is a passthrough, not an emit site: it re-serializes an
+            # already-minted code. Exclude it explicitly so it is neither
+            # collected nor reported as a dynamic emit.
+            if not _is_self_attr(code_value, "code"):
+                literal = _string_literal(code_value)
+                if literal is not None:
+                    self.codes.add(literal)
+                else:
+                    self.dynamic.append(
+                        (self._func, node.lineno, "raw-dict code is not a literal")
+                    )
+        self.generic_visit(node)
+
+
+def source_emit_codes(
+    src_dir: Path = SRC_DIR,
+) -> tuple[set[str], list[tuple[str, str, int, str]]]:
+    """AST-scan the oracle source for every emitted diagnostic code.
+
+    Returns ``(codes, dynamic)`` where ``codes`` is the set of statically
+    resolved emitted codes and ``dynamic`` is a sorted list of
+    ``(file, function, lineno, description)`` for emits the AST could not resolve
+    to a literal (reported by the caller, never silently dropped).
+    """
+    codes: set[str] = set()
+    dynamic: list[tuple[str, str, int, str]] = []
+    if not src_dir.is_dir():
+        return codes, dynamic
+    for py_path in sorted(src_dir.rglob("*.py")):
+        try:
+            source = py_path.read_text(encoding="utf-8")
+            tree = ast.parse(source, filename=str(py_path))
+        except (OSError, SyntaxError):
+            continue
+        rel = py_path.relative_to(REPO_ROOT).as_posix()
+        collector = _EmitCollector(rel)
+        collector.visit(tree)
+        codes |= collector.codes
+        for func, lineno, desc in collector.dynamic:
+            dynamic.append((rel, func, lineno, desc))
+    dynamic.sort()
+    return codes, dynamic
+
+
+# --------------------------------------------------------------------------- #
 # Checks
 # --------------------------------------------------------------------------- #
 def run_checks(
     registry: dict,
     corpus: set[str],
     test_codes: set[str],
+    source_codes: set[str] | None = None,
 ) -> list[str]:
-    """Run both checks. Return a list of human-readable failure lines
+    """Run all checks. Return a list of human-readable failure lines
     (empty == all green). Orphans with a filed issue are reported to stdout by
-    the caller but never appear here."""
+    the caller but never appear here.
+
+    ``source_codes`` is the set of codes AST-collected from the oracle source
+    (check 3, #67). ``None`` means "not scanned" (used by focused self-tests);
+    an empty set means "scanned, nothing emitted"."""
     failures: list[str] = []
     active = active_codes(registry)
     pending = pending_codes(registry)
@@ -229,6 +427,19 @@ def run_checks(
             f"corpus fixture exercises it. Cover it with a test/fixture, or add "
             f"it to KNOWN_ORPHAN_ISSUES with a filed issue."
         )
+
+    # ---- check 3: source-emit registration (source -> registry, #67) ------- #
+    # Every code emitted directly in the oracle source must be registered
+    # (active OR pending). This closes the gap where a new emit site whose code
+    # never reached a corpus fixture or test was invisible to checks 1 and 2.
+    if source_codes is not None:
+        for code in sorted(source_codes - registered):
+            failures.append(
+                f"[check 3] code {code!r} is emitted in the oracle source "
+                f"(packages/core/src/air/**.py) but has NO entry in "
+                f"registry/diagnostics.json. Register it (active or pending) "
+                f"before it ships -- see docs/diagnostics_spec.md."
+            )
     return failures
 
 
@@ -244,8 +455,9 @@ def main_check() -> int:
     registered = active_codes(registry) | pending_codes(registry)
     corpus = corpus_codes()
     test_codes = test_source_codes(registered)
+    source, source_dynamic = source_emit_codes()
 
-    failures = run_checks(registry, corpus, test_codes)
+    failures = run_checks(registry, corpus, test_codes, source_codes=source)
 
     active = active_codes(registry)
     pending = pending_codes(registry)
@@ -255,8 +467,15 @@ def main_check() -> int:
     )
     print(
         f"discovered {len(corpus)} code(s) in the golden corpus, "
-        f"{len(test_codes)} code(s) named in test source."
+        f"{len(test_codes)} code(s) named in test source, "
+        f"{len(source)} code(s) emitted in the oracle source."
     )
+    for rel, func, lineno, desc in source_dynamic:
+        print(
+            f"note: source emit at {rel}:{lineno} (in {func}) has a "
+            f"non-static code the AST cannot resolve ({desc}); it cannot be "
+            f"checked mechanically -- verify it is registered by hand."
+        )
     for code in reported_orphans(registry, corpus, test_codes):
         print(
             f"note: active code {code!r} is not directly exercised but has a "
@@ -268,7 +487,7 @@ def main_check() -> int:
         for line in failures:
             print("  " + line)
         return 1
-    print("diagnostics registry check passed (both directions).")
+    print("diagnostics registry check passed (all three directions).")
     return 0
 
 
@@ -349,6 +568,146 @@ def _self_test() -> int:
     t.check(
         "pending: corpus code matching only a pending entry satisfies check 1",
         not any("PENDING_CODE" in f for f in fails),
+    )
+
+    # ---- check 3 (source-emit registration, #67) --------------------------- #
+    # A code emitted in the oracle source but not registered fails check 3.
+    reg = registry_with([entry("REGGED_OK")], [])
+    fails = run_checks(
+        reg, corpus=set(), test_codes={"REGGED_OK"},
+        source_codes={"REGGED_OK", "EMITTED_UNREGISTERED"},
+    )
+    t.check(
+        "check 3: source-emitted unregistered code fails",
+        any("EMITTED_UNREGISTERED" in f and "[check 3]" in f for f in fails),
+    )
+    # A source-emitted code that IS registered (active) passes check 3.
+    reg = registry_with([entry("REGGED_OK")], [])
+    fails = run_checks(
+        reg, corpus=set(), test_codes={"REGGED_OK"}, source_codes={"REGGED_OK"}
+    )
+    t.check(
+        "check 3: source-emitted registered code passes",
+        not any("[check 3]" in f for f in fails),
+    )
+    # A source-emitted code registered only in the PENDING section satisfies
+    # check 3 (in-flight codes coordinate the same way as for check 1).
+    reg = registry_with([entry("REGGED_OK")], [entry("PENDING_EMIT")])
+    fails = run_checks(
+        reg, corpus=set(), test_codes={"REGGED_OK"},
+        source_codes={"REGGED_OK", "PENDING_EMIT"},
+    )
+    t.check(
+        "check 3: source-emitted code registered only in pending passes",
+        not any("PENDING_EMIT" in f for f in fails),
+    )
+    # source_codes=None means "not scanned" -> check 3 is skipped entirely (used
+    # by focused self-tests that only exercise checks 1/2).
+    reg = registry_with([entry("REGGED_OK")], [])
+    fails = run_checks(reg, corpus=set(), test_codes={"REGGED_OK"}, source_codes=None)
+    t.check(
+        "check 3: source_codes=None skips the check",
+        not any("[check 3]" in f for f in fails),
+    )
+
+    # ---- check 3 AST collector: both emit patterns are caught --------------- #
+    # The collector must extract codes from BOTH builder.make(...) calls (any
+    # receiver, string-literal 3rd arg or a local var bound to a literal) AND
+    # raw diagnostic dict literals, while ignoring the Diagnostic.to_dict()
+    # serializer passthrough ({"code": self.code, ...}).
+    def collect(src: str) -> tuple[set[str], list]:
+        col = _EmitCollector("<synthetic>")
+        col.visit(ast.parse(src))
+        return col.codes, col.dynamic
+
+    codes, dynamic = collect(
+        "def f(builder):\n"
+        "    builder.make('error', 'schema', 'MADE_LITERAL', 'msg')\n"
+    )
+    t.check(
+        "AST: builder.make string-literal code is collected",
+        codes == {"MADE_LITERAL"} and dynamic == [],
+    )
+    codes, _ = collect(
+        "def f(builder):\n"
+        "    return DiagnosticBuilder().make('error', 'x', 'CHAINED_CODE', 'm')\n"
+    )
+    t.check(
+        "AST: chained-receiver .make code is collected",
+        codes == {"CHAINED_CODE"},
+    )
+    codes, _ = collect(
+        "def f(builder):\n"
+        "    code = 'VAR_CODE'\n"
+        "    builder.make('error', 'x', code, 'm')\n"
+    )
+    t.check(
+        "AST: .make code passed as a local literal-bound var is resolved",
+        codes == {"VAR_CODE"},
+    )
+    codes, _ = collect(
+        "def f(builder):\n"
+        "    builder.make('error', 'x', code='KWARG_CODE', message='m')\n"
+    )
+    t.check(
+        "AST: .make code= kwarg is collected",
+        codes == {"KWARG_CODE"},
+    )
+    codes, _ = collect(
+        "def f():\n"
+        "    return [{'severity': 'error', 'code': 'RAW_DICT_CODE', 'message': 'm'}]\n"
+    )
+    t.check(
+        "AST: raw diagnostic dict-literal code is collected",
+        codes == {"RAW_DICT_CODE"},
+    )
+    codes, dynamic = collect(
+        "class Diagnostic:\n"
+        "    def to_dict(self):\n"
+        "        return {'severity': self.severity, 'code': self.code, 'message': self.message}\n"
+    )
+    t.check(
+        "AST: to_dict() serializer ({'code': self.code}) is NOT an emit and NOT dynamic",
+        codes == set() and dynamic == [],
+    )
+    codes, dynamic = collect(
+        "def f(builder, computed):\n"
+        "    builder.make('error', 'x', computed, 'm')\n"
+    )
+    t.check(
+        "AST: a non-static .make code is reported as dynamic, not silently dropped",
+        codes == set() and len(dynamic) == 1,
+    )
+    codes, _ = collect(
+        "def f(d):\n"
+        "    return d.get('code', 'ERROR')\n"
+    )
+    t.check(
+        "AST: a dict .get('code', ...) read is NOT an emit site",
+        codes == set(),
+    )
+
+    # End-to-end against the real tree: the collector finds the two agent.py
+    # raw-dict codes and the SIM-010 local-var code, and every code it finds is
+    # registered (so the committed source passes check 3).
+    real_source, real_dynamic = source_emit_codes()
+    real_reg = load_registry()
+    real_registered = active_codes(real_reg) | pending_codes(real_reg)
+    t.check(
+        "AST(real): agent.py raw-dict codes are collected",
+        {"XML_PARSE_ERROR", "PATCH_APPLY_ERROR"} <= real_source,
+    )
+    t.check(
+        "AST(real): simulator.py local-var code SIM-010 is collected",
+        "SIM-010" in real_source,
+    )
+    t.check(
+        "AST(real): every source-emitted code is registered (check 3 passes on main)",
+        real_source <= real_registered,
+    )
+    t.check(
+        "AST(real): no unresolved dynamic emit sites in the committed source",
+        real_dynamic == [],
     )
 
     # namespaced-code discovery: a NEW hyphenated code (SEC-001) referenced by

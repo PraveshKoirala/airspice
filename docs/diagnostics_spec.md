@@ -69,7 +69,7 @@ namespaced scheme applies only to codes created after this spec.
 ## The rule: no code without a registry entry
 
 **A diagnostic code may not ship unless it has an entry in
-`registry/diagnostics.json`.** This is enforced mechanically in CI, in both
+`registry/diagnostics.json`.** This is enforced mechanically in CI, in three
 directions, by `scripts/check_diagnostics.py`:
 
 1. **Registry completeness.** Every code that appears in a golden-corpus
@@ -81,11 +81,46 @@ directions, by `scripts/check_diagnostics.py`:
    and fails the build, unless it is listed in the checker's
    `KNOWN_ORPHAN_ISSUES` map with a filed tracking issue. The `pending` section
    is exempt from this check until its codes land on `main`.
+3. **Source-emit registration.** Every diagnostic code emitted **directly in the
+   oracle source** (`packages/core/src/air/**.py`) must have a registry entry
+   (active or pending). This closes the path checks 1 and 2 leave open: they only
+   see a code once it reaches a corpus fixture or a test, so a brand-new emit site
+   whose code is not yet in any fixture or test was invisible to CI — a code could
+   ship unregistered until it happened to land in a fixture. Check 3 makes the
+   "no code without an entry" rule mechanical **at the emit site itself**.
+
+   Check 3 is an **AST scan** (not a text grep) of the emit patterns the oracle
+   actually uses:
+
+   - `builder.make(sev, domain, "CODE", …)` / `DiagnosticBuilder().make(…)` —
+     any `*.make(…)` call; the code is the 3rd positional argument or a `code=`
+     keyword. A string literal is collected directly; a local name bound to a
+     string literal in the same function (e.g. `code = "SIM-010"; builder.make(…,
+     code, …)`) is resolved to its literal.
+   - raw diagnostic **dict literals** — `{"severity": "error", "code": "CODE",
+     "message": …}` — for emit sites that build the dict by hand instead of going
+     through `DiagnosticBuilder` (the `agent.py` XML/patch error paths do this). A
+     dict is treated as an emit only if its `"code"` key maps to a string literal
+     **and** it has a diagnostic-shape sibling key (`severity`/`message`/`domain`).
+     The `Diagnostic.to_dict()` serializer (`{"code": self.code, …}`) is a
+     passthrough, not an emit site, and is excluded by construction (its code is
+     `self.code`, not a literal).
+
+   A code the AST **cannot** resolve to a literal (a code built dynamically — an
+   f-string, a non-local variable) is **reported** with its source location as a
+   note rather than silently dropped, so the coverage gap is visible; the
+   committed source has none. This is a known limitation of a static scan: a
+   genuinely dynamic emit would still be caught by check 1 once it reaches a
+   fixture, but check 3 cannot pre-register it. If a future emit site needs a
+   dynamically-constructed code, register the code(s) it can produce and add a
+   test that exercises the path (check 1 + check 2 then cover it).
 
 The checker ships with a `--self-test` that proves it has teeth (an
 unregistered code fails check 1; an unexercised active code is flagged by
 check 2; a pending-only code is exempt from check 2 but still satisfies
-check 1). CI runs the self-test before the real check.
+check 1; an unregistered source-emitted code fails check 3, for both the
+`builder.make` and the raw-dict emit patterns). CI runs the self-test before the
+real check.
 
 ### Adding a new code — the checklist
 
@@ -96,8 +131,11 @@ check 1). CI runs the self-test before the real check.
    read the severity from the registry via the loader (below) so the emitted
    diagnostic and the registry can never drift.
 4. Add a test that exercises the emit path (this satisfies check 2 and documents
-   the code).
-5. Run `python scripts/check_diagnostics.py` locally; it must pass both ways.
+   the code). Emitting the code in the source without registering it now fails
+   check 3 directly, so registering the entry (this step + step 2) is not
+   optional — you cannot ship the emit site first and register later.
+5. Run `python scripts/check_diagnostics.py` locally; it must pass all three
+   ways (registry completeness, no dead codes, source-emit registration).
 
 ## How the engines consume the registry
 
