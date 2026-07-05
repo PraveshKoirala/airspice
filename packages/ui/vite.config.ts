@@ -24,12 +24,21 @@ export default defineConfig({
       'fast-xml-parser': fileURLToPath(
         new URL('./node_modules/fast-xml-parser/src/fxp.js', import.meta.url),
       ),
-      // The dev-only /sim-lab route consumes the sim-wasm client (issue #13)
-      // through its source entry, aliased here. sim-wasm is worker-only: the
-      // WASM engine loads ONLY inside its Web Worker (never the main thread),
-      // and the ~20MB WASM is a lazy Vite chunk, so importing the client here
-      // does NOT pull the engine into the app's initial bundle.
+      // The sim-wasm client (issue #13) is consumed through its source entry,
+      // aliased here. sim-wasm is worker-only: the WASM engine loads ONLY inside
+      // its Web Worker (never the main thread), and the ~20MB WASM is a lazy
+      // Vite chunk. The dev-only /sim-lab route uses it directly; the local
+      // simulation pipeline (issue #14, engine/simulate.ts) uses it behind a
+      // dynamic import so the engine chunk still loads only on first Run.
       'sim-wasm': fileURLToPath(new URL('../sim-wasm/src/index.ts', import.meta.url)),
+      // sim-wasm's engine.worker dynamic-imports `eecircuit-engine`. Pin it to
+      // the UI's OWN copy (a ui devDependency) so the worker bundle resolves it
+      // from packages/ui/node_modules -- packages/sim-wasm/node_modules is NOT
+      // installed in the `ui` CI job (npm ci in packages/ui only), exactly as
+      // the fast-xml-parser alias above does for air-ts's dependency.
+      'eecircuit-engine': fileURLToPath(
+        new URL('./node_modules/eecircuit-engine/dist/eecircuit-engine.mjs', import.meta.url),
+      ),
     },
   },
   // Module workers so the air-ts engine worker can `import` air-ts as ESM.

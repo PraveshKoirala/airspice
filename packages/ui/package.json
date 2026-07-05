@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:browser": "playwright test",
+    "test:browser:install": "playwright install --with-deps chromium"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
@@ -22,6 +24,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "1.58.2",
     "@types/node": "^24.12.3",
     "eecircuit-engine": "1.7.0",
     "@types/react": "^19.2.14",

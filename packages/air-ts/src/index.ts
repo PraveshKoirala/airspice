@@ -144,6 +144,44 @@ export {
 } from "./emit/spice.js";
 export type { SpiceArtifacts, CompileSpiceOptions } from "./emit/spice.js";
 
+// Simulation report pipeline (issue #14): PURE functions turning the WASM
+// engine's WaveTables + the design IR + the test's assertion specs into a report
+// object schema-identical to the Python oracle's simulator.py output (the
+// golden-corpus `report/reports/*.json`). The agent tools (#18) and repair loop
+// (#19) consume this exact schema, so the structure is byte-exact. Includes the
+// DC solver port, measurement_stats (tie-break-faithful), assertion evaluation,
+// the honest as-written convergence section, JSON/CSV serializers, and the
+// default-profile resolver.
+export {
+  buildReport,
+  measureDc,
+  solveResistiveDividers,
+  statsForSamples,
+  statsFromMeasurements,
+  serializeStats,
+  evaluateAssertions,
+  probeNets,
+  samplesForNet,
+  convergenceSection,
+  defaultNgspiceProfile,
+  serializeReportJson,
+  pyJsonDumps,
+  waveformCsv,
+  DiagnosticBuilder,
+} from "./sim/report.js";
+export type {
+  Sample,
+  SignalStats,
+  WaveTableLike,
+  ReportDiagnostic,
+  SerializedStats,
+  ConvergenceAttempt,
+  ConvergenceSection,
+  SimulationReport,
+  SimulationResult,
+  ReportInputs,
+} from "./sim/report.js";
+
 // Differential-fuzzer outcome reporting (for #43).
 export { parseOutcome, parseOutcomeBytes, fnv1a64, type ParseOutcome } from "./outcome.js";
 

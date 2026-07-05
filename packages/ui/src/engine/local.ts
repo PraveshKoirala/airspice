@@ -15,6 +15,7 @@ import type {
   GraphData,
   DiagnosticsPayload,
   EngineMode,
+  LocalSimulationResult,
 } from './types';
 import { NotImplementedError } from './types';
 import type { EngineMethod, EngineRequest, EngineResponse } from './protocol';
@@ -73,9 +74,12 @@ class LocalEngine implements AirEngine {
     return this.call('validate', xml) as Promise<DiagnosticsPayload>;
   }
 
-  simulate(): Promise<never> {
-    // #14 fills this in (simulation in a WASM worker). Until then, loud failure.
-    return Promise.reject(new NotImplementedError('simulate', 'issue #14'));
+  async simulate(xml: string): Promise<LocalSimulationResult> {
+    // #14: the full zero-backend pipeline (compile -> WASM ngspice -> report).
+    // Dynamic-import so the sim-wasm client + its ~20MB WASM chunk load ONLY on
+    // the first Run, not at app start when this engine module is first touched.
+    const { simulateLocal } = await import('./simulate');
+    return simulateLocal(xml);
   }
 
   applyPatch(): Promise<never> {
@@ -90,6 +94,9 @@ class LocalEngine implements AirEngine {
       entry.reject(new Error('engine disposed'));
     }
     this.pending.clear();
+    // Tear down the sim-wasm worker too (lazy import keeps this out of the
+    // eager path; the module is already loaded if a simulation ever ran).
+    void import('./simulate').then((m) => m.disposeSimulateClient()).catch(() => {});
   }
 }
 

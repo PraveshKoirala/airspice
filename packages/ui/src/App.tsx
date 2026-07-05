@@ -12,7 +12,9 @@ import ChatRepl from './components/ChatRepl';
 import SettingsPanel from './components/SettingsPanel';
 import Landing from './pages/Landing';
 import type { ApiError, ChatHistoryEntry, Diagnostic, ValidationResult } from './types/api';
-import { getEngine, ENGINE_MODE } from './engine';
+import { getEngine, ENGINE_MODE, getRun } from './engine';
+import { waveformCsv } from 'air-ts';
+import type { SimulationReport as OracleReport } from 'air-ts';
 import './App.css';
 
 interface LogEntry {
@@ -24,15 +26,10 @@ interface LogEntry {
 interface SimulationReport {
   profile?: string;
   status?: string;
-  reports?: Array<{
-    test: string;
-    status: string;
-    backend: string;
-    measurements?: Record<string, string>;
-    measurement_stats?: Record<string, Record<string, string>>;
-    artifacts?: string[];
-    diagnostics?: Array<{ severity: string; code: string; message: string }>;
-  }>;
+  // The per-test reports are the oracle-schema reports (air-ts `buildReport`
+  // output) in local mode; server mode returns the structurally-identical
+  // backend JSON. `Partial` tolerates the server payload's looser shape.
+  reports?: Array<Partial<OracleReport> & { test: string; status: string; backend: string }>;
   diagnostics?: Array<{ severity: string; code: string; message: string }>;
 }
 
@@ -54,6 +51,15 @@ interface WaveformPoint {
 interface WaveformData extends WaveformSummary {
   success: boolean;
   points: WaveformPoint[];
+  /**
+   * Local (zero-backend) runs retain TYPED ARRAYS (issue #14): the chart and CSV
+   * export read these directly, so the hot path never converts samples to
+   * `number[]` / JSON. Absent for server-mode waveforms (which arrive as JSON).
+   */
+  timeArr?: Float64Array;
+  valueArr?: Float64Array;
+  /** The waveform-store run id (local mode), for CSV export of typed arrays. */
+  runId?: string;
 }
 
 const API_BASE = 'http://127.0.0.1:8000';
@@ -314,6 +320,27 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
 
   const handleSimulate = async () => {
     setIsBusy(true);
+    // Local (zero-backend) path: compile (air-ts) -> simulate (WASM ngspice
+    // worker) -> report (air-ts report.ts) -> render. NO persist-to-disk, NO
+    // server. The report is schema-identical to the oracle's, so the panels
+    // below render it unchanged; waveforms are retained as typed arrays keyed by
+    // the returned run id (issue #14).
+    if (ENGINE_MODE === 'local') {
+      addLog('Simulating (local engine, no backend)', 'info');
+      try {
+        const result = await getEngine().simulate(xml);
+        setSimulation({ profile: result.profile, status: result.status, reports: result.reports });
+        setWaveforms(buildLocalWaveforms(result.runId, result.reports));
+        result.notes.forEach((note) => addLog(note, 'warning'));
+        addLog(`Simulation ${result.status}.`, result.status === 'passed' ? 'success' : 'warning');
+        setActiveTab('simulation');
+      } catch (error) {
+        addLog(`Simulation failed: ${(error as Error).message}`, 'error');
+      } finally {
+        setIsBusy(false);
+      }
+      return;
+    }
     const saved = await persistDesign();
     if (!saved) {
       setIsBusy(false);
@@ -336,6 +363,36 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
     } finally {
       setIsBusy(false);
     }
+  };
+
+  // Build the Simulation-tab waveform list from the typed-array store a local
+  // run retained (issue #14). Samples stay Float64Array end to end: the chart
+  // reads them directly and CSV export re-serializes them via air-ts
+  // `waveformCsv`. NO number[]/JSON conversion in this hot path.
+  const buildLocalWaveforms = (runId: string, reports: Array<{ test: string }> = []): WaveformData[] => {
+    const run = getRun(runId);
+    if (!run) return [];
+    const out: WaveformData[] = [];
+    for (const report of reports ?? []) {
+      for (const [key, wf] of run.waveforms) {
+        if (!key.startsWith(`${report.test}_`)) continue;
+        const last = wf.values.length > 0 ? wf.values[wf.values.length - 1] : 0;
+        out.push({
+          name: key,
+          path: `waveforms/${key}.csv`,
+          test: wf.test,
+          signal: wf.net,
+          quantity: 'voltage',
+          success: true,
+          points: [],
+          timeArr: wf.time,
+          valueArr: wf.values,
+          runId,
+          last: { time_s: wf.time.length ? wf.time[wf.time.length - 1] : 0, value: last },
+        });
+      }
+    }
+    return out;
   };
 
   const loadWaveforms = async () => {
@@ -525,6 +582,7 @@ function SimulationPanel({ simulation, waveforms }: { simulation: SimulationRepo
             <div className="metric-section-title">
               <strong>{report.test}</strong>
               <span className={`status-pill ${report.status}`}>{report.status}</span>
+              {report.backend && <span className="muted-copy"> {report.backend}</span>}
             </div>
             <div className="measurement-table">
               {Object.entries(report.measurements || {}).map(([name, value]) => (
@@ -534,6 +592,16 @@ function SimulationPanel({ simulation, waveforms }: { simulation: SimulationRepo
                 </div>
               ))}
             </div>
+            {(report.diagnostics?.length ?? 0) > 0 && (
+              <div className="diagnostic-list">
+                {report.diagnostics!.map((diagnostic, index) => (
+                  <div className={`diagnostic ${diagnostic.severity}`} key={`${diagnostic.code}-${index}`}>
+                    <strong>{diagnostic.code}</strong>
+                    <span>{diagnostic.message}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -555,36 +623,73 @@ function SimulationPanel({ simulation, waveforms }: { simulation: SimulationRepo
 }
 
 function WaveformChart({ waveform }: { waveform: WaveformData }) {
-  const points = waveform.points || [];
-  if (points.length === 0) {
+  // Prefer the retained TYPED ARRAYS (local #14 runs) — read directly, no JSON
+  // conversion. Fall back to the JSON `points` (server-mode waveforms).
+  const timeArr = waveform.timeArr;
+  const valueArr = waveform.valueArr;
+  const useTyped = timeArr !== undefined && valueArr !== undefined && valueArr.length > 0;
+  const jsonPoints = waveform.points || [];
+  const sampleCount = useTyped ? valueArr!.length : jsonPoints.length;
+
+  if (sampleCount === 0) {
     return <div className="waveform-empty">No samples in {waveform.name}</div>;
   }
 
   const width = 720;
   const height = 280;
   const pad = { left: 58, right: 18, top: 18, bottom: 36 };
-  const xs = points.map((point) => point.time_s);
-  const ys = points.map((point) => point.value);
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
+  const timeAt = (i: number) => (useTyped ? (timeArr![i] as number) : jsonPoints[i]!.time_s);
+  const valueAt = (i: number) => (useTyped ? (valueArr![i] as number) : jsonPoints[i]!.value);
+
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (let i = 0; i < sampleCount; i++) {
+    const t = timeAt(i), v = valueAt(i);
+    if (t < minX) minX = t;
+    if (t > maxX) maxX = t;
+    if (v < minY) minY = v;
+    if (v > maxY) maxY = v;
+  }
   const spanX = maxX - minX || 1;
   const spanY = maxY - minY || 1;
   const plotWidth = width - pad.left - pad.right;
   const plotHeight = height - pad.top - pad.bottom;
-  const path = points.map((point) => {
-    const x = pad.left + ((point.time_s - minX) / spanX) * plotWidth;
-    const y = pad.top + (1 - ((point.value - minY) / spanY)) * plotHeight;
-    return `${x.toFixed(2)},${y.toFixed(2)}`;
-  }).join(' ');
+  const segments: string[] = [];
+  for (let i = 0; i < sampleCount; i++) {
+    const x = pad.left + ((timeAt(i) - minX) / spanX) * plotWidth;
+    const y = pad.top + (1 - ((valueAt(i) - minY) / spanY)) * plotHeight;
+    segments.push(`${x.toFixed(2)},${y.toFixed(2)}`);
+  }
+  const path = segments.join(' ');
   const unit = waveform.quantity === 'current' ? 'A' : 'V';
+  const finalValue = valueAt(sampleCount - 1);
+
+  // CSV export byte-identical in FORMAT to the oracle's canonical waveform CSVs
+  // (issue #14): air-ts `waveformCsv` serializes the retained typed arrays.
+  const canExport = useTyped;
+  const onExport = () => {
+    if (!canExport) return;
+    const samples: [number, number][] = [];
+    for (let i = 0; i < valueArr!.length; i++) samples.push([timeArr![i] as number, valueArr![i] as number]);
+    const csv = waveformCsv(waveform.signal, samples);
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${waveform.test}_${waveform.signal}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="waveform-chart">
       <div className="waveform-meta">
         <span>{waveform.name}</span>
-        <strong>{formatValue(ys[ys.length - 1], unit)} final</strong>
+        <strong>{formatValue(finalValue, unit)} final</strong>
+        {canExport && (
+          <button onClick={onExport} data-testid="waveform-export-csv" style={{ marginLeft: 8 }}>
+            Export CSV
+          </button>
+        )}
       </div>
       <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${waveform.signal} waveform`}>
         <line x1={pad.left} y1={pad.top} x2={pad.left} y2={height - pad.bottom} />

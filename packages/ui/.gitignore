@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Playwright (issue #14 browser report-pipeline tests)
+playwright-report
+test-results
+blob-report
+.playwright
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
