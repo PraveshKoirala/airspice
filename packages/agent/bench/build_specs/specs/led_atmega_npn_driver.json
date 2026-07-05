@@ -1,0 +1,26 @@
+{
+  "id": "led_atmega_npn_driver",
+  "title": "High-brightness LED via NPN",
+  "category": "led_driver",
+  "prompt": "My Arduino (ATmega328) needs to drive a bright LED that wants more current than a pin should source directly. Use an NPN transistor as a low-side switch: the GPIO drives the base through a base resistor, and the LED with its current-limit resistor sits between the 5 V rail and the transistor collector. Firmware turns the LED on and off.",
+  "mcu": "atmega328",
+  "fidelity": "faithful",
+  "criteria": {
+    "required_components": [
+      { "type": "mcu", "count": 1, "part": "ATmega328P" },
+      { "type": "bjt", "count": 1 },
+      { "type": "resistor", "count": 2 },
+      { "type": "diode", "count": 1 }
+    ],
+    "connectivity": [
+      "gpio_output(net=<base_drive>, mcu=ATmega328P)",
+      "series_element(type=resistor, a=<base_drive>, b=<base>)",
+      "low_side_switch(sw=bjt, control=<base>, load=<led_cathode>, common=gnd)",
+      "series_diode(anode=<led_anode>, cathode=<led_cathode>)"
+    ],
+    "firmware_intent": [ "write_gpio(net=<base_drive>)" ],
+    "erc_clean": true
+  },
+  "turn_budget": 4,
+  "golden": "golden/led_atmega_npn_driver/design.air.xml"
+}

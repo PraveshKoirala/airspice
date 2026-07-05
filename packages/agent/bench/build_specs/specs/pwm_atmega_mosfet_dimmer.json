@@ -1,0 +1,24 @@
+{
+  "id": "pwm_atmega_mosfet_dimmer",
+  "title": "PWM LED dimmer via MOSFET",
+  "category": "filter_pwm",
+  "prompt": "I want to dim a 12 V LED strip from my Arduino (ATmega328) using PWM. Drive an N-channel MOSFET low-side switch from a PWM-capable pin, with the LED strip between 12 V and the drain, so the average brightness follows the duty cycle. Firmware sets the PWM duty. Treat the strip as a resistive load and assume the FET is on for the DC bench check.",
+  "mcu": "atmega328",
+  "fidelity": "faithful",
+  "criteria": {
+    "required_components": [
+      { "type": "mcu", "count": 1, "part": "ATmega328P" },
+      { "type": "mosfet", "count": 1 },
+      { "type": "resistor", "count": 1 }
+    ],
+    "connectivity": [
+      "gpio_output(net=<pwm>, mcu=ATmega328P)",
+      "low_side_switch(sw=mosfet, control=<pwm>, load=<strip_low>, common=gnd)",
+      "series_element(type=resistor, a=<v12>, b=<strip_low>)"
+    ],
+    "firmware_intent": [ "pwm(net=<pwm>)" ],
+    "erc_clean": true
+  },
+  "turn_budget": 4,
+  "golden": "golden/pwm_atmega_mosfet_dimmer/design.air.xml"
+}

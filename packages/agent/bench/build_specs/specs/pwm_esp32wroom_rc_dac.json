@@ -1,0 +1,23 @@
+{
+  "id": "pwm_esp32wroom_rc_dac",
+  "title": "ESP32-WROOM PWM analog control voltage",
+  "category": "filter_pwm",
+  "prompt": "I need a smooth analog control voltage from my ESP32-WROOM-32 to bias another circuit. Take a PWM GPIO, filter it with an RC low-pass so the output is the duty-averaged voltage, and read/feed that node. Firmware drives the PWM. For the bench test use 50% duty and expect roughly half the logic level at the filtered node.",
+  "mcu": "esp32_wroom_32",
+  "fidelity": "faithful",
+  "criteria": {
+    "required_components": [
+      { "type": "mcu", "count": 1, "part": "ESP32-WROOM-32" },
+      { "type": "resistor", "count": 1 },
+      { "type": "capacitor", "count": 1 }
+    ],
+    "connectivity": [
+      "gpio_output(net=<pwm>, mcu=ESP32-WROOM-32)",
+      "rc_lowpass(in=<pwm>, out=<ctrl_v>)"
+    ],
+    "firmware_intent": [ "pwm(net=<pwm>, duty=0.5)" ],
+    "erc_clean": true,
+    "sim_assertion": { "net": "ctrl_v", "min_v": 1.55, "max_v": 1.75 }
+  },
+  "turn_budget": 4
+}

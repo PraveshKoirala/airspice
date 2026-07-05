@@ -1,0 +1,23 @@
+{
+  "id": "btn_esp32c3_pullup",
+  "title": "ESP32-C3 pull-up pushbutton",
+  "category": "button",
+  "prompt": "Add a pushbutton to my ESP32-C3 that firmware can read on a GPIO input. Use a pull-up resistor to the 3.3 V rail so the pin reads high when the button is open and gets pulled to ground when pressed. Firmware polls the button. For the bench check the button is open, so the input rests near 3.3 V.",
+  "mcu": "esp32_c3",
+  "fidelity": "faithful",
+  "criteria": {
+    "required_components": [
+      { "type": "mcu", "count": 1, "part": "ESP32-C3" },
+      { "type": "resistor", "count": 1 }
+    ],
+    "connectivity": [
+      "pullup(net=<btn>, to=<v3v3>)",
+      "gpio_input(net=<btn>, mcu=ESP32-C3)"
+    ],
+    "firmware_intent": [ "read_gpio(net=<btn>)" ],
+    "erc_clean": true,
+    "sim_assertion": { "net": "btn", "min_v": 3.2, "max_v": 3.4 }
+  },
+  "turn_budget": 4,
+  "golden": "golden/btn_esp32c3_pullup/design.air.xml"
+}

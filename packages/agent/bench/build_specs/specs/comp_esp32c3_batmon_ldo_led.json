@@ -1,0 +1,30 @@
+{
+  "id": "comp_esp32c3_batmon_ldo_led",
+  "title": "Battery monitor + rail + status LED",
+  "category": "composite",
+  "prompt": "Build the front-end for a LiPo-powered ESP32-C3 gadget. Three things: regulate the battery (3.0-4.2 V) down to a clean 3.3 V rail that powers the ESP32; read the raw battery voltage through a divider on an ADC pin without ever exceeding 3.3 V at the pin; and add a status LED on a GPIO with a current-limit resistor that firmware blinks. For the bench check assume a full 4.2 V battery.",
+  "mcu": "esp32_c3",
+  "fidelity": "faithful",
+  "criteria": {
+    "required_components": [
+      { "type": "mcu", "count": 1, "part": "ESP32-C3" },
+      { "type": "ldo", "count": 1 },
+      { "type": "resistor", "count": 3 },
+      { "type": "diode", "count": 1 }
+    ],
+    "connectivity": [
+      "regulator(in=<vbat>, out=<v3v3>, gnd=gnd)",
+      "mcu_powered(mcu=ESP32-C3, rail=<v3v3>)",
+      "series_divider(high=<vbat>, tap=<batt_sense>, low=gnd)",
+      "adc_input(net=<batt_sense>, mcu=ESP32-C3)",
+      "gpio_output(net=<led_drive>, mcu=ESP32-C3)",
+      "current_limit_resistor(gpio=<led_drive>, load=<led_anode>)",
+      "series_diode(anode=<led_anode>, cathode=gnd)"
+    ],
+    "firmware_intent": [ "read_adc(net=<batt_sense>)", "write_gpio(net=<led_drive>)", "log" ],
+    "erc_clean": true,
+    "sim_assertion": { "net": "batt_sense", "min_v": 2.0, "max_v": 2.2 }
+  },
+  "turn_budget": 5,
+  "golden": "golden/comp_esp32c3_batmon_ldo_led/design.air.xml"
+}

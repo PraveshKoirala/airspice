@@ -1,0 +1,25 @@
+{
+  "id": "sw_esp32wroom_npn_load",
+  "title": "ESP32-WROOM NPN low-side load switch",
+  "category": "switching",
+  "prompt": "My ESP32-WROOM-32 needs to switch a small 5 V resistive load (a buzzer element) that draws more than the GPIO can handle. Use an NPN transistor as a low-side switch driven from a GPIO through a base resistor, with the load between 5 V and the collector and the emitter to ground. Firmware activates it; assume it's on for the bench test.",
+  "mcu": "esp32_wroom_32",
+  "fidelity": "faithful",
+  "criteria": {
+    "required_components": [
+      { "type": "mcu", "count": 1, "part": "ESP32-WROOM-32" },
+      { "type": "bjt", "count": 1 },
+      { "type": "resistor", "count": 2 }
+    ],
+    "connectivity": [
+      "gpio_output(net=<base_drive>, mcu=ESP32-WROOM-32)",
+      "series_element(type=resistor, a=<base_drive>, b=<base>)",
+      "low_side_switch(sw=bjt, control=<base>, load=<load_low>, common=gnd)",
+      "series_element(type=resistor, a=<v5>, b=<load_low>)"
+    ],
+    "firmware_intent": [ "write_gpio(net=<base_drive>)" ],
+    "erc_clean": true,
+    "sim_assertion": { "net": "load_low", "min_v": 0.0, "max_v": 0.4 }
+  },
+  "turn_budget": 4
+}

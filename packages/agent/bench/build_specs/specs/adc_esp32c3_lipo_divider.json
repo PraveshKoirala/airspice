@@ -1,0 +1,23 @@
+{
+  "id": "adc_esp32c3_lipo_divider",
+  "title": "ESP32-C3 LiPo battery monitor",
+  "category": "adc_frontend",
+  "prompt": "I'm building a battery-powered ESP32-C3 sensor. It runs off a single-cell LiPo that swings from about 3.0 V empty to 4.2 V full. I want the ESP32-C3 to read the pack voltage on one of its ADC pins and log it, but the ADC input can never be allowed to go above the chip's 3.3 V limit. Wire up the sensing front-end.",
+  "mcu": "esp32_c3",
+  "fidelity": "faithful",
+  "criteria": {
+    "required_components": [
+      { "type": "mcu", "count": 1, "part": "ESP32-C3" },
+      { "type": "resistor", "count": 2 }
+    ],
+    "connectivity": [
+      "series_divider(high=<vbat>, tap=<sense>, low=gnd)",
+      "adc_input(net=<sense>, mcu=ESP32-C3)"
+    ],
+    "firmware_intent": [ "read_adc(net=<sense>)", "log" ],
+    "erc_clean": true,
+    "sim_assertion": { "net": "battery_sense", "min_v": 1.02, "max_v": 1.06 }
+  },
+  "turn_budget": 4,
+  "golden": "golden/adc_esp32c3_lipo_divider/design.air.xml"
+}

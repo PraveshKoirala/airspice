@@ -1,0 +1,24 @@
+{
+  "id": "pwm_esp32c3_rc_dac",
+  "title": "PWM + RC analog output (DAC)",
+  "category": "filter_pwm",
+  "prompt": "My ESP32-C3 doesn't have a real DAC, so I want to fake an adjustable analog output by low-pass filtering a PWM pin. Drive a PWM GPIO into an RC low-pass filter so the capacitor sits at the duty-weighted average voltage. Firmware sets a 50% duty for the bench test; the filtered output should read about half the logic swing.",
+  "mcu": "esp32_c3",
+  "fidelity": "faithful",
+  "criteria": {
+    "required_components": [
+      { "type": "mcu", "count": 1, "part": "ESP32-C3" },
+      { "type": "resistor", "count": 1 },
+      { "type": "capacitor", "count": 1 }
+    ],
+    "connectivity": [
+      "gpio_output(net=<pwm>, mcu=ESP32-C3)",
+      "rc_lowpass(in=<pwm>, out=<analog_out>)"
+    ],
+    "firmware_intent": [ "pwm(net=<pwm>, duty=0.5)" ],
+    "erc_clean": true,
+    "sim_assertion": { "net": "analog_out", "min_v": 1.55, "max_v": 1.75 }
+  },
+  "turn_budget": 4,
+  "golden": "golden/pwm_esp32c3_rc_dac/design.air.xml"
+}

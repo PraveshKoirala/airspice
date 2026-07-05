@@ -1,0 +1,69 @@
+<system name="gt106_pwm_atmega_mosfet_dimmer" ir_version="0.1">
+  <metadata>
+    <title>PWM dimmer</title>
+    <description>Golden build for issue #106 build-spec corpus. Known-good, ERC-clean, simulates to the spec sim_assertion on ngspice.</description>
+    <author>issue-106</author>
+  </metadata>
+  <nets>
+    <net id="gnd" role="ground"/>
+    <net id="v12" role="power" nominal_voltage="12V"/>
+    <net id="pwm" role="digital_signal"/>
+    <net id="strip_low" role="analog_signal"/>
+  </nets>
+  <components>
+    <component id="V_12" type="voltage_source">
+      <value>12V</value>
+      <pin name="p" net="v12"/>
+      <pin name="n" net="gnd"/>
+    </component>
+    <component id="R_STRIP" type="resistor">
+      <value>48</value>
+      <pin name="1" net="v12"/>
+      <pin name="2" net="strip_low"/>
+    </component>
+    <component id="Q1" type="mosfet" part="BSS138">
+      <pin name="G" net="pwm"/>
+      <pin name="D" net="strip_low"/>
+      <pin name="S" net="gnd"/>
+    </component>
+    <component id="U_MCU" type="mcu" part="ATmega328P">
+      <pin name="VCC" net="v12"/>
+      <pin name="GND" net="gnd"/>
+      <pin name="D3" net="pwm" function="PWM"/>
+    </component>
+  </components>
+  <firmware>
+    <project id="fw_main" target="U_MCU" framework="platformio" language="cpp">
+      <board>uno</board>
+      <source_tree path="firmware/"/>
+    </project>
+    <task id="pwm50" target="fw_main">
+      <period>10us</period>
+      <write_gpio pin="D3" value="high"/>
+      <delay duration="5us"/>
+      <write_gpio pin="D3" value="low"/>
+    </task>
+  </firmware>
+  <analog>
+    <subsystem id="s">
+      <uses component="V_12"/>
+      <uses component="R_STRIP"/>
+      <uses component="Q1"/>
+      <probe id="probe_strip_low" net="strip_low" quantity="voltage"/>
+    </subsystem>
+  </analog>
+  <tests>
+    <test id="t">
+      <setup><set_voltage net="v12" value="12V"/></setup>
+      <run duration="10ms"/>
+      <assert_voltage net="strip_low" min="0.0V" max="12.0V"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="analog_only" default="true">
+      <backend type="ngspice"/>
+      <include subsystem="s"/>
+      <run test="t"/>
+    </profile>
+  </simulation_profiles>
+</system>

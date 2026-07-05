@@ -1,0 +1,80 @@
+<system name="gt106_comp_atmega_solar_front" ir_version="0.1">
+  <metadata>
+    <title>Solar front</title>
+    <description>Golden build for issue #106 build-spec corpus. Known-good, ERC-clean, simulates to the spec sim_assertion on ngspice.</description>
+    <author>issue-106</author>
+  </metadata>
+  <nets>
+    <net id="gnd" role="ground"/>
+    <net id="panel" role="power" nominal_voltage="6V"/>
+    <net id="batt" role="power" nominal_voltage="5.3V"/>
+    <net id="batt_sense" role="analog_signal"/>
+  </nets>
+  <components>
+    <component id="V_PANEL" type="voltage_source" part="SOLAR_PANEL">
+      <value>6V</value>
+      <pin name="p" net="panel"/>
+      <pin name="n" net="gnd"/>
+    </component>
+    <component id="D_BLOCK" type="diode" part="1N4148">
+      <pin name="a" net="panel"/>
+      <pin name="c" net="batt"/>
+    </component>
+    <component id="R_TOP" type="resistor">
+      <value>10k</value>
+      <pin name="1" net="batt"/>
+      <pin name="2" net="batt_sense"/>
+    </component>
+    <component id="R_BOT" type="resistor">
+      <value>10k</value>
+      <pin name="1" net="batt_sense"/>
+      <pin name="2" net="gnd"/>
+    </component>
+    <component id="U_MCU" type="mcu" part="ATmega328P">
+      <pin name="VCC" net="batt"/>
+      <pin name="GND" net="gnd"/>
+      <pin name="A0" net="batt_sense" function="ADC1_CH0"/>
+    </component>
+  </components>
+  <firmware>
+    <project id="fw_main" target="U_MCU" framework="platformio" language="cpp">
+      <board>uno</board>
+      <source_tree path="firmware/"/>
+    </project>
+    <binding id="adc_binding">
+      <signal name="sense"/>
+      <component ref="U_MCU"/>
+      <peripheral>ADC1</peripheral>
+      <channel>ADC1_CH0</channel>
+      <net>batt_sense</net>
+    </binding>
+    <task id="read_sense" target="fw_main">
+      <period>1s</period>
+      <read_adc binding="adc_binding" into="v_raw"/>
+      <log value="v_raw"/>
+    </task>
+  </firmware>
+  <analog>
+    <subsystem id="s">
+      <uses component="V_PANEL"/>
+      <uses component="D_BLOCK"/>
+      <uses component="R_TOP"/>
+      <uses component="R_BOT"/>
+      <probe id="probe_batt_sense" net="batt_sense" quantity="voltage"/>
+    </subsystem>
+  </analog>
+  <tests>
+    <test id="t">
+      <setup><set_voltage net="panel" value="6V"/></setup>
+      <run duration="1ms"/>
+      <assert_voltage net="batt_sense" min="2.5V" max="2.8V"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="analog_only" default="true">
+      <backend type="ngspice"/>
+      <include subsystem="s"/>
+      <run test="t"/>
+    </profile>
+  </simulation_profiles>
+</system>

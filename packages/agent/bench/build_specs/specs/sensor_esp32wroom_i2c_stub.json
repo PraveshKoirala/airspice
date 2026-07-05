@@ -1,0 +1,28 @@
+{
+  "id": "sensor_esp32wroom_i2c_stub",
+  "title": "I2C sensor node on ESP32-WROOM",
+  "category": "sensor_node",
+  "prompt": "Add an I2C sensor breakout to my ESP32-WROOM-32 running from its 3.3 V rail. Wire it to the I2C pins with proper pull-ups to 3.3 V, power and ground the module, and budget for its supply current. For the bench check the idle I2C lines should rest at 3.3 V through the pull-ups.",
+  "mcu": "esp32_wroom_32",
+  "fidelity": "abstracted",
+  "abstraction": {
+    "part": "I2C_SENSOR_STUB",
+    "primitive": "generic_load",
+    "reason": "the I2C sensor's data path is out of analog scope (M8); only supply draw + open-drain pull-up topology is modelled per the #105 I2C stub convention"
+  },
+  "criteria": {
+    "required_components": [
+      { "type": "mcu", "count": 1, "part": "ESP32-WROOM-32" },
+      { "type": "resistor", "count": 2 },
+      { "type": "generic_load", "count": 1 }
+    ],
+    "connectivity": [
+      "i2c_bus(sda=<i2c_sda>, scl=<i2c_scl>, rail=<v3v3>)",
+      "load_on_rail(rail=<v3v3>)"
+    ],
+    "firmware_intent": [],
+    "erc_clean": true,
+    "sim_assertion": { "net": "i2c_sda", "min_v": 3.2, "max_v": 3.4 }
+  },
+  "turn_budget": 4
+}

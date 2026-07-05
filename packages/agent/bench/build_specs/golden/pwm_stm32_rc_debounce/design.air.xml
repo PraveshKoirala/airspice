@@ -1,0 +1,85 @@
+<system name="gt106_pwm_stm32_rc_debounce" ir_version="0.1">
+  <metadata>
+    <title>RC debounce</title>
+    <description>Golden build for issue #106 build-spec corpus. Known-good, ERC-clean, simulates to the spec sim_assertion on ngspice.</description>
+    <author>issue-106</author>
+  </metadata>
+  <nets>
+    <net id="gnd" role="ground"/>
+    <net id="v3v3" role="power" nominal_voltage="3.3V"/>
+    <net id="btn_raw" role="digital_signal"/>
+    <net id="btn_debounced" role="digital_signal"/>
+  </nets>
+  <components>
+    <component id="V_3V3" type="voltage_source">
+      <value>3.3V</value>
+      <pin name="p" net="v3v3"/>
+      <pin name="n" net="gnd"/>
+    </component>
+    <component id="R_PU" type="resistor">
+      <value>10k</value>
+      <pin name="1" net="v3v3"/>
+      <pin name="2" net="btn_raw"/>
+    </component>
+    <component id="R_BTN" type="resistor">
+      <value>10Meg</value>
+      <pin name="1" net="btn_raw"/>
+      <pin name="2" net="gnd"/>
+    </component>
+    <component id="R_F" type="resistor">
+      <value>1k</value>
+      <pin name="1" net="btn_raw"/>
+      <pin name="2" net="btn_debounced"/>
+    </component>
+    <component id="C_F" type="capacitor">
+      <value>100nF</value>
+      <pin name="1" net="btn_debounced"/>
+      <pin name="2" net="gnd"/>
+    </component>
+    <component id="U_MCU" type="mcu" part="STM32F103">
+      <pin name="VDD" net="v3v3"/>
+      <pin name="VSS" net="gnd"/>
+      <pin name="PA0" net="btn_debounced" function="GPIO"/>
+    </component>
+  </components>
+  <firmware>
+    <project id="fw_main" target="U_MCU" framework="platformio" language="cpp">
+      <board>bluepill_f103c8</board>
+      <source_tree path="firmware/"/>
+    </project>
+    <binding id="adc_binding">
+      <signal name="sense"/>
+      <component ref="U_MCU"/>
+      <peripheral>ADC1</peripheral>
+      <channel>ADC1_CH0</channel>
+      <net>btn_debounced</net>
+    </binding>
+    <task id="read_sense" target="fw_main">
+      <period>1s</period>
+      <read_adc binding="adc_binding" into="v_raw"/>
+    </task>
+  </firmware>
+  <analog>
+    <subsystem id="s">
+      <uses component="R_PU"/>
+      <uses component="R_BTN"/>
+      <uses component="R_F"/>
+      <uses component="C_F"/>
+      <probe id="probe_btn_debounced" net="btn_debounced" quantity="voltage"/>
+    </subsystem>
+  </analog>
+  <tests>
+    <test id="t">
+      <setup><set_voltage net="v3v3" value="3.3V"/></setup>
+      <run duration="10ms"/>
+      <assert_voltage net="btn_debounced" min="3.2V" max="3.4V"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="analog_only" default="true">
+      <backend type="ngspice"/>
+      <include subsystem="s"/>
+      <run test="t"/>
+    </profile>
+  </simulation_profiles>
+</system>

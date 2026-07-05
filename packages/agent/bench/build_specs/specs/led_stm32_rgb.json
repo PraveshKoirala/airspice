@@ -1,0 +1,26 @@
+{
+  "id": "led_stm32_rgb",
+  "title": "STM32 common-cathode RGB LED",
+  "category": "led_driver",
+  "prompt": "I have a common-cathode RGB LED I want to drive from my STM32F103. Each of the three color channels should come from its own GPIO through its own current-limit resistor, with the shared cathode to ground. Let firmware set each color independently.",
+  "mcu": "stm32_f103",
+  "fidelity": "faithful",
+  "criteria": {
+    "required_components": [
+      { "type": "mcu", "count": 1, "part": "STM32F103" },
+      { "type": "resistor", "count": 3 },
+      { "type": "diode", "count": 3 }
+    ],
+    "connectivity": [
+      "current_limit_resistor(gpio=<r_drive>, load=<r_anode>)",
+      "current_limit_resistor(gpio=<g_drive>, load=<g_anode>)",
+      "current_limit_resistor(gpio=<b_drive>, load=<b_anode>)",
+      "series_diode(anode=<r_anode>, cathode=gnd)",
+      "series_diode(anode=<g_anode>, cathode=gnd)",
+      "series_diode(anode=<b_anode>, cathode=gnd)"
+    ],
+    "firmware_intent": [ "write_gpio(net=<r_drive>)", "write_gpio(net=<g_drive>)", "write_gpio(net=<b_drive>)" ],
+    "erc_clean": true
+  },
+  "turn_budget": 4
+}

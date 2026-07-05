@@ -1,0 +1,24 @@
+{
+  "id": "led_esp32c3_single",
+  "title": "ESP32-C3 status LED",
+  "category": "led_driver",
+  "prompt": "Add a simple status LED to my ESP32-C3 that firmware can blink on a GPIO. Drive it straight from the pin with a series current-limit resistor to ground so the LED current stays in a safe range for the pin. Make the firmware toggle it.",
+  "mcu": "esp32_c3",
+  "fidelity": "faithful",
+  "criteria": {
+    "required_components": [
+      { "type": "mcu", "count": 1, "part": "ESP32-C3" },
+      { "type": "resistor", "count": 1 },
+      { "type": "diode", "count": 1 }
+    ],
+    "connectivity": [
+      "gpio_output(net=<led_drive>, mcu=ESP32-C3)",
+      "current_limit_resistor(gpio=<led_drive>, load=<led_anode>)",
+      "series_diode(anode=<led_anode>, cathode=gnd)"
+    ],
+    "firmware_intent": [ "write_gpio(net=<led_drive>)" ],
+    "erc_clean": true
+  },
+  "turn_budget": 4,
+  "golden": "golden/led_esp32c3_single/design.air.xml"
+}

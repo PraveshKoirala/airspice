@@ -1,0 +1,23 @@
+{
+  "id": "adc_esp32wroom_level_divider",
+  "title": "ESP32-WROOM reads a 5 V sensor output",
+  "category": "adc_frontend",
+  "prompt": "My ESP32-WROOM-32 board needs to read an analog sensor whose output swings all the way up to 5 V, but the ESP32 ADC pins only tolerate up to 3.3 V. Add a front-end so the full 5 V range of the sensor lands safely inside the ADC's range on one of its analog inputs, and read it periodically.",
+  "mcu": "esp32_wroom_32",
+  "fidelity": "faithful",
+  "criteria": {
+    "required_components": [
+      { "type": "mcu", "count": 1, "part": "ESP32-WROOM-32" },
+      { "type": "resistor", "count": 2 }
+    ],
+    "connectivity": [
+      "series_divider(high=<sensor_5v>, tap=<sense>, low=gnd)",
+      "adc_input(net=<sense>, mcu=ESP32-WROOM-32)"
+    ],
+    "firmware_intent": [ "read_adc(net=<sense>)" ],
+    "erc_clean": true,
+    "sim_assertion": { "net": "sense", "min_v": 1.9, "max_v": 2.1 }
+  },
+  "turn_budget": 4,
+  "golden": "golden/adc_esp32wroom_level_divider/design.air.xml"
+}

@@ -1,0 +1,27 @@
+{
+  "id": "opamp_atmega_buffer",
+  "title": "Unity-gain buffer before the ADC",
+  "category": "opamp",
+  "prompt": "My high-impedance sensor sags when the Arduino (ATmega328) ADC samples it. Add a unity-gain op-amp (LM358) buffer between the sensor and the ADC pin so the ADC sees a low-impedance copy of the sensor voltage. Firmware reads the buffered node. For the bench test the buffered output equals the sensor voltage, about 2.5 V.",
+  "mcu": "atmega328",
+  "fidelity": "abstracted",
+  "abstraction": {
+    "part": "LM358_BUFFER",
+    "primitive": "voltage_source",
+    "reason": "the LM358 buffer has no simulatable SPICE subcircuit; the buffered OUTPUT (a low-impedance copy of the sensor voltage) is modelled with a #105 voltage_source stand-in"
+  },
+  "criteria": {
+    "required_components": [
+      { "type": "mcu", "count": 1, "part": "ATmega328P" },
+      { "type": "voltage_source", "count": 1 }
+    ],
+    "connectivity": [
+      "series_element(type=voltage_source, a=<buf_out>, b=gnd)",
+      "adc_input(net=<buf_out>, mcu=ATmega328P)"
+    ],
+    "firmware_intent": [ "read_adc(net=<buf_out>)" ],
+    "erc_clean": true,
+    "sim_assertion": { "net": "buf_out", "min_v": 2.45, "max_v": 2.55 }
+  },
+  "turn_budget": 4
+}

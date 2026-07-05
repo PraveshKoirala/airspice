@@ -1,0 +1,25 @@
+{
+  "id": "pwr_esp32c3_dual_rail",
+  "title": "5 V input with a 3.3 V regulated rail",
+  "category": "power",
+  "prompt": "My ESP32-C3 project runs from a 5 V input but the ESP32 and its sensors need 3.3 V. Regulate the 5 V down to a 3.3 V rail, power the ESP32-C3 from 3.3 V, and add a decoupling capacitor on the 3.3 V rail near the chip. Keep the raw 5 V available too. For the bench check confirm the 3.3 V rail.",
+  "mcu": "esp32_c3",
+  "fidelity": "faithful",
+  "criteria": {
+    "required_components": [
+      { "type": "mcu", "count": 1, "part": "ESP32-C3" },
+      { "type": "ldo", "count": 1 },
+      { "type": "capacitor", "count": 1 }
+    ],
+    "connectivity": [
+      "regulator(in=<v5>, out=<v3v3>, gnd=gnd)",
+      "mcu_powered(mcu=ESP32-C3, rail=<v3v3>)",
+      "decoupling_cap(net=<v3v3>)"
+    ],
+    "firmware_intent": [],
+    "erc_clean": true,
+    "sim_assertion": { "net": "v3v3", "min_v": 3.2, "max_v": 3.4 }
+  },
+  "turn_budget": 4,
+  "golden": "golden/pwr_esp32c3_dual_rail/design.air.xml"
+}

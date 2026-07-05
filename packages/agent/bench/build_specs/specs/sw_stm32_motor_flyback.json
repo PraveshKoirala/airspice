@@ -1,0 +1,27 @@
+{
+  "id": "sw_stm32_motor_flyback",
+  "title": "STM32 DC motor driver with flyback",
+  "category": "switching",
+  "prompt": "I want my STM32F103 to switch a small 12 V DC motor with an N-channel MOSFET low-side switch. The gate comes from a GPIO, the motor sits between the 12 V supply and the drain, and I need a flyback diode across the motor so the inductive kick doesn't destroy the FET when it turns off. Firmware runs the motor. Treat the motor winding as a modest resistive load and assume the FET is on for the bench check.",
+  "mcu": "stm32_f103",
+  "fidelity": "faithful",
+  "criteria": {
+    "required_components": [
+      { "type": "mcu", "count": 1, "part": "STM32F103" },
+      { "type": "mosfet", "count": 1 },
+      { "type": "resistor", "count": 1 },
+      { "type": "diode", "count": 1 }
+    ],
+    "connectivity": [
+      "gpio_output(net=<gate_drive>, mcu=STM32F103)",
+      "low_side_switch(sw=mosfet, control=<gate_drive>, load=<motor_low>, common=gnd)",
+      "series_element(type=resistor, a=<v12>, b=<motor_low>)",
+      "flyback_diode(across=<motor_low>, rail=<v12>)"
+    ],
+    "firmware_intent": [ "write_gpio(net=<gate_drive>)" ],
+    "erc_clean": true,
+    "sim_assertion": { "net": "motor_low", "min_v": 0.0, "max_v": 0.5 }
+  },
+  "turn_budget": 4,
+  "golden": "golden/sw_stm32_motor_flyback/design.air.xml"
+}

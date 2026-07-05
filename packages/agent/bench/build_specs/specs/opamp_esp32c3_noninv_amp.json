@@ -1,0 +1,28 @@
+{
+  "id": "opamp_esp32c3_noninv_amp",
+  "title": "Non-inverting sensor amplifier into ADC",
+  "category": "opamp",
+  "prompt": "My analog sensor's output is too small to read accurately, so I want to amplify it with a non-inverting op-amp stage (LM358) and feed the amplified signal into my ESP32-C3 ADC. Wire the amplifier's output to an ADC pin and keep it inside 3.3 V. Firmware reads the amplified value. For the bench test the conditioned output sits around mid-scale (~1.65 V).",
+  "mcu": "esp32_c3",
+  "fidelity": "abstracted",
+  "abstraction": {
+    "part": "LM358_STAGE",
+    "primitive": "voltage_source",
+    "reason": "the LM358 has no simulatable SPICE subcircuit (validation blocks UNDEFINED_SPICE_MODEL), so the op-amp stage OUTPUT is modelled with a #105 voltage_source stand-in at the conditioned operating point"
+  },
+  "criteria": {
+    "required_components": [
+      { "type": "mcu", "count": 1, "part": "ESP32-C3" },
+      { "type": "voltage_source", "count": 1 }
+    ],
+    "connectivity": [
+      "series_element(type=voltage_source, a=<amp_out>, b=gnd)",
+      "adc_input(net=<amp_out>, mcu=ESP32-C3)"
+    ],
+    "firmware_intent": [ "read_adc(net=<amp_out>)" ],
+    "erc_clean": true,
+    "sim_assertion": { "net": "amp_out", "min_v": 1.6, "max_v": 1.7 }
+  },
+  "turn_budget": 4,
+  "golden": "golden/opamp_esp32c3_noninv_amp/design.air.xml"
+}

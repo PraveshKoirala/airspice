@@ -1,0 +1,25 @@
+{
+  "id": "btn_atmega_multi",
+  "title": "Two pushbuttons on Arduino",
+  "category": "button",
+  "prompt": "My Arduino Uno (ATmega328) project has two pushbuttons, 'up' and 'down'. Each needs its own pull-up resistor to 5 V and its own GPIO input so firmware can tell which was pressed. For the bench check both buttons are open, so both inputs rest near 5 V.",
+  "mcu": "atmega328",
+  "fidelity": "faithful",
+  "criteria": {
+    "required_components": [
+      { "type": "mcu", "count": 1, "part": "ATmega328P" },
+      { "type": "resistor", "count": 2 }
+    ],
+    "connectivity": [
+      "pullup(net=<up_btn>, to=<v5>)",
+      "pullup(net=<down_btn>, to=<v5>)",
+      "gpio_input(net=<up_btn>, mcu=ATmega328P)",
+      "gpio_input(net=<down_btn>, mcu=ATmega328P)"
+    ],
+    "firmware_intent": [ "read_gpio(net=<up_btn>)", "read_gpio(net=<down_btn>)" ],
+    "erc_clean": true,
+    "sim_assertion": { "net": "up_btn", "min_v": 4.9, "max_v": 5.05 }
+  },
+  "turn_budget": 4,
+  "golden": "golden/btn_atmega_multi/design.air.xml"
+}

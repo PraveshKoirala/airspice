@@ -1,0 +1,27 @@
+{
+  "id": "opamp_stm32_comparator",
+  "title": "Threshold comparator to a GPIO",
+  "category": "opamp",
+  "prompt": "I want my STM32F103 to get a clean digital 'over threshold' signal when an analog sensor crosses a set point. Use an op-amp (LM358) as a comparator against a reference and route its digital-swinging output to a GPIO input the firmware watches. For the bench test the sensor is above the threshold so the comparator output is high (near the rail).",
+  "mcu": "stm32_f103",
+  "fidelity": "abstracted",
+  "abstraction": {
+    "part": "LM358_COMPARATOR",
+    "primitive": "voltage_source",
+    "reason": "the LM358 comparator has no simulatable SPICE subcircuit; its logic-level OUTPUT is modelled with a #105 voltage_source stand-in at the tested (over-threshold) state"
+  },
+  "criteria": {
+    "required_components": [
+      { "type": "mcu", "count": 1, "part": "STM32F103" },
+      { "type": "voltage_source", "count": 1 }
+    ],
+    "connectivity": [
+      "series_element(type=voltage_source, a=<comp_out>, b=gnd)",
+      "gpio_input(net=<comp_out>, mcu=STM32F103)"
+    ],
+    "firmware_intent": [ "read_gpio(net=<comp_out>)" ],
+    "erc_clean": true,
+    "sim_assertion": { "net": "comp_out", "min_v": 3.0, "max_v": 3.4 }
+  },
+  "turn_budget": 4
+}

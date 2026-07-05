@@ -1,0 +1,31 @@
+{
+  "id": "comp_atmega_solar_front",
+  "title": "Solar-charge front + battery sense",
+  "category": "composite",
+  "prompt": "I'm making a solar-charged Arduino (ATmega328) node. A ~6 V solar panel feeds a series blocking diode so it can't discharge the battery in the dark, then charges a battery/rail. The ATmega should also monitor the battery voltage through a divider on an ADC input, keeping the pin under its 5 V limit. For the bench check the panel is in sunlight at 6 V.",
+  "mcu": "atmega328",
+  "fidelity": "abstracted",
+  "abstraction": {
+    "part": "SOLAR_PANEL",
+    "primitive": "voltage_source",
+    "reason": "the solar panel is modelled as a fixed-voltage source at the tested illumination (a #105 voltage_source stand-in); the battery-sense divider and blocking diode are real"
+  },
+  "criteria": {
+    "required_components": [
+      { "type": "mcu", "count": 1, "part": "ATmega328P" },
+      { "type": "voltage_source", "count": 1 },
+      { "type": "diode", "count": 1 },
+      { "type": "resistor", "count": 2 }
+    ],
+    "connectivity": [
+      "series_diode(anode=<panel>, cathode=<batt>)",
+      "series_divider(high=<batt>, tap=<batt_sense>, low=gnd)",
+      "adc_input(net=<batt_sense>, mcu=ATmega328P)"
+    ],
+    "firmware_intent": [ "read_adc(net=<batt_sense>)", "log" ],
+    "erc_clean": true,
+    "sim_assertion": { "net": "batt_sense", "min_v": 2.5, "max_v": 2.8 }
+  },
+  "turn_budget": 5,
+  "golden": "golden/comp_atmega_solar_front/design.air.xml"
+}

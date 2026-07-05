@@ -1,0 +1,59 @@
+<system name="gt106_pwr_esp32c3_dual_rail" ir_version="0.1">
+  <metadata>
+    <title>Dual rail</title>
+    <description>Golden build for issue #106 build-spec corpus. Known-good, ERC-clean, simulates to the spec sim_assertion on ngspice.</description>
+    <author>issue-106</author>
+  </metadata>
+  <nets>
+    <net id="gnd" role="ground"/>
+    <net id="v5" role="power" nominal_voltage="5V"/>
+    <net id="v3v3" role="power" nominal_voltage="3.3V"/>
+  </nets>
+  <components>
+    <component id="V_5" type="voltage_source">
+      <value>5V</value>
+      <pin name="p" net="v5"/>
+      <pin name="n" net="gnd"/>
+    </component>
+    <component id="U_REG" type="ldo">
+      <pin name="in" net="v5"/>
+      <pin name="out" net="v3v3"/>
+      <pin name="gnd" net="gnd"/>
+      <property name="vout" value="3.3V"/>
+      <property name="iout_max" value="800mA"/>
+      <property name="v_dropout" value="0.2V"/>
+      <property name="iq" value="50uA"/>
+    </component>
+    <component id="C_DEC" type="capacitor">
+      <value>10uF</value>
+      <pin name="1" net="v3v3"/>
+      <pin name="2" net="gnd"/>
+    </component>
+    <component id="U_MCU" type="mcu" part="ESP32-C3">
+      <pin name="3V3" net="v3v3"/>
+      <pin name="GND" net="gnd"/>
+    </component>
+  </components>
+  <analog>
+    <subsystem id="s">
+      <uses component="V_5"/>
+      <uses component="U_REG"/>
+      <uses component="C_DEC"/>
+      <probe id="probe_v3v3" net="v3v3" quantity="voltage"/>
+    </subsystem>
+  </analog>
+  <tests>
+    <test id="t">
+      <setup><set_voltage net="v5" value="5V"/></setup>
+      <run duration="1ms"/>
+      <assert_voltage net="v3v3" min="3.2V" max="3.4V"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="analog_only" default="true">
+      <backend type="ngspice"/>
+      <include subsystem="s"/>
+      <run test="t"/>
+    </profile>
+  </simulation_profiles>
+</system>

@@ -1,0 +1,23 @@
+{
+  "id": "pwr_atmega_usb_ldo",
+  "title": "USB 5 V to 3.3 V rail for a peripheral",
+  "category": "power",
+  "prompt": "My ATmega328 board runs on 5 V from USB, but I've added a 3.3 V peripheral that needs its own clean rail. Add a regulator that takes the 5 V input and gives a 3.3 V output rail. The ATmega itself still runs on 5 V. For the bench check verify the 3.3 V rail comes up.",
+  "mcu": "atmega328",
+  "fidelity": "faithful",
+  "criteria": {
+    "required_components": [
+      { "type": "mcu", "count": 1, "part": "ATmega328P" },
+      { "type": "ldo", "count": 1 }
+    ],
+    "connectivity": [
+      "regulator(in=<v5>, out=<v3v3>, gnd=gnd)",
+      "mcu_powered(mcu=ATmega328P, rail=<v5>)"
+    ],
+    "firmware_intent": [],
+    "erc_clean": true,
+    "sim_assertion": { "net": "v3v3", "min_v": 3.2, "max_v": 3.4 }
+  },
+  "turn_budget": 4,
+  "golden": "golden/pwr_atmega_usb_ldo/design.air.xml"
+}

@@ -1,0 +1,28 @@
+{
+  "id": "sensor_esp32c3_analog_source",
+  "title": "Pre-conditioned analog sensor to ADC",
+  "category": "sensor_node",
+  "prompt": "I have an analog sensor board that already outputs a clean 0-3.3 V signal. I just need to bring that output into my ESP32-C3 ADC so firmware can read it. For the bench test the sensor is putting out its mid-scale value of about 1.65 V.",
+  "mcu": "esp32_c3",
+  "fidelity": "abstracted",
+  "abstraction": {
+    "part": "ANALOG_SENSOR",
+    "primitive": "voltage_source",
+    "reason": "the pre-conditioned sensor presents a fixed voltage at the tested operating point; modelled with a #105 voltage_source stand-in (no internal sensor physics)"
+  },
+  "criteria": {
+    "required_components": [
+      { "type": "mcu", "count": 1, "part": "ESP32-C3" },
+      { "type": "voltage_source", "count": 1 }
+    ],
+    "connectivity": [
+      "series_element(type=voltage_source, a=<sensor_out>, b=gnd)",
+      "adc_input(net=<sensor_out>, mcu=ESP32-C3)"
+    ],
+    "firmware_intent": [ "read_adc(net=<sensor_out>)" ],
+    "erc_clean": true,
+    "sim_assertion": { "net": "sensor_out", "min_v": 1.6, "max_v": 1.7 }
+  },
+  "turn_budget": 4,
+  "golden": "golden/sensor_esp32c3_analog_source/design.air.xml"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "pwr_stm32_revpol_ldo",
+  "title": "Reverse-polarity protection + 3.3 V rail",
+  "category": "power",
+  "prompt": "My STM32F103 board is powered from an external 5 V input that people sometimes plug in backwards. Add reverse-polarity protection with a series diode in the input path, then a 3.3 V regulator after it, and power the STM32 from the 3.3 V rail. For the bench check apply a correct 5 V input and confirm the rail regulates.",
+  "mcu": "stm32_f103",
+  "fidelity": "faithful",
+  "criteria": {
+    "required_components": [
+      { "type": "mcu", "count": 1, "part": "STM32F103" },
+      { "type": "ldo", "count": 1 },
+      { "type": "diode", "count": 1 }
+    ],
+    "connectivity": [
+      "series_diode(anode=<v5_in>, cathode=<v5_prot>)",
+      "regulator(in=<v5_prot>, out=<v3v3>, gnd=gnd)",
+      "mcu_powered(mcu=STM32F103, rail=<v3v3>)"
+    ],
+    "firmware_intent": [],
+    "erc_clean": true,
+    "sim_assertion": { "net": "v3v3", "min_v": 3.2, "max_v": 3.4 }
+  },
+  "turn_budget": 4,
+  "golden": "golden/pwr_stm32_revpol_ldo/design.air.xml"
+}
