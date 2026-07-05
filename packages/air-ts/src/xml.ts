@@ -24,10 +24,15 @@
  *     the first child) and each child's `.tail` (after it); we model this by
  *     interleaving text nodes with element nodes in `children`.
  *
- * Security (conservative pre-#43 defaults, see docs/xml_security.md when it
- * lands): DOCTYPE and entity *declarations* are rejected outright, input is
- * capped at 5 MB, and nesting depth is capped at 64. These are intentionally
- * strict starting points, not the final formal contract.
+ * Security (the shared XML security contract, docs/xml_security.md, issue #43):
+ * DOCTYPE and entity *declarations* are rejected outright (SEC-001), input is
+ * capped at 5 MB (SEC-002), nesting depth at 64 (SEC-003), attribute count at
+ * 256 per element (SEC-004), attribute-value length at 65536 (SEC-005), total
+ * element count at 100000 (SEC-006); non-UTF-8 input is refused (SEC-007) and a
+ * numeric char ref to an XML-1.0-invalid code point is rejected (SEC-008). The
+ * SAME limits and codes are enforced by the Python oracle
+ * (packages/core/src/air/xml_security.py); the differential fuzzer (#43)
+ * compares the two engines' accept/reject + code on every mutated input.
  */
 
 import { XMLParser, XMLValidator } from "fast-xml-parser";
@@ -50,20 +55,44 @@ export interface XmlElement {
 
 export type XmlNode = XmlElement | XmlText;
 
-export const MAX_INPUT_BYTES = 5 * 1024 * 1024; // 5 MB, pre-#43 default.
-export const MAX_DEPTH = 64; // pre-#43 default.
+// The shared XML security contract (issue #43, docs/xml_security.md). These
+// limits are the single source of truth and are kept in lockstep with the
+// Python oracle (packages/core/src/air/xml_security.py). Each has a registered
+// SEC- diagnostic code so both engines reject a hostile input with the SAME
+// code, which the differential fuzzer compares.
+export const MAX_INPUT_BYTES = 5 * 1024 * 1024; // 5 MB (SEC-002).
+export const MAX_DEPTH = 64; // element nesting depth (SEC-003).
+export const MAX_ATTR_COUNT = 256; // attributes on one element (SEC-004).
+export const MAX_ATTR_VALUE_LEN = 65536; // one attribute value length (SEC-005).
+export const MAX_ELEMENT_COUNT = 100_000; // total elements per document (SEC-006).
 
+/**
+ * A violation of the shared XML security contract. Carries the registered
+ * `SEC-` diagnostic code (see registry/diagnostics.json) so callers and the
+ * differential harness get a stable, cross-engine identifier, not just a
+ * message string.
+ */
 export class XmlSecurityError extends Error {
-  constructor(message: string) {
+  readonly code: string;
+  constructor(code: string, message: string) {
     super(message);
     this.name = "XmlSecurityError";
+    this.code = code;
   }
 }
 
 export class XmlParseError extends Error {
-  constructor(message: string) {
+  /**
+   * Optional registered diagnostic code. Most malformed-XML rejections are
+   * expat "not well-formed" errors with no dedicated code (`code` is
+   * undefined); the invalid-char-ref rejection carries SEC-008 so the
+   * differential harness can compare rejection classes for that case.
+   */
+  readonly code: string | undefined;
+  constructor(message: string, code?: string) {
     super(message);
     this.name = "XmlParseError";
+    this.code = code;
   }
 }
 
@@ -148,30 +177,166 @@ export function parseXml(xmlText: string): XmlElement {
     throw new XmlParseError("junk after document element (multiple roots)");
   }
   const root = roots[0] as XmlElement;
-  enforceDepth(root, 1);
+  enforceStructure(root, 1, { elements: 0 });
   return root;
 }
 
 // --- Security gate ---------------------------------------------------------- #
 
 function enforceSecurity(xmlText: string): void {
-  // Byte length (UTF-8) cap. TextEncoder is a standard global in browser,
-  // Web Worker, and Node, so no Node-only Buffer fallback is needed.
+  // Encoding policy (SEC-007): the string handed to parseXml is already decoded
+  // UTF-16 in JS, so an encoding= declaration naming a non-UTF-8 charset is the
+  // detectable hostile case (a UTF-16/UTF-32 byte payload is refused by the
+  // byte-level gate in index/callers before it becomes a string; here we catch
+  // a mismatched declaration). This keeps the oracle and air-ts agreeing on the
+  // UTF-8-only decision. A UTF-8 BOM (U+FEFF) at the start is tolerated.
+  const declMatch = /^﻿?\s*<\?xml[^>]*?encoding\s*=\s*["']([^"']+)["']/i.exec(
+    xmlText,
+  );
+  if (declMatch) {
+    const name = (declMatch[1] as string).trim().toLowerCase();
+    if (name !== "utf-8" && name !== "utf8") {
+      throw new XmlSecurityError(
+        "SEC-007",
+        `declared encoding '${name}' is not permitted (UTF-8 only)`,
+      );
+    }
+  }
+  // Byte length (UTF-8) cap (SEC-002). TextEncoder is a standard global in
+  // browser, Web Worker, and Node, so no Node-only Buffer fallback is needed.
   const byteLen = new TextEncoder().encode(xmlText).length;
   if (byteLen > MAX_INPUT_BYTES) {
     throw new XmlSecurityError(
+      "SEC-002",
       `input exceeds ${MAX_INPUT_BYTES}-byte limit (${byteLen} bytes)`,
     );
   }
-  // Reject DOCTYPE and entity declarations outright (XXE / entity-expansion
-  // surface). A conservative textual scan is sufficient pre-#43: expat would
-  // otherwise process a <!DOCTYPE ...> and any <!ENTITY ...> it declares.
-  if (/<!DOCTYPE/i.test(xmlText)) {
-    throw new XmlSecurityError("DOCTYPE declarations are not permitted");
+  // Reject DOCTYPE and entity declarations outright (SEC-001): XXE /
+  // entity-expansion surface. A conservative textual scan is sufficient: expat
+  // would otherwise process a <!DOCTYPE ...> and any <!ENTITY ...> it declares.
+  if (/<!DOCTYPE/.test(xmlText)) {
+    throw new XmlSecurityError("SEC-001", "DOCTYPE declarations are not permitted");
   }
-  if (/<!ENTITY/i.test(xmlText)) {
-    throw new XmlSecurityError("entity declarations are not permitted");
+  if (/<!ENTITY/.test(xmlText)) {
+    throw new XmlSecurityError("SEC-001", "entity declarations are not permitted");
   }
+  // Depth (SEC-003) and element count (SEC-006) are enforced by a COUNTING
+  // textual pre-scan here -- BEFORE fast-xml-parser runs -- so we own the
+  // decision (and its SEC- code) rather than letting FXP's built-in
+  // "Maximum nested tags exceeded" fire first with no code, and so the cap is
+  // enforced by counting rather than by catching a parser stack overflow
+  // (issue #43 guardrail). Attribute count/length (SEC-004/005) are checked in
+  // the post-parse tree walk (enforceStructure), where attribute structure is
+  // already available.
+  enforceDepthAndCountByScan(xmlText);
+}
+
+/**
+ * Count element open/close markup in a single linear pass and enforce the depth
+ * (SEC-003) and element-count (SEC-006) caps. This is a tolerant scan: it does
+ * not require well-formed XML (the well-formedness gate runs separately), it
+ * just tracks nesting from `<tag ...>` / `</tag>` / `<tag/>` markers, skipping
+ * comments, CDATA, PIs, and the XML declaration. Enough to bound a hostile
+ * 1000-deep or million-element document before the real parser allocates.
+ */
+function enforceDepthAndCountByScan(xmlText: string): void {
+  let depth = 0;
+  let elementCount = 0;
+  let i = 0;
+  const n = xmlText.length;
+  while (i < n) {
+    const lt = xmlText.indexOf("<", i);
+    if (lt === -1) break;
+    if (xmlText.startsWith("<!--", lt)) {
+      const end = xmlText.indexOf("-->", lt + 4);
+      i = end === -1 ? n : end + 3;
+      continue;
+    }
+    if (xmlText.startsWith("<![CDATA[", lt)) {
+      const end = xmlText.indexOf("]]>", lt + 9);
+      i = end === -1 ? n : end + 3;
+      continue;
+    }
+    if (xmlText.startsWith("<?", lt) || xmlText.startsWith("<!", lt)) {
+      const end = xmlText.indexOf(">", lt + 2);
+      i = end === -1 ? n : end + 1;
+      continue;
+    }
+    const gt = xmlText.indexOf(">", lt);
+    if (gt === -1) break;
+    const isClose = xmlText[lt + 1] === "/";
+    const isSelfClose = xmlText[gt - 1] === "/";
+    if (isClose) {
+      depth -= 1;
+    } else {
+      elementCount += 1;
+      if (elementCount > MAX_ELEMENT_COUNT) {
+        throw new XmlSecurityError(
+          "SEC-006",
+          `element count exceeds ${MAX_ELEMENT_COUNT}`,
+        );
+      }
+      if (!isSelfClose) {
+        depth += 1;
+        if (depth > MAX_DEPTH) {
+          throw new XmlSecurityError(
+            "SEC-003",
+            `nesting depth exceeds ${MAX_DEPTH}`,
+          );
+        }
+      }
+    }
+    i = gt + 1;
+  }
+}
+
+// --- Byte-level encoding gate (SEC-007) ------------------------------------- #
+
+const UTF8_BOM = [0xef, 0xbb, 0xbf];
+
+/**
+ * Enforce the UTF-8-only encoding policy on RAW bytes and decode to text
+ * (SEC-007), mirroring the oracle's `enforce_encoding`. Untrusted XML arrives as
+ * bytes (a share-link blob, an imported file); this is the byte-level entry
+ * point that refuses UTF-16/UTF-32 (by BOM) and non-UTF-8 byte sequences, so
+ * both engines make the SAME UTF-8-only decision. A UTF-8 BOM is tolerated and
+ * stripped. Once decoded, callers hand the string to `parseXml`, which runs the
+ * rest of the contract.
+ */
+export function decodeXmlBytes(bytes: Uint8Array): string {
+  // UTF-32 BOMs first (UTF-32-LE begins with the UTF-16-LE BOM bytes).
+  if (
+    (bytes[0] === 0xff && bytes[1] === 0xfe && bytes[2] === 0x00 && bytes[3] === 0x00) ||
+    (bytes[0] === 0x00 && bytes[1] === 0x00 && bytes[2] === 0xfe && bytes[3] === 0xff)
+  ) {
+    throw new XmlSecurityError("SEC-007", "UTF-32 input is not permitted (UTF-8 only)");
+  }
+  if (
+    (bytes[0] === 0xff && bytes[1] === 0xfe) ||
+    (bytes[0] === 0xfe && bytes[1] === 0xff)
+  ) {
+    throw new XmlSecurityError("SEC-007", "UTF-16 input is not permitted (UTF-8 only)");
+  }
+  let body = bytes;
+  if (bytes[0] === UTF8_BOM[0] && bytes[1] === UTF8_BOM[1] && bytes[2] === UTF8_BOM[2]) {
+    body = bytes.subarray(3);
+  }
+  // Strict UTF-8 decode: `fatal: true` throws on any invalid byte sequence,
+  // exactly as the oracle's `body.decode("utf-8")` raises UnicodeDecodeError.
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(body);
+  } catch {
+    throw new XmlSecurityError("SEC-007", "input is not valid UTF-8 (UTF-8 only)");
+  }
+}
+
+/**
+ * Parse raw XML bytes: enforce the UTF-8-only policy (SEC-007), then parse the
+ * decoded text through the full contract. The byte-level counterpart to
+ * `parseXml` for untrusted input that arrives as bytes.
+ */
+export function parseXmlBytes(bytes: Uint8Array): XmlElement {
+  return parseXml(decodeXmlBytes(bytes));
 }
 
 // --- Numeric character reference gate (PR #77 rework round 1) --------------- #
@@ -216,8 +381,13 @@ function rejectInvalidCharRefs(xmlText: string): void {
         ? parseInt(m[1], 10)
         : parseInt(m[2] as string, 16);
     if (!isXmlChar(cp)) {
+      // SEC-008: expat rejects a ref to an XML-1.0-invalid code point. We raise
+      // XmlParseError (not XmlSecurityError) to preserve #7's error TYPE, but
+      // attach the SEC-008 code so the differential harness sees the same
+      // rejection class the oracle reports.
       throw new XmlParseError(
         `reference to invalid character number: ${m[0]}`,
+        "SEC-008",
       );
     }
   }
@@ -238,13 +408,46 @@ function isXmlChar(cp: number): boolean {
   );
 }
 
-function enforceDepth(el: XmlElement, depth: number): void {
+/**
+ * Enforce the structural caps by COUNTING during a single tree walk (issue #43
+ * guardrail: depth/count are enforced by counting, never by catching a stack
+ * overflow): depth (SEC-003), total element count (SEC-006), per-element
+ * attribute count (SEC-004), and per-attribute value length (SEC-005). The
+ * counter object is shared across the recursion so the element total is a
+ * running document-wide count.
+ */
+function enforceStructure(
+  el: XmlElement,
+  depth: number,
+  counter: { elements: number },
+): void {
   if (depth > MAX_DEPTH) {
-    throw new XmlSecurityError(`nesting depth exceeds ${MAX_DEPTH}`);
+    throw new XmlSecurityError("SEC-003", `nesting depth exceeds ${MAX_DEPTH}`);
+  }
+  counter.elements += 1;
+  if (counter.elements > MAX_ELEMENT_COUNT) {
+    throw new XmlSecurityError(
+      "SEC-006",
+      `element count exceeds ${MAX_ELEMENT_COUNT}`,
+    );
+  }
+  if (el.attrib.size > MAX_ATTR_COUNT) {
+    throw new XmlSecurityError(
+      "SEC-004",
+      `element <${el.tag}> has ${el.attrib.size} attributes (limit ${MAX_ATTR_COUNT})`,
+    );
+  }
+  for (const value of el.attrib.values()) {
+    if (value.length > MAX_ATTR_VALUE_LEN) {
+      throw new XmlSecurityError(
+        "SEC-005",
+        `attribute value on <${el.tag}> exceeds ${MAX_ATTR_VALUE_LEN} characters`,
+      );
+    }
   }
   for (const child of el.children) {
     if (child.kind === "element") {
-      enforceDepth(child, depth + 1);
+      enforceStructure(child, depth + 1, counter);
     }
   }
 }

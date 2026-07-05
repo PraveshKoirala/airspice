@@ -1,0 +1,18 @@
+{
+  "issue": "#78",
+  "note": "comment content contains '--': expat rejects as not well-formed",
+  "expect": "diverge-known",
+  "classifiedKnown": "#78",
+  "diverges": true,
+  "mismatchKind": "decision",
+  "ts": {
+    "status": "accept",
+    "modelHash": "62ad40900bece78a"
+  },
+  "py": {
+    "codes": [],
+    "reason": "XmlParseError: not well-formed (invalid token): line 1, column 42",
+    "status": "reject"
+  },
+  "input": "<system name=\"t\" ir_version=\"0.1\"><!-- a--b --></system>"
+}

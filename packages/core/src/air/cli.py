@@ -58,6 +58,26 @@ def main(argv: list[str] | None = None) -> int:
     dump_model_p.add_argument("--json", action="store_true", help="Emit deterministic model JSON (default and only output form)")
     dump_model_p.add_argument("--out", help="Write to this path instead of stdout")
 
+    fuzz_eval_p = sub.add_parser(
+        "fuzz-eval",
+        help="Machine-readable parse outcome for a single input (differential fuzzing, issue #43)",
+    )
+    fuzz_eval_p.add_argument(
+        "design",
+        nargs="?",
+        help="Path to the input XML; omit (or pass '-') to read from stdin",
+    )
+    fuzz_eval_p.add_argument(
+        "--stdin", action="store_true", help="Read the input XML from stdin"
+    )
+    fuzz_eval_p.add_argument(
+        "--batch",
+        action="store_true",
+        help="Stream mode: read length-prefixed inputs from stdin, emit one JSON "
+        "outcome line per input (fast path for the differential fuzzer). Each "
+        "record is a decimal byte length, a newline, then that many UTF-8 bytes.",
+    )
+
     explain_p = sub.add_parser("explain", help="Explain a design")
     explain_p.add_argument("design")
     explain_p.add_argument("--json", action="store_true")
@@ -186,6 +206,10 @@ def main(argv: list[str] | None = None) -> int:
         return _summarize(Path(args.design), args.json)
     if args.command == "dump-model":
         return _dump_model(Path(args.design), Path(args.out) if args.out else None)
+    if args.command == "fuzz-eval":
+        if args.batch:
+            return _fuzz_eval_batch()
+        return _fuzz_eval(args.design, args.stdin)
     if args.command == "generate-template":
         return _generate_template(args.template, Path(args.out), args.json)
     if args.command == "compile":
@@ -279,6 +303,61 @@ def _dump_model(path: Path, out: Path | None) -> int:
     else:
         # Write raw bytes so stdout is LF-terminated regardless of platform.
         sys.stdout.write(text)
+    return 0
+
+
+def _fuzz_eval(design: str | None, from_stdin: bool) -> int:
+    """Emit a machine-readable parse outcome for a single input (issue #43).
+
+    Reads the input from a path or stdin (path '-' or --stdin), runs the oracle
+    fuzz-eval pipeline, and prints one JSON object:
+      {"status":"accept","modelHash":"..."} |
+      {"status":"reject","codes":[...],"reason":"..."} |
+      {"status":"crash","error":"..."}
+    Exit code is 0 for accept/reject (both are well-defined outcomes the fuzzer
+    compares) and 2 for crash (an unhandled escape the fuzzer must flag).
+    """
+    from .fuzz_eval import evaluate, evaluate_path
+
+    if from_stdin or design in (None, "-"):
+        raw = sys.stdin.buffer.read()
+        outcome = evaluate(raw)
+    else:
+        outcome = evaluate_path(Path(design))
+    print(json.dumps(outcome.to_dict(), separators=(",", ":"), sort_keys=True))
+    return 2 if outcome.status == "crash" else 0
+
+
+def _fuzz_eval_batch() -> int:
+    """Stream-evaluate length-prefixed inputs from stdin (issue #43 fast path).
+
+    Protocol (binary stdin): each record is a decimal byte length, a newline,
+    then exactly that many UTF-8 bytes of input. EOF (or a blank length line)
+    ends the stream. For each record, one JSON outcome line is written to stdout
+    and flushed, so the differential fuzzer can drive one long-lived oracle
+    process instead of spawning Python per case. This is a read-only evaluation
+    loop -- no parse behavior differs from single-shot ``fuzz-eval``.
+    """
+    from .fuzz_eval import evaluate
+
+    stdin = sys.stdin.buffer
+    out = sys.stdout
+    while True:
+        header = stdin.readline()
+        if not header:
+            break
+        line = header.strip()
+        if not line:
+            break
+        try:
+            length = int(line)
+        except ValueError:
+            break
+        payload = stdin.read(length)
+        outcome = evaluate(payload)
+        out.write(json.dumps(outcome.to_dict(), separators=(",", ":"), sort_keys=True))
+        out.write("\n")
+        out.flush()
     return 0
 
 

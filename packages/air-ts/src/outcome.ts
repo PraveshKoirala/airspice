@@ -18,7 +18,7 @@
 
 import { parse } from "./index.js";
 import { serializeModel } from "./model_dump.js";
-import { XmlSecurityError, XmlParseError } from "./xml.js";
+import { XmlSecurityError, XmlParseError, decodeXmlBytes } from "./xml.js";
 import { AirParseError } from "./parser.js";
 
 export type ParseOutcome =
@@ -43,9 +43,19 @@ export function parseOutcome(xmlText: string): ParseOutcome {
       err instanceof XmlParseError ||
       err instanceof XmlSecurityError
     ) {
+      // Security violations (and the SEC-008 invalid-char-ref rejection) carry a
+      // registered SEC- code; surface it so the differential harness compares
+      // rejection CLASS, not just accept/reject. Non-security parse rejections
+      // (bad root, expat not-well-formed) have no dedicated code -> [] (#7).
+      const code =
+        err instanceof XmlSecurityError
+          ? err.code
+          : err instanceof XmlParseError
+            ? err.code
+            : undefined;
       return {
         status: "reject",
-        codes: [], // parser-level: no diagnostic codes in #7 (see module doc).
+        codes: code ? [code] : [],
         reason: `${err.name}: ${err.message}`,
       };
     }
@@ -54,6 +64,28 @@ export function parseOutcome(xmlText: string): ParseOutcome {
     return { status: "crash", error: `${e?.name ?? "Error"}: ${e?.message ?? String(err)}` };
   }
   return { status: "accept", modelHash: fnv1a64(modelJson) };
+}
+
+/**
+ * Byte-level outcome: enforce the UTF-8-only encoding policy (SEC-007) on raw
+ * bytes, then evaluate the decoded text. This is the counterpart the
+ * differential fuzzer uses when it feeds raw bytes (e.g. a UTF-16 payload) to
+ * both engines -- the oracle reads bytes too, so this keeps the two engines'
+ * encoding decision comparable. A non-UTF-8 payload becomes a `reject` carrying
+ * SEC-007, never a crash.
+ */
+export function parseOutcomeBytes(bytes: Uint8Array): ParseOutcome {
+  let text: string;
+  try {
+    text = decodeXmlBytes(bytes);
+  } catch (err) {
+    if (err instanceof XmlSecurityError) {
+      return { status: "reject", codes: [err.code], reason: `${err.name}: ${err.message}` };
+    }
+    const e = err as Error;
+    return { status: "crash", error: `${e?.name ?? "Error"}: ${e?.message ?? String(err)}` };
+  }
+  return parseOutcome(text);
 }
 
 /**

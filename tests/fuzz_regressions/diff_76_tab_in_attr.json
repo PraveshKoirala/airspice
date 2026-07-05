@@ -1,0 +1,17 @@
+{
+  "issue": "#76",
+  "note": "literal tab in attribute value: expat normalizes to space at parse time",
+  "expect": "diverge-known",
+  "classifiedKnown": "#76",
+  "diverges": true,
+  "mismatchKind": "hash",
+  "ts": {
+    "status": "accept",
+    "modelHash": "8342c614713d1899"
+  },
+  "py": {
+    "modelHash": "7d04ab5df1eda759",
+    "status": "accept"
+  },
+  "input": "<system name=\"a\tb\" ir_version=\"0.1\"></system>"
+}

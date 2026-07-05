@@ -68,6 +68,16 @@ TESTS_DIR = REPO_ROOT / "tests"
 # registry collectors use exact "code" fields so they are not affected.
 CODE_TOKEN_RE = re.compile(r"\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b")
 
+# A NAMESPACED code token (docs/diagnostics_spec.md scheme for NEW codes): a
+# subsystem prefix, a hyphen, and a zero-padded number, e.g. SEC-001, VAL-012.
+# The SCREAMING_SNAKE regex above deliberately excludes hyphens, so namespaced
+# codes need their own collector -- otherwise a new SEC-/VAL-/... code exercised
+# only by a name reference in a test (no golden-corpus fixture) would be flagged
+# as a dead code by check 2. The prefixes match the spec's namespace table.
+NAMESPACED_CODE_RE = re.compile(
+    r"\b(?:VAL|PARSE|SIM|COSIM|PATCH|IMP|SEC)-[0-9]{3,}\b"
+)
+
 # Codes discovered in test .py files that are NOT platform diagnostic codes:
 # test-harness / product tokens that happen to look like codes. Anything listed
 # here is ignored by the test-source collector for check 1 (so it does not
@@ -161,6 +171,9 @@ def test_source_tokens(tests_dir: Path = TESTS_DIR) -> set[str]:
         except OSError:
             continue
         found.update(CODE_TOKEN_RE.findall(text))
+        # Also collect namespaced codes (SEC-001, VAL-012, ...); the
+        # SCREAMING_SNAKE regex excludes hyphens so these need their own sweep.
+        found.update(NAMESPACED_CODE_RE.findall(text))
     return found - TEST_SOURCE_IGNORE
 
 
@@ -336,6 +349,39 @@ def _self_test() -> int:
     t.check(
         "pending: corpus code matching only a pending entry satisfies check 1",
         not any("PENDING_CODE" in f for f in fails),
+    )
+
+    # namespaced-code discovery: a NEW hyphenated code (SEC-001) referenced by
+    # name in test source must be discovered by the test-source collector, so an
+    # active namespaced code covered only by a name reference (no corpus fixture)
+    # is NOT flagged as a dead code by check 2. The SCREAMING_SNAKE regex does
+    # not match hyphens; NAMESPACED_CODE_RE does.
+    t.check(
+        "namespaced: SEC-001 is NOT matched by the SCREAMING_SNAKE regex",
+        CODE_TOKEN_RE.findall("assertIn('SEC-001', codes)") == [],
+    )
+    t.check(
+        "namespaced: SEC-001 IS matched by the namespaced regex",
+        NAMESPACED_CODE_RE.findall("assertIn('SEC-001', codes)") == ["SEC-001"],
+    )
+    t.check(
+        "namespaced: every spec prefix is recognized",
+        NAMESPACED_CODE_RE.findall("VAL-001 PARSE-002 SIM-003 COSIM-004 "
+                                   "PATCH-005 IMP-006 SEC-007")
+        == ["VAL-001", "PARSE-002", "SIM-003", "COSIM-004", "PATCH-005",
+            "IMP-006", "SEC-007"],
+    )
+    # And end-to-end: an active SEC- code exercised only by a name reference is
+    # credited (no orphan), while an unexercised one is still flagged.
+    reg = registry_with([entry("SEC-001"), entry("SEC-999")], [])
+    fails = run_checks(reg, corpus=set(), test_codes={"SEC-001"})
+    t.check(
+        "namespaced: referenced SEC-001 is not an orphan",
+        not any("SEC-001" in f for f in fails),
+    )
+    t.check(
+        "namespaced: unreferenced SEC-999 is flagged as an orphan",
+        any("SEC-999" in f and "[check 2]" in f for f in fails),
     )
 
     # KNOWN_ORPHAN_ISSUES escape hatch: a filed-issue orphan is non-fatal.

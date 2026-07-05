@@ -1,0 +1,18 @@
+{
+  "issue": "#75",
+  "note": "undefined named entity &foo;: expat rejects (undefined entity), fast-xml-parser keeps it literal and accepts -> a DECISION divergence. (NB: bare '&' in text and &#X42; are both REJECTED by air-ts's XMLValidator too, so they do NOT diverge -- only named-entity resolution is lenient in fast-xml-parser.)",
+  "expect": "diverge-known",
+  "classifiedKnown": "#75",
+  "diverges": true,
+  "mismatchKind": "decision",
+  "ts": {
+    "status": "accept",
+    "modelHash": "36239b9a695f46cb"
+  },
+  "py": {
+    "codes": [],
+    "reason": "XmlParseError: undefined entity: line 1, column 51",
+    "status": "reject"
+  },
+  "input": "<system name=\"t\" ir_version=\"0.1\"><metadata><title>&foo;</title></metadata></system>"
+}

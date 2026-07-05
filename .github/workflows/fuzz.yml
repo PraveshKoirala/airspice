@@ -1,0 +1,147 @@
+name: fuzz
+
+# Differential parser fuzzing (issue #43). Two cadences, per the issue:
+#   * PR / push:   1,000 seeded cases -- fast, DETERMINISTIC (same seed -> same
+#                  cases). Fails the PR on any NEW divergence or crash in either
+#                  engine. KNOWN divergence families (#75/#76/#78/#80) are
+#                  reported but do not fail (the classifier is narrow + self-tested).
+#   * nightly:     50,000 seeded cases on a schedule; on failure, auto-opens an
+#                  issue with the campaign summary so a regression can't sit
+#                  unnoticed.
+#
+# The fuzzer drives BOTH engines: air-ts in-process (from its built dist/) and
+# the Python oracle via `air fuzz-eval --batch` (one long-lived subprocess). So
+# the job builds air-ts and installs the core package.
+#
+# This is a NEW workflow file; ci.yml / air-ts.yml are untouched.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # 03:17 UTC nightly (offset from the hour to avoid the scheduler stampede).
+    - cron: "17 3 * * *"
+
+concurrency:
+  group: fuzz-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    name: differential parser fuzz
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: write # nightly auto-issue on failure
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: packages/air-ts/package-lock.json
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      # air-ts (in-process engine): install + build so dist/index.js exists.
+      - name: Build air-ts
+        working-directory: packages/air-ts
+        run: |
+          npm ci
+          npm run build
+
+      # Core package (the oracle behind `air fuzz-eval`).
+      - name: Install core package
+        run: python -m pip install --upgrade pip && python -m pip install -e .
+
+      # Point the fuzzer's oracle at the CI Python (the default path is the local
+      # .venv). The fuzzer runs `python -m air.cli fuzz-eval --batch`.
+      - name: Fuzzer self-test (prove the machinery + KNOWN classifier have teeth)
+        env:
+          AIR_FUZZ_PYTHON: python
+        run: node scripts/fuzz_diff.mjs --self-test
+
+      # Determinism gate: run the PR seed TWICE and assert byte-identical output.
+      - name: Determinism check (same seed -> identical output, run twice)
+        env:
+          AIR_FUZZ_PYTHON: python
+        run: |
+          node scripts/fuzz_diff.mjs --seed 1 --cases 1000 --json-out run_a.json
+          node scripts/fuzz_diff.mjs --seed 1 --cases 1000 --json-out run_b.json
+          if cmp -s run_a.json run_b.json; then
+            echo "deterministic: seed 1 produced byte-identical output twice"
+          else
+            echo "::error::fuzzer is non-deterministic: seed 1 produced different output on two runs"
+            # Show the first differing lines for triage. `diff` exits nonzero on a
+            # difference; that is expected here, so guard it with `if` (not the
+            # R2-banned OR-true idiom) and always fail the step afterwards.
+            if diff run_a.json run_b.json; then :; fi
+            exit 1
+          fi
+
+      # PR / push cadence: 1,000 seeded cases. Exit non-zero on any NEW divergence.
+      - name: PR fuzz campaign (1,000 cases)
+        if: github.event_name != 'schedule'
+        env:
+          AIR_FUZZ_PYTHON: python
+        run: node scripts/fuzz_diff.mjs --seed 1 --cases 1000
+
+      # Nightly cadence: 50,000 seeded cases. The seed is derived from the run so
+      # the nightly explores fresh cases while staying reproducible from the log.
+      - name: Nightly fuzz campaign (50,000 cases)
+        id: nightly
+        if: github.event_name == 'schedule'
+        env:
+          AIR_FUZZ_PYTHON: python
+        run: |
+          SEED=$(( 20260000 + (RANDOM % 100000) ))
+          echo "seed=$SEED" >> "$GITHUB_OUTPUT"
+          node scripts/fuzz_diff.mjs --seed "$SEED" --cases 50000 --json-out nightly.json | tee nightly.log
+
+      # On nightly failure, open an issue with the campaign summary + shrunk
+      # reproducer so the regression is tracked, not silently red.
+      - name: Auto-open issue on nightly failure
+        if: failure() && github.event_name == 'schedule'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let summary = '(no campaign log captured)';
+            try { summary = fs.readFileSync('nightly.log', 'utf8').slice(-6000); } catch {}
+            const seed = '${{ steps.nightly.outputs.seed }}' || 'unknown';
+            const body = [
+              '## Nightly differential fuzz failure',
+              '',
+              `A NEW divergence (or crash) was found by the nightly fuzz campaign (seed \`${seed}\`).`,
+              'Reproduce locally:',
+              '',
+              '```',
+              `node scripts/fuzz_diff.mjs --seed ${seed} --cases 50000 --emit-regressions`,
+              '```',
+              '',
+              'Campaign summary (tail):',
+              '',
+              '```',
+              summary,
+              '```',
+              '',
+              `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            ].join('\n');
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Nightly fuzz: NEW parser divergence (seed ${seed})`,
+              body,
+              labels: ['core-ts', 'core-py'],
+            });

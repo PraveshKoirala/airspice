@@ -1,0 +1,59 @@
+{
+  "_note": "Hostile-XML fixtures for the shared XML security contract (issue #43, docs/xml_security.md). BOTH engines -- the Python oracle (tests/test_xml_security.py) and air-ts (packages/air-ts/tests/xml_security.test.ts) -- read this manifest and assert each fixture is REJECTED with the listed SEC- code. Fixtures that are large or non-UTF-8 (oversized, utf16) are GENERATED in-test rather than committed as blobs; their 'generated' flag says how.",
+  "fixtures": [
+    {
+      "name": "billion_laughs",
+      "file": "fixtures/billion_laughs.air.xml",
+      "expect_code": "SEC-001",
+      "note": "entity-expansion payload: rejected on the DOCTYPE/ENTITY declaration BEFORE any expansion (must complete in <100ms)."
+    },
+    {
+      "name": "external_entity",
+      "file": "fixtures/external_entity.air.xml",
+      "expect_code": "SEC-001",
+      "note": "external general entity (XXE): rejected on the DOCTYPE/ENTITY declaration."
+    },
+    {
+      "name": "deep_nesting",
+      "file": "fixtures/deep_nesting.air.xml",
+      "expect_code": "SEC-003",
+      "note": "1000-deep element nesting: exceeds the depth cap of 64 (enforced by counting, not by catching a stack overflow)."
+    },
+    {
+      "name": "bad_encoding_decl",
+      "file": "fixtures/bad_encoding_decl.air.xml",
+      "expect_code": "SEC-007",
+      "note": "a non-UTF-8 encoding declaration is refused (UTF-8-only policy)."
+    },
+    {
+      "name": "invalid_charref",
+      "file": "fixtures/invalid_charref.air.xml",
+      "expect_code": "SEC-008",
+      "note": "numeric char ref to an XML-1.0-invalid code point (&#8;) is rejected identically by both engines."
+    },
+    {
+      "name": "oversized",
+      "generated": "oversized",
+      "expect_code": "SEC-002",
+      "note": "an input just over the 5 MB byte cap (generated in-test to avoid committing a 5 MB blob)."
+    },
+    {
+      "name": "utf16",
+      "generated": "utf16",
+      "expect_code": "SEC-007",
+      "note": "a UTF-16-encoded document (with BOM), generated in-test; refused by the UTF-8-only policy."
+    },
+    {
+      "name": "many_attributes",
+      "generated": "many_attributes",
+      "expect_code": "SEC-004",
+      "note": "an element with more attributes than the per-element cap (generated in-test)."
+    },
+    {
+      "name": "long_attr_value",
+      "generated": "long_attr_value",
+      "expect_code": "SEC-005",
+      "note": "a single attribute value longer than the per-value cap (generated in-test)."
+    }
+  ]
+}

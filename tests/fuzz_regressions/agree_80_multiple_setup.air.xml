@@ -1,0 +1,1 @@
+<system name="t" ir_version="0.1"><tests><test id="x"><setup><set_voltage net="a" value="1V"/></setup><setup><set_voltage net="b" value="2V"/></setup></test></tests></system>
