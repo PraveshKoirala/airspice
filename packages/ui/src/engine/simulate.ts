@@ -66,8 +66,19 @@ let runCounter = 0;
  * Run the design's default ngspice profile entirely in the browser and return
  * the report + retained-waveform run id. Throws if the design has no
  * ngspice-backed profile (the caller surfaces that to the user).
+ *
+ * CANCELLATION (issue #18 Stop button; #13 ADR 0011): an optional AbortSignal
+ * cancels an in-flight run. Because eecircuit cannot interrupt a running
+ * transient, cancel TERMINATES + RESPAWNS the worker (SimClient.cancel), so the
+ * abort returns in well under the 500ms acceptance bar and the next run gets a
+ * pristine engine. On abort this rejects with an `aborted` error the agent tool
+ * runtime turns into a "simulation_canceled" tool result.
  */
-export async function simulateLocal(xml: string): Promise<LocalSimulationResult> {
+export async function simulateLocal(
+  xml: string,
+  signal?: AbortSignal,
+): Promise<LocalSimulationResult> {
+  if (signal?.aborted) throw new DOMException("Simulation aborted", "AbortError");
   const ir: SystemIR = parse(xml);
   const profileId = defaultNgspiceProfile(ir);
   if (profileId === null) {
@@ -82,12 +93,13 @@ export async function simulateLocal(xml: string): Promise<LocalSimulationResult>
   let overallStatus: "passed" | "failed" = "passed";
 
   for (const testId of profile.tests) {
+    if (signal?.aborted) throw new DOMException("Simulation aborted", "AbortError");
     const test = ir.tests.get(testId);
     if (!test) {
       notes.push(`skipped unknown test ${testId}`);
       continue;
     }
-    const { report, tables } = await runOneTest(ir, test, profileId, runId, notes);
+    const { report, tables } = await runOneTest(ir, test, profileId, runId, notes, signal);
     reports.push(report);
     if (report.status === "failed") overallStatus = "failed";
     retainTables(runWaveforms, test.id, tables, probeNets(ir, test, profileId));
@@ -110,6 +122,7 @@ async function runOneTest(
   profileId: string,
   runId: string,
   notes: string[],
+  signal?: AbortSignal,
 ): Promise<{ report: SimulationReport; tables: WaveTable[] }> {
   const extraProbes = subsystemProbeNets(ir, profileId);
   const { netlist } = compileSpice(ir, test, { extraProbes });
@@ -120,6 +133,17 @@ async function runOneTest(
   const probes = probeVectors.map((v) => ({ id: v, vector: v }));
 
   const simId = `${runId}-${test.id}`;
+  // Stop button: cancel this run's worker (terminate + respawn, ADR 0011) the
+  // moment the signal fires, so the abort returns in well under 500ms.
+  let aborted = false;
+  const onAbort = () => {
+    aborted = true;
+    client().cancel(simId);
+  };
+  if (signal) {
+    if (signal.aborted) onAbort();
+    else signal.addEventListener("abort", onAbort, { once: true });
+  }
   let tables: WaveTable[] = [];
   // The engine was ATTEMPTED iff the worker produced a terminal event (result or
   // error) — i.e. the WASM engine loaded and ran. It is UNattempted only on an
@@ -130,16 +154,27 @@ async function runOneTest(
   let errorLine: string | null = null;
   const stderr: string[] = [];
 
-  for await (const ev of client().run({ id: simId, netlist: prepared, probes }) as AsyncIterable<SimEvent>) {
-    if (ev.type === "result") {
-      engineAttempted = true;
-      tables = ev.tables;
-    } else if (ev.type === "error") {
-      engineAttempted = true;
-      errorLine = `${ev.diagnostic.code}: ${ev.diagnostic.message}`;
-    } else if (ev.type === "stderr") {
-      stderr.push(ev.line);
+  try {
+    for await (const ev of client().run({ id: simId, netlist: prepared, probes }) as AsyncIterable<SimEvent>) {
+      if (ev.type === "result") {
+        engineAttempted = true;
+        tables = ev.tables;
+      } else if (ev.type === "error") {
+        engineAttempted = true;
+        errorLine = `${ev.diagnostic.code}: ${ev.diagnostic.message}`;
+      } else if (ev.type === "stderr") {
+        stderr.push(ev.line);
+      }
     }
+  } finally {
+    signal?.removeEventListener("abort", onAbort);
+  }
+
+  // A canceled run surfaces as an abort to the caller (the agent tool runtime
+  // turns it into a "simulation_canceled" result). The cancel already settled
+  // the stream with a SIM-CANCELED error above.
+  if (aborted || signal?.aborted) {
+    throw new DOMException("Simulation aborted", "AbortError");
   }
 
   if (errorLine) {
