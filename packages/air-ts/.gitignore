@@ -1,0 +1,4 @@
+# Build output and dependencies (also covered by the repo-root .gitignore).
+dist/
+node_modules/
+*.tsbuildinfo

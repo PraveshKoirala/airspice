@@ -1,0 +1,6 @@
+# Force LF for all air-ts sources and fixtures. The parity tests read fixture
+# JSON and the golden corpus and compare byte-for-byte; a stray CR from Windows
+# autocrlf would corrupt those comparisons. Linux CI must see exactly what was
+# committed. (The corpus itself is already pinned to LF by the repo-root
+# .gitattributes; this covers the package's own files.)
+* text=auto eol=lf

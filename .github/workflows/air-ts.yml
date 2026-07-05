@@ -1,0 +1,60 @@
+name: air-ts
+
+# Parity CI for the TypeScript AIR engine core (packages/air-ts, issue #7).
+# Runs on every push to main and every pull request. This is a SEPARATE workflow
+# from ci.yml by design (the orchestrator asked for a new file, not an edit to
+# ci.yml). The job builds the package under strict TypeScript and runs the full
+# Vitest suite, whose parity tests diff air-ts output against the golden corpus
+# byte-for-byte. No ngspice / Python is needed -- issue #7 does no simulation.
+#
+# Maintainer note: once green, `air-ts` can be added to the required status
+# checks for `main` alongside guardrails / core-py / ui.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Newer pushes to the same ref cancel in-flight runs.
+concurrency:
+  group: air-ts-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  air-ts:
+    name: air-ts (build + vitest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/air-ts
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: packages/air-ts/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Strict TypeScript build (tsc -b) fails on any type error; also
+      # type-checks the test sources against the same strict config.
+      - name: Typecheck (src + tests, strict)
+        run: npm run typecheck
+
+      # `npm run build` == `tsc -b`; emits dist/ and fails on any TS error.
+      - name: Build
+        run: npm run build
+
+      # Full Vitest suite: corpus parity (15 designs x model.json +
+      # canonical.air.xml, byte-diff), units table, formatNumber/%.6g,
+      # canonicalizer edges, parser leniencies, security limits, the parity
+      # harness mutation self-test, and the fuzzer outcome reporter.
+      - name: Test (vitest)
+        run: npm test

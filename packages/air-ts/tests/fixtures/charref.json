@@ -1,0 +1,20 @@
+[
+  {
+    "name": "charref_text_valid",
+    "xml": "<system name=\"t\" ir_version=\"0.1\"><metadata><title>A&#65;B&#x2764;C&#x1F600;D&#55295;E&#57344;F&#65533;</title></metadata><nets><net id=\"gnd\" role=\"ground\"/></nets></system>",
+    "model": "{\n  \"analog\": [],\n  \"bridges\": [],\n  \"components\": {},\n  \"exports\": [],\n  \"firmware_bindings\": {},\n  \"firmware_projects\": {},\n  \"firmware_tasks\": {},\n  \"interfaces\": {},\n  \"ir_version\": \"0.1\",\n  \"metadata\": {\n    \"author\": \"\",\n    \"created_at\": \"\",\n    \"description\": \"\",\n    \"title\": \"AAB\\u2764C\\ud83d\\ude00D\\ud7ffE\\ue000F\\ufffd\"\n  },\n  \"name\": \"t\",\n  \"nets\": {\n    \"gnd\": {\n      \"id\": \"gnd\",\n      \"nominal_voltage\": null,\n      \"role\": \"ground\"\n    }\n  },\n  \"power_domains\": {},\n  \"requirements\": [],\n  \"simulation_profiles\": {},\n  \"tests\": {}\n}\n",
+    "canonical": "<?xml version=\"1.0\" ?>\n<system ir_version=\"0.1\" name=\"t\">\n  <metadata>\n    <title>AAB❤C😀D퟿EF�</title>\n  </metadata>\n  <nets>\n    <net id=\"gnd\" role=\"ground\"/>\n  </nets>\n</system>\n"
+  },
+  {
+    "name": "charref_attr_valid",
+    "xml": "<system name=\"n&#x41;me&#x2764;\" ir_version=\"0.1\"><nets><net id=\"g&#110;d\" role=\"ground\"/></nets></system>",
+    "model": "{\n  \"analog\": [],\n  \"bridges\": [],\n  \"components\": {},\n  \"exports\": [],\n  \"firmware_bindings\": {},\n  \"firmware_projects\": {},\n  \"firmware_tasks\": {},\n  \"interfaces\": {},\n  \"ir_version\": \"0.1\",\n  \"metadata\": {\n    \"author\": \"\",\n    \"created_at\": \"\",\n    \"description\": \"\",\n    \"title\": \"\"\n  },\n  \"name\": \"nAme\\u2764\",\n  \"nets\": {\n    \"gnd\": {\n      \"id\": \"gnd\",\n      \"nominal_voltage\": null,\n      \"role\": \"ground\"\n    }\n  },\n  \"power_domains\": {},\n  \"requirements\": [],\n  \"simulation_profiles\": {},\n  \"tests\": {}\n}\n",
+    "canonical": "<?xml version=\"1.0\" ?>\n<system ir_version=\"0.1\" name=\"nAme❤\">\n  <nets>\n    <net id=\"gnd\" role=\"ground\"/>\n  </nets>\n</system>\n"
+  },
+  {
+    "name": "charref_ws_valid",
+    "xml": "<system name=\"t\" ir_version=\"0.1\"><metadata><title>&#9;pad&#32;ded&#9;</title></metadata><nets><net id=\"gnd\" role=\"ground\"/></nets></system>",
+    "model": "{\n  \"analog\": [],\n  \"bridges\": [],\n  \"components\": {},\n  \"exports\": [],\n  \"firmware_bindings\": {},\n  \"firmware_projects\": {},\n  \"firmware_tasks\": {},\n  \"interfaces\": {},\n  \"ir_version\": \"0.1\",\n  \"metadata\": {\n    \"author\": \"\",\n    \"created_at\": \"\",\n    \"description\": \"\",\n    \"title\": \"pad ded\"\n  },\n  \"name\": \"t\",\n  \"nets\": {\n    \"gnd\": {\n      \"id\": \"gnd\",\n      \"nominal_voltage\": null,\n      \"role\": \"ground\"\n    }\n  },\n  \"power_domains\": {},\n  \"requirements\": [],\n  \"simulation_profiles\": {},\n  \"tests\": {}\n}\n",
+    "canonical": "<?xml version=\"1.0\" ?>\n<system ir_version=\"0.1\" name=\"t\">\n  <metadata>\n    <title>\tpad ded\t</title>\n  </metadata>\n  <nets>\n    <net id=\"gnd\" role=\"ground\"/>\n  </nets>\n</system>\n"
+  }
+]
