@@ -136,7 +136,7 @@ describe("report parity: browser buildReport reproduces the oracle report byte-f
 
 describe("report parity: the corpus report set is pinned (fixtures cannot silently vanish)", () => {
   // Reflects the committed corpus at issue #14 time: 5 report JSONs across 4
-  // designs (esp32_battery_sensor has two tests). Asserted dynamically off the
+  // designs (one design carries two tests). Asserted dynamically off the
   // discovery so no corpus name is hard-coded (guardrails R4); bump in an
   // oracle-first PR if the corpus legitimately grows.
   it("exactly 5 report cases are present", () => {
