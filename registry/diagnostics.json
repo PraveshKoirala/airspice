@@ -545,6 +545,17 @@
       "grandfathered": true
     },
     {
+      "code": "SIM-010",
+      "namespace": "simulation",
+      "owner": "simulator",
+      "severity": "error",
+      "message_template": "Test {test_id} did not converge after the full convergence-aid ladder ({rungs} rungs: as-written, gmin stepping, source stepping, Gear+relaxed reltol). A design that exhausts every numerical aid usually has a topology problem, not a value problem: check for a floating node or a net with no DC path to ground, then re-run.",
+      "parameters": ["test_id", "rungs"],
+      "remediation": "Check for floating nodes (a net reachable only through capacitors) / Ensure every node has a DC path to ground / Add the missing ground connection or a high-value bleeder resistor, then re-simulate",
+      "source": "packages/core/src/air/simulator.py:_terminal_convergence_diagnostic",
+      "grandfathered": false
+    },
+    {
       "code": "ASSERT_NO_MEASUREMENT",
       "namespace": "analog",
       "owner": "simulator",

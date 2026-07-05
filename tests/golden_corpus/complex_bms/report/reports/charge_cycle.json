@@ -6,6 +6,21 @@
     "waveforms/charge_cycle_charge_ctrl.csv"
   ],
   "backend": "ngspice",
+  "convergence": {
+    "aids_required": false,
+    "attempts": [
+      {
+        "converged": true,
+        "name": "as-written",
+        "options": [],
+        "rung": 1
+      }
+    ],
+    "converged": true,
+    "note": null,
+    "rung": 1,
+    "terminal": false
+  },
   "diagnostics": [],
   "measurement_stats": {
     "bat": {
