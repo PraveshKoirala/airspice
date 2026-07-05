@@ -154,7 +154,11 @@ export function compileSpice(
     lines.push(`${sourceName} ${spiceNet(net)} 0 DC ${spiceValue(value)}`);
   }
 
-  if (rawStimulus) {
+  // PARITY: spice.py's `if raw_stimulus:` is Python truthiness -- an EMPTY
+  // list is falsy, so `raw_stimulus=[]` falls through to the MCU stimulus.
+  // A bare `if (rawStimulus)` would treat [] as truthy and silently suppress
+  // the MCU lines (found in the rework round 1 ??/falsy audit).
+  if (rawStimulus && rawStimulus.length > 0) {
     lines.push(...rawStimulus);
   } else {
     lines.push(...mcuStimulusLines(ir));
@@ -259,9 +263,15 @@ function componentLine(component: Component, test: Test | null): string | null {
         `PULSE(${spiceValue(start)} ${spiceValue(stop)} ${spiceValue(at)} ${spiceValue(rise)} ${spiceValue(rise)} 1s 2s)`
       );
     }
+    // PARITY: spice.py chains these with `or` -- `_test_current(...) or
+    // properties.get("current") or value` -- and Python `or` falls through
+    // EVERY falsy value, including the EMPTY STRING (a <set_current> with no
+    // value attribute stores "" in setup; an empty current property is "").
+    // `??` stops at "" and silently drops the device line (rework round 1,
+    // divergence 1). `||` reproduces the Python or-chain for strings exactly.
     const current =
-      testCurrent(test, component.id) ??
-      component.properties.get("current") ??
+      testCurrent(test, component.id) ||
+      component.properties.get("current") ||
       component.value;
     if (current) {
       return `I_${component.id} ${spiceNet(pins[0]!.net)} ${spiceNet(pins[1]!.net)} DC ${spiceValue(current)}`;
@@ -274,8 +284,10 @@ function componentLine(component: Component, test: Test | null): string | null {
  * MCU firmware stimulus lines, mirroring spice.py `_mcu_stimulus_lines`. Walks
  * `firmware_tasks` in document order; for each `write_gpio` op it emits either a
  * PWM PULSE (periodic + high) or a DC rail (non-periodic). The ON-time `ton` is
- * the `delay` op immediately following the `write_gpio high`, defaulting to
- * `1ms` when there is no following delay (spice.py's `ton = "1ms"` default).
+ * the first `delay` op after `task.operations.index(op)` -- the FIRST
+ * content-equal occurrence of the op, not necessarily the current position
+ * (see the PARITY note in the body) -- defaulting to `1ms` when there is no
+ * following delay (spice.py's `ton = "1ms"` default).
  */
 function mcuStimulusLines(ir: SystemIR): string[] {
   const lines: string[] = [];
@@ -299,10 +311,23 @@ function mcuStimulusLines(ir: SystemIR): string[] {
         // Periodic high-low -> a SPICE PULSE. The firmware ON-time `ton` (the
         // `delay` following `write_gpio high`) is the INTENDED high-time;
         // `pwmPulse(ton, period)` compensates the ramp area (#59).
+        //
+        // PARITY: spice.py computes `op_idx = task.operations.index(op)`, and
+        // Python `list.index` compares by CONTENT equality (dict ==), NOT
+        // identity/position. When two operations are content-identical (the
+        // same write_gpio pin/value twice with different following delays),
+        // `.index` returns the FIRST occurrence for BOTH, so both stimulus
+        // lines pick the first op's delay as ton. Using the true loop index
+        // here would be "more correct" and is exactly what parity forbids
+        // (rework round 1, divergence 2). Replicate `.index` verbatim.
+        const searchIdx = firstContentEqualIndex(operations, op);
         let ton = "1ms";
-        for (let j = opIdx + 1; j < operations.length; j++) {
+        for (let j = searchIdx + 1; j < operations.length; j++) {
           const next = operations[j] as FirmwareOperation;
           if (next["op"] === "delay") {
+            // spice.py: `next_op.get("duration", "1ms")` -- dict.get with a
+            // default substitutes ONLY on a MISSING key (an empty duration=""
+            // stays ""), which is exactly `??` (NOT `||`).
             ton = next["duration"] ?? "1ms";
             break;
           }
@@ -453,6 +478,35 @@ function sortedComponents(ir: SystemIR): Component[] {
 function firstMapValue<K, V>(map: Map<K, V>): V | undefined {
   for (const v of map.values()) return v;
   return undefined;
+}
+
+/**
+ * Mirror of Python `list.index(op)` over firmware operations: the index of the
+ * FIRST element content-equal to `op`. Python compares dicts with `==` -- same
+ * key set and same values, insertion order ignored -- so two operations built
+ * from identical XML elements are equal even though they are distinct objects.
+ * `op` is always an element of `operations`, so a match always exists; the
+ * fallback return is defensive only.
+ */
+function firstContentEqualIndex(
+  operations: readonly FirmwareOperation[],
+  op: FirmwareOperation,
+): number {
+  for (let i = 0; i < operations.length; i++) {
+    if (operationsEqual(operations[i] as FirmwareOperation, op)) return i;
+  }
+  return operations.indexOf(op);
+}
+
+/** Python dict `==` for two string-record operations (order-insensitive). */
+function operationsEqual(a: FirmwareOperation, b: FirmwareOperation): boolean {
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return false;
+  for (const k of aKeys) {
+    if (!Object.prototype.hasOwnProperty.call(b, k) || a[k] !== b[k]) return false;
+  }
+  return true;
 }
 
 /**

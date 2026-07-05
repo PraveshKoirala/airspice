@@ -2,8 +2,8 @@
  * SPICE differential-probe suite (issue #9): air-ts vs the LIVE Python oracle on
  * designs BEYOND the golden corpus.
  *
- * These six designs are ours (not corpus fixtures), chosen to stress exactly the
- * places byte parity is fragile:
+ * These eight designs are ours (not corpus fixtures), chosen to stress exactly
+ * the places byte parity is fragile:
  *   - numeric net names (`1`/`2`/`10`) -- the #79 lesson: a Map preserves
  *     document order and lexicographic probe sort (`10` before `2`), where a
  *     plain object would reorder integer-like keys;
@@ -15,7 +15,11 @@
  *     an explicit `spice_model` and with the default fallback (NPN/NMOS/D);
  *   - the LDO behavioural source, generic_load DC + load-step PULSE, current
  *     source, firmware PWM stimulus, the test-source/component-source collision
- *     skip, and the `M`->`Meg` rewrite.
+ *     skip, and the `M`->`Meg` rewrite;
+ *   - rework round 1 regressions: the Python `or`-chain's empty-string
+ *     fallthrough on the generic_load current (d7 -- `??` would silently drop
+ *     both device lines) and the `list.index(op)` content-equality quirk (d8 --
+ *     two identical write_gpio ops both take the FIRST op's delay as ton).
  *
  * The `.expected.cir` reference beside each design is the ORACLE'S output,
  * produced by `scripts/gen-spice-diff-refs.py` (which calls
@@ -58,8 +62,8 @@ function discoverDiffCases(): DiffCase[] {
 const cases = discoverDiffCases();
 
 describe("SPICE differential probes vs the live oracle", () => {
-  it("all six differential designs are present", () => {
-    expect(cases.length).toBe(6);
+  it("all eight differential designs are present", () => {
+    expect(cases.length).toBe(8);
   });
 
   for (const c of cases) {
@@ -82,6 +86,32 @@ describe("SPICE differential probes vs the live oracle", () => {
     expect(probeLines).toEqual([
       "wrdata ../waveforms/divider_probe_10.csv v(10)",
       "wrdata ../waveforms/divider_probe_2.csv v(2)",
+    ]);
+  });
+
+  it("or-chain fallthrough: empty set_current and empty current property still emit device lines (rework r1, divergence 1)", () => {
+    // Pre-fix `??` stopped at the empty string and BOTH loads vanished from the
+    // netlist. Oracle bytes: the empty <set_current> falls through to the
+    // `current` property (LOADA -> 10mA); the empty property falls through to
+    // <value> (LOADB -> 5mA).
+    const d7 = cases.find((c) => c.name.startsWith("d7"));
+    expect(d7).toBeDefined();
+    const netlist = compileDesign(readFileSync(d7!.xmlPath, "utf-8"))!.netlist;
+    const loadLines = netlist.split("\n").filter((l) => l.startsWith("I_LOAD"));
+    expect(loadLines).toEqual(["I_LOADA v33 0 DC 10mA", "I_LOADB v33 0 DC 5mA"]);
+  });
+
+  it("list.index quirk: two content-identical write_gpio ops BOTH take the first op's delay (rework r1, divergence 2)", () => {
+    // Oracle: `task.operations.index(op)` matches the FIRST content-equal op,
+    // so the second identical write_gpio also anchors its delay search after
+    // the first -> both PULSE cards use ton=1ms (PW 999us), not 3ms (2.999ms).
+    const d8 = cases.find((c) => c.name.startsWith("d8"));
+    expect(d8).toBeDefined();
+    const netlist = compileDesign(readFileSync(d8!.xmlPath, "utf-8"))!.netlist;
+    const stimLines = netlist.split("\n").filter((l) => l.startsWith("V_STIM_"));
+    expect(stimLines).toEqual([
+      "V_STIM_U_MCU_GPIO0 sig 0 PULSE(0 3.3 0 1us 1us 999us 10ms)",
+      "V_STIM_U_MCU_GPIO0 sig 0 PULSE(0 3.3 0 1us 1us 999us 10ms)",
     ]);
   });
 });

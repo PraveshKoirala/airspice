@@ -313,10 +313,6 @@ describe("analysis-line (.tran) construction", () => {
 });
 
 // --------------------------------------------------------------------------- //
-// probes.json                                                                  //
-// --------------------------------------------------------------------------- //
-
-// --------------------------------------------------------------------------- //
 // CompileSpiceOptions: .ic, raw_stimulus, extra_probes (off the corpus path)   //
 // --------------------------------------------------------------------------- //
 
@@ -376,7 +372,53 @@ describe("compileSpice options (.ic / rawStimulus / extraProbes)", () => {
       "wrdata ../waveforms/t1_mid.csv v(mid)",
     ]);
   });
+
+  it("an EMPTY rawStimulus array falls through to the MCU stimulus (Python `if raw_stimulus:` falsiness)", () => {
+    // PARITY (rework r1 ??/falsy audit): Python's empty list is falsy, so the
+    // oracle emits the MCU stimulus for raw_stimulus=[] exactly as for None
+    // (verified live: both produce `V_STIM_U_MCU_GPIO0 sig 0 PULSE(0 3.3 0 1us
+    // 1us 4.999ms 10ms)`; a non-empty list replaces it). A bare truthiness
+    // check on a JS array would suppress the MCU lines.
+    const ir = parse(`
+<system name="raw_empty" ir_version="0.1">
+  <nets>
+    <net id="v33" role="power" nominal_voltage="3.3V"/>
+    <net id="sig" role="digital_signal"/>
+    <net id="gnd" role="ground"/>
+  </nets>
+  <components>
+    <component id="V_33" type="voltage_source">
+      <pin name="p" net="v33"/><pin name="n" net="gnd"/><value>3.3V</value>
+    </component>
+    <component id="U_MCU" type="mcu" part="ESP32-C3">
+      <pin name="3V3" net="v33"/><pin name="GND" net="gnd"/>
+      <pin name="GPIO0" net="sig" function="GPIO_OUT"/>
+    </component>
+  </components>
+  <firmware>
+    <project id="fw" target="U_MCU" framework="platformio" language="cpp">
+      <board>esp32-c3-devkitm-1</board>
+    </project>
+    <task id="t" target="fw">
+      <period>10ms</period>
+      <write_gpio pin="GPIO0" value="high"/>
+      <delay duration="5ms"/>
+      <write_gpio pin="GPIO0" value="low"/>
+    </task>
+  </firmware>
+</system>`);
+    const expectStim = ["V_STIM_U_MCU_GPIO0 sig 0 PULSE(0 3.3 0 1us 1us 4.999ms 10ms)"];
+    const stimOf = (opts: Parameters<typeof compileSpice>[2]) =>
+      compileSpice(ir, null, opts).netlist.split("\n").filter((l) => l.startsWith("V_STIM_"));
+    expect(stimOf({ rawStimulus: [] })).toEqual(expectStim);
+    expect(stimOf(null)).toEqual(expectStim);
+    expect(stimOf({ rawStimulus: ["X_RAW a 0 SUB"] })).toEqual([]);
+  });
 });
+
+// --------------------------------------------------------------------------- //
+// probes.json                                                                  //
+// --------------------------------------------------------------------------- //
 
 describe("probes descriptor", () => {
   it("is always the empty object with a trailing newline", () => {
