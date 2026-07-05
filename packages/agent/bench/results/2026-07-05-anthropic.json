@@ -1,0 +1,65 @@
+{
+  "provider": "anthropic",
+  "model": "claude-sonnet-5",
+  "mode": "live",
+  "date": "2026-07-05",
+  "maxIterations": 5,
+  "totalCases": 6,
+  "fixedCount": 5,
+  "cases": [
+    {
+      "name": "bad_adc_divider",
+      "fixed": true,
+      "iterations": 1,
+      "tokens": 6601,
+      "stopReason": "fixed",
+      "appliedPatches": 1,
+      "message": "All constraints pass after 1 iteration(s)."
+    },
+    {
+      "name": "i2c_without_pullups",
+      "fixed": false,
+      "iterations": 1,
+      "tokens": 5917,
+      "stopReason": "provider_error",
+      "appliedPatches": 0,
+      "message": "Stopped: the provider errored (auth / quota / network) after 1 iteration(s)."
+    },
+    {
+      "name": "invalid_pin_function",
+      "fixed": true,
+      "iterations": 1,
+      "tokens": 5419,
+      "stopReason": "fixed",
+      "appliedPatches": 1,
+      "message": "All constraints pass after 1 iteration(s)."
+    },
+    {
+      "name": "missing_ground",
+      "fixed": true,
+      "iterations": 1,
+      "tokens": 5411,
+      "stopReason": "fixed",
+      "appliedPatches": 1,
+      "message": "All constraints pass after 1 iteration(s)."
+    },
+    {
+      "name": "overloaded_3v3_rail",
+      "fixed": true,
+      "iterations": 1,
+      "tokens": 5729,
+      "stopReason": "fixed",
+      "appliedPatches": 1,
+      "message": "All constraints pass after 1 iteration(s)."
+    },
+    {
+      "name": "phase3_failure",
+      "fixed": true,
+      "iterations": 1,
+      "tokens": 6569,
+      "stopReason": "fixed",
+      "appliedPatches": 1,
+      "message": "All constraints pass after 1 iteration(s)."
+    }
+  ]
+}
