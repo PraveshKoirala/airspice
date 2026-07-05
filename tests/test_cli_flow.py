@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from contextlib import redirect_stdout
+from io import StringIO
+import json
 from pathlib import Path
 import os
 import tempfile
@@ -64,6 +67,85 @@ class CliFlowTests(unittest.TestCase):
         self.assertEqual(diag["severity"], "info")
         self.assertIn("ngspice not found", diag["message"])
         self.assertIn("AIR_NGSPICE", diag["message"])
+
+    def test_cli_simulate_text_surfaces_per_report_diagnostics(self) -> None:
+        # Issue #64: `air simulate` text mode (no --json) previously rendered
+        # only top-level diagnostics and NEVER `reports[*]["diagnostics"]`,
+        # hiding the NGSPICE_NOT_FOUND info diag from anyone who did not think
+        # to add --json. This regression-guards both branches:
+        #   * ngspice PRESENT -> reports render, no missing-tool diag leaks in.
+        #   * ngspice MISSING -> text stdout carries NGSPICE_NOT_FOUND;
+        #     --json stdout still carries it (unchanged shape).
+        # The MISSING path drives the CLI end-to-end with ngspice resolution
+        # patched to None (matches the hermetic pattern from the test above).
+        # The PRESENT path exercises the text renderer with a synthetic
+        # "passed / no diagnostics" report -- that keeps this test independent
+        # of whether CI has a real ngspice binary while still asserting the
+        # renderer does not hallucinate a missing-tool line.
+        from air.cli import _runner_text
+
+        present_result = {
+            "success": True,
+            "profile": "analog_only",
+            "status": "passed",
+            "reports": [
+                {
+                    "test": "battery_adc_nominal",
+                    "status": "passed",
+                    "backend": "ngspice",
+                    "diagnostics": [],
+                }
+            ],
+        }
+        text_present = _runner_text("Simulation", present_result)
+        self.assertIn("Simulation: SUCCESS", text_present)
+        # A present-ngspice, clean-run report must NOT leak the missing-tool
+        # diagnostic and must NOT emit a spurious empty "report" header.
+        self.assertNotIn("NGSPICE_NOT_FOUND", text_present)
+        self.assertNotIn("report (test=", text_present)
+
+        # MISSING path: real CLI, both text and --json.
+        with mock.patch("air.tools.ngspice_path", return_value=None), \
+                tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            buf_text = StringIO()
+            with redirect_stdout(buf_text):
+                rc_text = main([
+                    "simulate", str(EXAMPLE),
+                    "--profile", "analog_only",
+                    "--out-dir", str(tmp_path / "missing_text"),
+                ])
+            text_missing = buf_text.getvalue()
+
+            buf_json = StringIO()
+            with redirect_stdout(buf_json):
+                rc_json = main([
+                    "simulate", str(EXAMPLE),
+                    "--profile", "analog_only",
+                    "--out-dir", str(tmp_path / "missing_json"),
+                    "--json",
+                ])
+            json_missing = buf_json.getvalue()
+
+        self.assertEqual(rc_text, 0)
+        self.assertIn("Simulation: SUCCESS", text_missing)
+        # The core assertion for #64: the info diag is visible in text stdout,
+        # not only under --json. Message body from #5 must survive too so the
+        # newcomer gets install guidance, not just a bare code.
+        self.assertIn("NGSPICE_NOT_FOUND", text_missing)
+        self.assertIn("[info]", text_missing)
+        self.assertIn("ngspice not found", text_missing)
+        self.assertIn("AIR_NGSPICE", text_missing)
+
+        # --json output is unchanged: still valid JSON, still carries the diag
+        # on every report. If a future change moves the diag out of
+        # reports[*]["diagnostics"], this catches it.
+        self.assertEqual(rc_json, 0)
+        payload = json.loads(json_missing)
+        self.assertTrue(payload["reports"])
+        for report in payload["reports"]:
+            codes = {d["code"] for d in report["diagnostics"]}
+            self.assertIn("NGSPICE_NOT_FOUND", codes)
 
     def test_cli_compile_spice(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
