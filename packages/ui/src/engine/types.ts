@@ -8,6 +8,7 @@
 
 import type { Node, Edge } from 'reactflow';
 import type { Diagnostic, ValidationResult } from '../types/api';
+import type { LocalSimulationResult } from './simulate';
 
 /**
  * The schematic-graph payload. Byte-parity with the oracle's `graph.json` lives
@@ -25,23 +26,29 @@ export interface GraphData {
 export type DiagnosticsPayload = ValidationResult;
 
 export type { Diagnostic };
+export type { LocalSimulationResult };
 
 /**
  * The engine facade contract (epic #6 requirement 5: the UI consumes air-ts
  * through ONE facade so the feature flag can swap local/server cleanly).
  *
- * `toGraph` and `validate` are implemented in this issue. `simulate` and
- * `applyPatch` are declared here so the surface is complete and type-checked,
- * but throw `NotImplementedError` until #14 (simulate) and #11 (patch) fill
- * them -- callers that reach for them fail loudly rather than silently.
+ * `toGraph` and `validate` were implemented in #10. `simulate` is implemented in
+ * #14 for the LOCAL engine (the full zero-backend browser pipeline: compile ->
+ * WASM ngspice -> report). The server engine still throws `NotImplementedError`
+ * for `simulate` (the backend Run path is the existing Toolbar workflow, out of
+ * #14 scope). `applyPatch` throws until #11 fills it.
  */
 export interface AirEngine {
   /** Compute the schematic graph for the given AIR XML. */
   toGraph(xml: string): Promise<GraphData>;
   /** Validate the given AIR XML; resolves to `{ success, diagnostics }`. */
   validate(xml: string): Promise<DiagnosticsPayload>;
-  /** #14: run a simulation. Throws NotImplementedError today. */
-  simulate(xml: string): Promise<never>;
+  /**
+   * #14: run the design's default ngspice profile in the browser and return the
+   * oracle-schema report + the run id its waveforms are retained under. Local
+   * engine: real WASM pipeline. Server engine: throws NotImplementedError.
+   */
+  simulate(xml: string): Promise<LocalSimulationResult>;
   /** #11: apply a patch. Throws NotImplementedError today. */
   applyPatch(xml: string, patch: string): Promise<never>;
   /** Which engine backs this instance ("local" | "server"). */

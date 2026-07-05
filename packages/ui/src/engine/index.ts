@@ -21,8 +21,10 @@ import type { AirEngine, EngineMode } from './types';
 import { createLocalEngine } from './local';
 import { createServerEngine } from './server';
 
-export type { AirEngine, GraphData, DiagnosticsPayload, Diagnostic, EngineMode } from './types';
+export type { AirEngine, GraphData, DiagnosticsPayload, Diagnostic, EngineMode, LocalSimulationResult } from './types';
 export { NotImplementedError } from './types';
+export { getWaveform, getRun } from './waveformStore';
+export type { RetainedWaveform, RunWaveforms } from './waveformStore';
 
 /** Resolve the configured engine mode, defaulting to "server". */
 export function resolveEngineMode(): EngineMode {

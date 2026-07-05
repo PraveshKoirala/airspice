@@ -15,6 +15,7 @@ import type {
   GraphData,
   DiagnosticsPayload,
   EngineMode,
+  LocalSimulationResult,
 } from './types';
 import { NotImplementedError } from './types';
 
@@ -44,10 +45,12 @@ class ServerEngine implements AirEngine {
     };
   }
 
-  simulate(): Promise<never> {
-    // Simulation over the facade is #14. The existing Toolbar "Simulate" button
-    // still calls /simulate directly (a persist+run workflow out of #10 scope).
-    return Promise.reject(new NotImplementedError('simulate', 'issue #14'));
+  simulate(): Promise<LocalSimulationResult> {
+    // Simulation over the facade is the LOCAL (zero-backend) pipeline (#14). In
+    // server mode the existing Toolbar "Simulate" button still calls /simulate
+    // directly (a persist+run backend workflow, out of #14 scope), so the facade
+    // simulate stays a loud stub here.
+    return Promise.reject(new NotImplementedError('simulate', 'issue #14 (local engine only)'));
   }
 
   applyPatch(): Promise<never> {

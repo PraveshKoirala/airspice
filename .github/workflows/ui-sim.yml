@@ -1,0 +1,72 @@
+name: ui-sim
+
+# Browser report-pipeline CI (packages/ui, issue #14). A SEPARATE workflow from
+# ci.yml (which runs the ui lint+build required check) by design: this tier runs
+# the FULL local simulation pipeline (compile air-ts #9 -> WASM ngspice worker
+# sim-wasm #13 -> report air-ts report.ts #14) in a REAL Chromium and diffs the
+# browser's report JSON against the golden corpus — the M2 proof that the browser
+# produces the Python oracle's report SCHEMA with NO backend.
+#
+# jsdom/node cannot run a WASM Web Worker, so this MUST be a real browser. No
+# ngspice apt install: the ngspice here is the one compiled INTO eecircuit-engine's
+# WASM (45.2), not the host's. No COOP/COEP headers: the single-threaded WASM
+# build needs none (epic #12 binding decision 2).
+#
+# Maintainer note: once green, add `ui-sim (playwright report pipeline)` to the
+# required status checks for `main`.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ui-sim-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ui-sim:
+    name: ui-sim (playwright report pipeline)
+    runs-on: ubuntu-latest
+    # Official Playwright container: Chromium + all system libraries preinstalled
+    # and version-matched to @playwright/test. Pin the image to the EXACT
+    # @playwright/test version (1.58.2) so the container's browser matches the
+    # library. The browsers live at the image's default /ms-playwright path.
+    container:
+      image: mcr.microsoft.com/playwright:v1.58.2-noble
+    defaults:
+      run:
+        working-directory: packages/ui
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: packages/ui/package-lock.json
+
+      # The report pipeline consumes air-ts + sim-wasm from SOURCE (Vite aliases),
+      # and the sim-wasm engine worker dynamic-imports eecircuit-engine, which the
+      # UI's own vite/tsconfig aliases pin to packages/ui/node_modules. So the
+      # ui-only install is sufficient — no sibling-package install needed.
+      - name: Install dependencies
+        run: npm ci
+
+      # Real Chromium, real Web Worker, real WASM ngspice: run every corpus
+      # design through the full browser pipeline and diff its report JSON against
+      # the oracle (structure byte-exact, numbers within rtol 1e-3).
+      - name: Playwright report-pipeline parity (Chromium)
+        run: npx playwright test
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-sim-playwright-report
+          path: packages/ui/playwright-report
+          retention-days: 7
