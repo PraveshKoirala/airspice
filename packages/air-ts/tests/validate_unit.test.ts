@@ -84,8 +84,8 @@ describe("message-numeric formatting parity (%.3g / %.6g)", () => {
 describe("registry (compiled-in, built-in fallback semantics)", () => {
   it("merges built-ins with on-disk registry files", () => {
     // ESP32-C3 / WROOM-32 exist as built-ins AND files (file wins, identical here);
-    // STM32F103 comes from a file only.
-    expect(Object.keys(MCUS).sort()).toEqual(["ESP32-C3", "ESP32-WROOM-32", "STM32F103"]);
+    // STM32F103 and ATmega328P (build benchmark, issue #105) come from a file only.
+    expect(Object.keys(MCUS).sort()).toEqual(["ATmega328P", "ESP32-C3", "ESP32-WROOM-32", "STM32F103"]);
   });
   it("component specs cover the built-in types plus registry files", () => {
     for (const t of ["resistor", "capacitor", "voltage_source", "current_source", "generic_load", "ldo", "mosfet", "diode", "bjt", "mcu"]) {
