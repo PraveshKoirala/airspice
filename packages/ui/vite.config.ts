@@ -1,12 +1,32 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { fileURLToPath } from 'node:url'
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  // Read VITE_ENGINE at config time from .env files + process.env so the engine
+  // adapter alias below (issue #86) is a genuine build-time constant.
+  // `loadEnv(mode, cwd, '')` merges process.env (which is where a CLI-provided
+  // `VITE_ENGINE=local npm run build` lands) with any `.env`/`.env.<mode>` file.
+  const env = loadEnv(mode, process.cwd(), '');
+  const engineMode = (env.VITE_ENGINE ?? '').toString().trim().toLowerCase() === 'local' ? 'local' : 'server';
+  // The engine-adapter seam (issue #86): swap the `@engine-adapter` specifier
+  // used by `src/engine/index.ts` for either the local or server adapter file
+  // at build time. Only the chosen adapter's transitive static-import graph
+  // (and, in local mode, its worker + sim-wasm + eecircuit-engine chunks)
+  // enters the bundle -- the other side is genuinely tree-shaken out, not
+  // just lazy.
+  const engineAdapterFile = engineMode === 'local'
+    ? new URL('./src/engine/adapter.local.ts', import.meta.url)
+    : new URL('./src/engine/adapter.server.ts', import.meta.url);
+
+  return {
   plugins: [react()],
   resolve: {
     alias: {
+      // Engine-adapter build-time seam (issue #86). Resolved above from
+      // VITE_ENGINE so the unused adapter is dead-code-eliminated.
+      '@engine-adapter': fileURLToPath(engineAdapterFile),
       // The UI consumes the TypeScript engine (packages/air-ts) through its
       // source entry, aliased here (issue #10 / epic #6). air-ts is strict ESM
       // TypeScript with zero DOM dependency, so Vite compiles + bundles it (and
@@ -64,4 +84,5 @@ export default defineConfig({
       allow: [fileURLToPath(new URL('..', import.meta.url))],
     },
   },
+  };
 })
