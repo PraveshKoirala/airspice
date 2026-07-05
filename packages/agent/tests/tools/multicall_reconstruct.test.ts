@@ -33,6 +33,7 @@
 import { describe, it, expect } from "vitest";
 import {
   AnthropicProvider,
+  GeminiProvider,
   OpenAIProvider,
   MockProvider,
   ToolRuntime,
@@ -290,5 +291,191 @@ describe("issue #101 — provider request body is balanced on the follow-up turn
     );
     expect(assistantIdx).toBeGreaterThanOrEqual(0);
     expect(assistantIdx).toBeLessThan(firstToolIdx);
+  });
+
+  // ------------------------------------------------------------------------- //
+  // Gemini (issue #103): Gemini has NO tool-call ids — the API correlates a
+  // `functionResponse` to its `functionCall` by NAME + ORDER. That means the
+  // wire-body assertion is subtly different from Anthropic/OpenAI: instead of
+  // asserting an id-set balance, we assert that the model turn's functionCall
+  // parts and the following functionResponse parts are in the SAME ORDER
+  // (position i answers call i, even when both calls share a name — the
+  // i2c SDA+SCL shape uses two same-name `propose_patch` calls, so a
+  // silent reorder would swap SDA's result onto SCL and vice-versa).
+  // ------------------------------------------------------------------------- //
+
+  /**
+   * Gemini SSE: one text part + two `functionCall` parts (both named
+   * `propose_patch` — the i2c SDA+SCL shape), then a usage event. Gemini
+   * emits each functionCall as a COMPLETE object (args already parsed), so
+   * one SSE event per call is enough.
+   */
+  function geminiTwoToolStream(
+    argsA: Record<string, unknown>,
+    argsB: Record<string, unknown>,
+  ): Response {
+    return sseEvents([
+      { candidates: [{ content: { role: "model", parts: [{ text: "Adding both pull-ups." }] } }] },
+      {
+        candidates: [
+          {
+            content: {
+              role: "model",
+              parts: [{ functionCall: { name: "propose_patch", args: argsA } }],
+            },
+          },
+        ],
+      },
+      {
+        candidates: [
+          {
+            content: {
+              role: "model",
+              parts: [{ functionCall: { name: "propose_patch", args: argsB } }],
+            },
+          },
+        ],
+      },
+      { usageMetadata: { promptTokenCount: 60, candidatesTokenCount: 30 } },
+    ]);
+  }
+
+  function geminiStopStream(): Response {
+    return sseEvents([
+      { candidates: [{ content: { role: "model", parts: [{ text: "Done." } ] }, finishReason: "STOP" }] },
+      { usageMetadata: { promptTokenCount: 5, candidatesTokenCount: 2 } },
+    ]);
+  }
+
+  it("Gemini: second-turn body has 2 ordered functionCall parts + 2 ordered functionResponse parts (same-name)", async () => {
+    const { fetchImpl, getSecondBody } = captureSecondTurn(
+      () => geminiTwoToolStream(
+        { patch_xml: PATCH_A, summary: "SDA" },
+        { patch_xml: PATCH_B, summary: "SCL" },
+      ),
+      geminiStopStream,
+    );
+    const provider = new GeminiProvider({
+      apiKey: fakeKey("AIza", "SyGeminiSecretKeyABCDEFGHIJKLMNOP"),
+      fetchImpl,
+    });
+    const runtime = new ToolRuntime({ xml: GOLDEN_DESIGN, version: 0 }, { hooks: realAirTsEngine() });
+    const { reason } = await runConversation({
+      provider,
+      runtime,
+      userMessage: "add SDA and SCL pull-ups",
+      system: chatSystemInstruction(),
+      maxTokensPerTurn: 1024,
+      signal: new AbortController().signal,
+      onEvent: () => {},
+    });
+    expect(reason).toBe("completed");
+
+    const body = getSecondBody();
+    const contents = body["contents"] as { role: string; parts: unknown[] }[];
+
+    // Walk the wire body in order; capture the model turn's functionCall names
+    // and the following user turns' functionResponse names.
+    const modelIdx = contents.findIndex((c) => c.role === "model");
+    expect(modelIdx).toBeGreaterThanOrEqual(0);
+
+    const modelParts = contents[modelIdx]!.parts as Record<string, unknown>[];
+    const functionCallNames = modelParts
+      .filter((p) => p["functionCall"])
+      .map((p) => String((p["functionCall"] as Record<string, unknown>)["name"]));
+    expect(functionCallNames).toEqual(["propose_patch", "propose_patch"]);
+
+    // functionResponses arrive as `role: "user"` contents entries following the
+    // model turn — one entry per response. Collect them in wire order.
+    const functionResponseNames: string[] = [];
+    for (let i = modelIdx + 1; i < contents.length; i++) {
+      const entry = contents[i]!;
+      if (entry.role !== "user") continue;
+      for (const p of entry.parts as Record<string, unknown>[]) {
+        const fr = p["functionResponse"] as Record<string, unknown> | undefined;
+        if (fr) functionResponseNames.push(String(fr["name"]));
+      }
+    }
+    expect(functionResponseNames).toEqual(["propose_patch", "propose_patch"]);
+
+    // The model turn's functionCall parts must precede the first functionResponse
+    // (Gemini 400s otherwise — a functionResponse with no matching functionCall).
+    const firstResponseIdx = contents.findIndex(
+      (c, i) =>
+        i > modelIdx &&
+        (c.parts as Record<string, unknown>[]).some((p) => p["functionResponse"]),
+    );
+    expect(firstResponseIdx).toBeGreaterThan(modelIdx);
+
+    // Order-correlation guard: the model turn's functionCall args (which carry
+    // the SDA vs SCL patch bodies) and the following functionResponses (which
+    // carry the gate's result payload for each) must be in matching order — if
+    // Gemini's name-based correlation ever regressed to a silent reorder,
+    // the SDA result would be delivered as the answer to the SCL call.
+    const functionCallArgs = modelParts
+      .filter((p) => p["functionCall"])
+      .map((p) => (p["functionCall"] as Record<string, unknown>)["args"] as Record<string, unknown>);
+    expect(functionCallArgs).toHaveLength(2);
+    expect(String(functionCallArgs[0]!["summary"])).toBe("SDA");
+    expect(String(functionCallArgs[1]!["summary"])).toBe("SCL");
+  });
+
+  it("Gemini: swapping the call order in the fixture swaps the wire order (order is what's carried, not name-matched)", async () => {
+    // Same two same-name calls, but the fixture emits SCL first and SDA
+    // second. Since Gemini correlates by name+order and the calls share a
+    // name, the ONLY thing keeping SDA's result attached to SDA's call is
+    // that the reconstruction preserves the order the runner observed. If a
+    // future change silently sorted or re-keyed the calls (e.g. reordering
+    // to "canonical" argument order), this test flags it.
+    const { fetchImpl, getSecondBody } = captureSecondTurn(
+      () => geminiTwoToolStream(
+        { patch_xml: PATCH_B, summary: "SCL" },
+        { patch_xml: PATCH_A, summary: "SDA" },
+      ),
+      geminiStopStream,
+    );
+    const provider = new GeminiProvider({
+      apiKey: fakeKey("AIza", "SyGeminiSecretKeyABCDEFGHIJKLMNOP"),
+      fetchImpl,
+    });
+    const runtime = new ToolRuntime({ xml: GOLDEN_DESIGN, version: 0 }, { hooks: realAirTsEngine() });
+    const { reason } = await runConversation({
+      provider,
+      runtime,
+      userMessage: "add SCL and SDA pull-ups",
+      system: chatSystemInstruction(),
+      maxTokensPerTurn: 1024,
+      signal: new AbortController().signal,
+      onEvent: () => {},
+    });
+    expect(reason).toBe("completed");
+
+    const body = getSecondBody();
+    const contents = body["contents"] as { role: string; parts: unknown[] }[];
+    const modelIdx = contents.findIndex((c) => c.role === "model");
+    const modelParts = contents[modelIdx]!.parts as Record<string, unknown>[];
+
+    // The wire order now must be SCL, then SDA — matching the emission order,
+    // NOT any lexical / name-based reordering.
+    const functionCallSummaries = modelParts
+      .filter((p) => p["functionCall"])
+      .map((p) => String(
+        ((p["functionCall"] as Record<string, unknown>)["args"] as Record<string, unknown>)["summary"],
+      ));
+    expect(functionCallSummaries).toEqual(["SCL", "SDA"]);
+
+    // And each following functionResponse must appear in that same order —
+    // Gemini answers call i with response i.
+    const responseOrder: string[] = [];
+    for (let i = modelIdx + 1; i < contents.length; i++) {
+      const entry = contents[i]!;
+      if (entry.role !== "user") continue;
+      for (const p of entry.parts as Record<string, unknown>[]) {
+        const fr = p["functionResponse"] as Record<string, unknown> | undefined;
+        if (fr) responseOrder.push(String(fr["name"]));
+      }
+    }
+    expect(responseOrder).toEqual(["propose_patch", "propose_patch"]);
+    expect(responseOrder).toHaveLength(2);
   });
 });
