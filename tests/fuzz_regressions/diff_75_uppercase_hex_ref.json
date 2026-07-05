@@ -1,0 +1,19 @@
+{
+  "issue": "#75",
+  "note": "malformed reference syntax &#X42; (uppercase X): expat rejects",
+  "expect": "diverge-known",
+  "classifiedKnown": "#75",
+  "diverges": false,
+  "mismatchKind": null,
+  "ts": {
+    "status": "reject",
+    "codes": [],
+    "reason": "XmlParseError: malformed XML: InvalidChar at line 1, col 52: char '&' is not expected."
+  },
+  "py": {
+    "codes": [],
+    "reason": "XmlParseError: not well-formed (invalid token): line 1, column 53",
+    "status": "reject"
+  },
+  "input": "<system name=\"t\" ir_version=\"0.1\"><metadata><title>&#X42;</title></metadata></system>"
+}

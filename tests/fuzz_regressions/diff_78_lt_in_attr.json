@@ -1,0 +1,18 @@
+{
+  "issue": "#78",
+  "note": "'<' literal in attribute value: expat rejects as not well-formed",
+  "expect": "diverge-known",
+  "classifiedKnown": "#78",
+  "diverges": true,
+  "mismatchKind": "decision",
+  "ts": {
+    "status": "accept",
+    "modelHash": "ac7149941f4fa2a5"
+  },
+  "py": {
+    "codes": [],
+    "reason": "XmlParseError: not well-formed (invalid token): line 1, column 15",
+    "status": "reject"
+  },
+  "input": "<system name=\"a<b\" ir_version=\"0.1\"></system>"
+}

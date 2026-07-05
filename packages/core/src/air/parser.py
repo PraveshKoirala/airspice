@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
+from .xml_security import enforce_xml_security
 from .model import (
     AnalogSubsystem,
     Bridge,
@@ -25,12 +26,21 @@ from .normalizer import normalize_air_tree
 
 
 def parse_file(path: Path) -> tuple[SystemIR, ET.ElementTree]:
-    tree = ET.parse(path)
+    # Gate untrusted XML against the shared security contract (issue #43,
+    # docs/xml_security.md) BEFORE expat sees it: reject DOCTYPE/entities,
+    # non-UTF-8 encodings, and oversized/too-deep/too-wide documents. Reading the
+    # raw bytes lets the encoding gate run on the file exactly as air-ts runs it
+    # on the string. Benign designs are unaffected (see the corpus-parity
+    # evidence in the #43 PR); only hostile inputs are refused.
+    text = enforce_xml_security(Path(path).read_bytes())
+    root = ET.fromstring(text)
+    tree = ET.ElementTree(root)
     return parse_tree(tree), tree
 
 
 def parse_string(xml_text: str) -> tuple[SystemIR, ET.ElementTree]:
-    root = ET.fromstring(xml_text)
+    text = enforce_xml_security(xml_text)
+    root = ET.fromstring(text)
     tree = ET.ElementTree(root)
     return parse_tree(tree), tree
 

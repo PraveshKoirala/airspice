@@ -1,0 +1,23 @@
+{
+  "issue": "SEC-001",
+  "note": "billion-laughs entity payload rejected before expansion by both engines",
+  "expect": "reject-agree",
+  "classifiedKnown": "#75",
+  "diverges": false,
+  "mismatchKind": null,
+  "ts": {
+    "status": "reject",
+    "codes": [
+      "SEC-001"
+    ],
+    "reason": "XmlSecurityError: DOCTYPE declarations are not permitted"
+  },
+  "py": {
+    "codes": [
+      "SEC-001"
+    ],
+    "reason": "XmlSecurityError: DOCTYPE declarations are not permitted",
+    "status": "reject"
+  },
+  "input": "<?xml version=\"1.0\"?><!DOCTYPE lolz [<!ENTITY lol \"lol\"><!ENTITY lol2 \"&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;\">]><lolz>&lol2;</lolz>"
+}

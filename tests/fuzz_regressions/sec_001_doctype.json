@@ -1,0 +1,23 @@
+{
+  "issue": "SEC-001",
+  "note": "DOCTYPE rejected identically by both engines (security contract)",
+  "expect": "reject-agree",
+  "classifiedKnown": null,
+  "diverges": false,
+  "mismatchKind": null,
+  "ts": {
+    "status": "reject",
+    "codes": [
+      "SEC-001"
+    ],
+    "reason": "XmlSecurityError: DOCTYPE declarations are not permitted"
+  },
+  "py": {
+    "codes": [
+      "SEC-001"
+    ],
+    "reason": "XmlSecurityError: DOCTYPE declarations are not permitted",
+    "status": "reject"
+  },
+  "input": "<!DOCTYPE x><system name=\"t\" ir_version=\"0.1\"></system>"
+}

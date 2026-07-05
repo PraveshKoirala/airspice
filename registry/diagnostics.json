@@ -620,6 +620,94 @@
       "remediation": "",
       "source": "packages/core/src/air/runners.py:run_renode",
       "grandfathered": true
+    },
+    {
+      "code": "SEC-001",
+      "namespace": "security",
+      "owner": "xml_security",
+      "severity": "error",
+      "message_template": "DOCTYPE or entity declarations are not permitted.",
+      "parameters": [],
+      "remediation": "Remove the <!DOCTYPE ...> / <!ENTITY ...> declaration; AIR documents never need them and they are an entity-expansion (billion-laughs) / XXE surface.",
+      "source": "packages/core/src/air/xml_security.py:enforce_xml_security",
+      "grandfathered": false
+    },
+    {
+      "code": "SEC-002",
+      "namespace": "security",
+      "owner": "xml_security",
+      "severity": "error",
+      "message_template": "Input exceeds the {limit_bytes}-byte size limit.",
+      "parameters": ["limit_bytes"],
+      "remediation": "Split or shrink the design; the 5 MB cap bounds parse-time memory for untrusted input (share links, imports).",
+      "source": "packages/core/src/air/xml_security.py:enforce_xml_security",
+      "grandfathered": false
+    },
+    {
+      "code": "SEC-003",
+      "namespace": "security",
+      "owner": "xml_security",
+      "severity": "error",
+      "message_template": "Element nesting depth exceeds {limit}.",
+      "parameters": ["limit"],
+      "remediation": "Flatten deeply nested structure; the depth cap prevents stack/entity-driven resource exhaustion.",
+      "source": "packages/core/src/air/xml_security.py:enforce_xml_security",
+      "grandfathered": false
+    },
+    {
+      "code": "SEC-004",
+      "namespace": "security",
+      "owner": "xml_security",
+      "severity": "error",
+      "message_template": "Element has more than {limit} attributes.",
+      "parameters": ["limit"],
+      "remediation": "Reduce the number of attributes on the element; the cap bounds per-element parse work for untrusted input.",
+      "source": "packages/core/src/air/xml_security.py:enforce_xml_security",
+      "grandfathered": false
+    },
+    {
+      "code": "SEC-005",
+      "namespace": "security",
+      "owner": "xml_security",
+      "severity": "error",
+      "message_template": "Attribute value exceeds {limit} characters.",
+      "parameters": ["limit"],
+      "remediation": "Shorten the attribute value; the cap bounds per-attribute memory for untrusted input.",
+      "source": "packages/core/src/air/xml_security.py:enforce_xml_security",
+      "grandfathered": false
+    },
+    {
+      "code": "SEC-006",
+      "namespace": "security",
+      "owner": "xml_security",
+      "severity": "error",
+      "message_template": "Document has more than {limit} elements.",
+      "parameters": ["limit"],
+      "remediation": "Split the design; the element-count cap bounds total parse work for untrusted input.",
+      "source": "packages/core/src/air/xml_security.py:enforce_xml_security",
+      "grandfathered": false
+    },
+    {
+      "code": "SEC-007",
+      "namespace": "security",
+      "owner": "xml_security",
+      "severity": "error",
+      "message_template": "Input encoding is not permitted; AIR XML must be UTF-8 (a UTF-8 BOM is tolerated).",
+      "parameters": [],
+      "remediation": "Re-encode the document as UTF-8; UTF-16/UTF-32 and other encodings are refused so both engines decode input identically.",
+      "source": "packages/core/src/air/xml_security.py:enforce_encoding",
+      "grandfathered": false
+    },
+    {
+      "code": "SEC-008",
+      "namespace": "security",
+      "owner": "xml_security",
+      "severity": "error",
+      "message_template": "Reference to an XML-1.0-invalid character number.",
+      "parameters": [],
+      "remediation": "Remove the numeric character reference to a control/surrogate/out-of-range code point; expat rejects these and both engines must agree.",
+      "source": "packages/core/src/air/xml_security.py:enforce_xml_security",
+      "grandfathered": false
     }
   ],
   "pending": {

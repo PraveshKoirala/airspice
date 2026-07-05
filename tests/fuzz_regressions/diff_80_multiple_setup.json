@@ -1,0 +1,17 @@
+{
+  "issue": "#80",
+  "note": "two <setup> blocks in one <test>: oracle merges both, air-ts reads first only",
+  "expect": "diverge-known",
+  "classifiedKnown": "#80",
+  "diverges": true,
+  "mismatchKind": "hash",
+  "ts": {
+    "status": "accept",
+    "modelHash": "190214133cbdfa99"
+  },
+  "py": {
+    "modelHash": "a29498eb63630fc1",
+    "status": "accept"
+  },
+  "input": "<system name=\"t\" ir_version=\"0.1\"><tests><test id=\"x\"><setup><set_voltage net=\"a\" value=\"1V\"/></setup><setup><set_voltage net=\"b\" value=\"2V\"/></setup></test></tests></system>"
+}
