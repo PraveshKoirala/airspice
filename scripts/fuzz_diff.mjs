@@ -515,9 +515,17 @@ function has78Fingerprint(xml) {
     if (m[2].includes("<")) return true;
   }
   // (c) the reserved 'xml' PI target (any case): <?xml ...?> after the root
-  //     opens, or a bare <?xml?> that is not the leading declaration.
+  //     opens, or a bare <?xml?> that is not the leading declaration. A LEADING
+  //     <?xml version=...?> (per XML 1.0, at document start, optionally preceded
+  //     by a BOM U+FEFF) is a BENIGN XMLDecl -- not a #78 well-formedness gap --
+  //     so its `<?` must be skipped. The exclusion was described in this comment
+  //     but never coded (#84): without it, a mutator that ever synthesized a
+  //     leading declaration on a NEW divergence would suppress it as KNOWN #78.
+  const declStart = xml.charCodeAt(0) === 0xfeff ? 1 : 0;
   for (const m of xml.matchAll(/<\?\s*([A-Za-z_][\w.-]*)/g)) {
-    if (m[1].toLowerCase() === "xml") return true;
+    if (m[1].toLowerCase() !== "xml") continue;
+    if (m.index === declStart) continue; // leading XMLDecl is benign
+    return true;
   }
   return false;
 }
@@ -1056,6 +1064,20 @@ function selfTest() {
     classifyKnown(ffAttr + "\r", DECISION, pyReject) === null);
   check("FLIP: form-feed-in-attr + CR in element text STILL NEW",
     classifyKnown('<system name="a\fb"><t>x\ry</t></system>', DECISION, pyReject) === null);
+  // #84 (verifier's leading-decl probe): a BENIGN leading <?xml version="1.0"?>
+  // is not a #78 well-formedness gap, so it must NOT flip a form-feed-in-attr
+  // NEW divergence to KNOWN #78. Before the clause-(c) exclusion, this probe
+  // would suppress as #78; after, it correctly stays NEW.
+  check("FLIP #84: leading <?xml?> + form-feed-in-attr STILL NEW (not #78)",
+    classifyKnown('<?xml version="1.0"?><system name="a\fb" ir_version="0.1"></system>', DECISION, pyReject) === null);
+  // #78 clause (c) NARROWNESS: a leading XMLDecl on its own is not #78, but a
+  // NON-leading <?xml?> (mid-document, or after any prefix) still is.
+  check("#78 narrow: leading <?xml version=?> alone is NOT #78",
+    classifyKnown('<?xml version="1.0"?><system/>', DECISION, pyReject) === null);
+  check("#78 narrow: leading <?xml?> after a BOM is NOT #78",
+    classifyKnown('﻿<?xml version="1.0"?><system/>', DECISION, pyReject) === null);
+  check("#78: non-leading <?xml?> (whitespace before) IS #78",
+    classifyKnown(' <?xml v?><system/>', DECISION, pyReject) === "#78");
 
   // ---- MISMATCH-KIND GATE (the causal core of the fix) ------------------- //
   check("gate: a whitespace-in-attr fingerprint on a DECISION mismatch is NOT #76",
