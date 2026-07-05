@@ -193,6 +193,20 @@ function buildRequestBody(req: ChatRequest): Record<string, unknown> {
         ],
       };
     }
+    // An assistant (`model`) turn that called tools (issue #101) must re-emit its
+    // `functionCall` parts so the following `functionResponse` parts have the
+    // matching calls to answer. Gemini correlates a functionResponse to its
+    // functionCall by NAME + order, so we emit one functionCall part per call in
+    // order (optional leading text part first). `args` is the parsed object
+    // (`{}` for a malformed call whose args did not parse).
+    if (m.role === "assistant" && m.toolCalls && m.toolCalls.length > 0) {
+      const parts: Record<string, unknown>[] = [];
+      if (m.content) parts.push({ text: m.content });
+      for (const call of m.toolCalls) {
+        parts.push({ functionCall: { name: call.name, args: call.args ?? {} } });
+      }
+      return { role: "model", parts };
+    }
     return {
       role: m.role === "assistant" ? "model" : "user",
       parts: [{ text: m.content }],

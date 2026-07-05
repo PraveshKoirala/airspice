@@ -208,6 +208,26 @@ function buildRequestBody(model: string, req: ChatRequest): Record<string, unkno
         tool_call_id: m.toolCallId ?? "",
         content: m.content,
       });
+    } else if (m.role === "assistant" && m.toolCalls && m.toolCalls.length > 0) {
+      // An assistant turn that called tools (issue #101) must carry a
+      // `tool_calls[]` array so the following `tool`-role messages (keyed by
+      // tool_call_id) have a preceding message to answer — OpenAI 400s on a
+      // `tool` message that does not follow an assistant `tool_calls`. Arguments
+      // are re-stringified JSON (`{}` for a malformed call whose args did not
+      // parse but whose id must still round-trip). `content` is null when the
+      // turn was tool-only (OpenAI allows null content alongside tool_calls).
+      messages.push({
+        role: "assistant",
+        content: m.content ? m.content : null,
+        tool_calls: m.toolCalls.map((call) => ({
+          id: call.id,
+          type: "function",
+          function: {
+            name: call.name,
+            arguments: JSON.stringify(call.args ?? {}),
+          },
+        })),
+      });
     } else {
       messages.push({ role: m.role, content: m.content });
     }

@@ -16,6 +16,7 @@ export type {
   JsonSchema,
   MalformedToolCall,
   Msg,
+  MsgToolCall,
   ProviderId,
   ProviderOptions,
   RetryConfig,

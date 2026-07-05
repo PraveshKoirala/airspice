@@ -235,6 +235,24 @@ function buildRequestBody(model: string, req: ChatRequest): Record<string, unkno
           ],
         };
       }
+      // An assistant turn that made tool calls (issue #101) must re-emit its
+      // tool_use blocks so the following tool_result blocks reference valid ids.
+      // Anthropic wants a content ARRAY: optional leading text, then one
+      // `tool_use` block per call (input = parsed args; `{}` for a malformed
+      // call whose args did not parse but whose id must still round-trip).
+      if (m.role === "assistant" && m.toolCalls && m.toolCalls.length > 0) {
+        const content: Record<string, unknown>[] = [];
+        if (m.content) content.push({ type: "text", text: m.content });
+        for (const call of m.toolCalls) {
+          content.push({
+            type: "tool_use",
+            id: call.id,
+            name: call.name,
+            input: call.args ?? {},
+          });
+        }
+        return { role: "assistant", content };
+      }
       return { role: m.role, content: m.content };
     }),
   };

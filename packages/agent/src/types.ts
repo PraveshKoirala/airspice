@@ -31,11 +31,41 @@ export interface ToolSpec {
   parameters: JsonSchema;
 }
 
+/**
+ * A tool call the ASSISTANT made in a turn, carried on the assistant `Msg` so
+ * the turn can be REPLAYED to the provider with its tool-use blocks intact.
+ *
+ * This is what fixes the multi-tool-call round-trip (issue #101): when a repair
+ * turn issues two `propose_patch` calls, the assistant message must re-serialize
+ * BOTH tool-use blocks (each with its `id`), so the following `tool_result`
+ * blocks reference VALID ids. Without this the assistant turn is replayed as
+ * plain text, the ids are orphaned, and Anthropic/OpenAI/Gemini all 400.
+ *
+ * `id` matches the `toolCallId` of the `role: "tool"` message that answers it.
+ * `args` is the parsed argument object; when the model emitted arguments that
+ * did not parse (a malformed call still answered with a structured error via the
+ * recovery ladder) `args` is `null` — providers serialize an empty argument
+ * object in that case, since the id (not the arguments) is what must round-trip.
+ */
+export interface MsgToolCall {
+  /** Provider-assigned id; echoed on the answering `tool` message's toolCallId. */
+  id: string;
+  name: string;
+  /** Parsed args, or `null` when the original call was malformed. */
+  args: Record<string, unknown> | null;
+}
+
 /** One turn in the conversation. Tool results are fed back as `tool` messages. */
 export interface Msg {
   role: "user" | "assistant" | "tool";
   /** Free-text content (user/assistant prose, or a tool result payload). */
   content: string;
+  /**
+   * For `role: "assistant"` messages: the tool calls the model made this turn,
+   * preserved so the turn replays with its tool-use blocks (issue #101). Absent
+   * or empty for a plain-text assistant turn. Ignored for user/tool messages.
+   */
+  toolCalls?: MsgToolCall[];
   /**
    * For `role: "tool"` messages: the id of the tool call this result answers,
    * so the provider can correlate the result to the originating call. Ignored
