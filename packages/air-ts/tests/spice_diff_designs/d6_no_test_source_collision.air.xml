@@ -1,0 +1,43 @@
+<system name="d6_no_test" ir_version="0.1">
+  <metadata>
+    <title>test-source/component-source net collision + M-mega units</title>
+  </metadata>
+  <nets>
+    <net id="1" role="power" nominal_voltage="5V"/>
+    <net id="2" role="analog_signal"/>
+    <net id="gnd" role="ground"/>
+  </nets>
+  <components>
+    <component id="V_RAIL" type="voltage_source">
+      <pin name="p" net="1"/>
+      <pin name="n" net="gnd"/>
+      <value>5V</value>
+    </component>
+    <component id="R_BIG" type="resistor">
+      <pin name="1" net="1"/>
+      <pin name="2" net="2"/>
+      <value>4.7M</value>
+    </component>
+    <component id="R_SMALL" type="resistor">
+      <pin name="1" net="2"/>
+      <pin name="2" net="gnd"/>
+      <value>1k</value>
+    </component>
+  </components>
+  <tests>
+    <test id="collide">
+      <run duration="30ms"/>
+      <setup>
+        <set_voltage net="1" value="9V"/>
+        <set_voltage net="2" value="1V"/>
+      </setup>
+      <assert_voltage net="2" min="0V" max="5V"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="analog" default="true">
+      <backend type="ngspice"/>
+      <run test="collide"/>
+    </profile>
+  </simulation_profiles>
+</system>

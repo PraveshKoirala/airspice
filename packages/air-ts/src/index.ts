@@ -105,6 +105,17 @@ export type * from "./model.js";
 export { parseQuantity, formatQuantity, spiceValue } from "./units.js";
 export { formatNumber, formatG, formatG6 } from "./format.js";
 
+// SPICE netlist emitter (issue #9): byte-parity with the Python oracle's
+// spice.py. `compileDesign` is the validation-gated public entry (refuses
+// error-severity designs, matching the exporter); `compileSpice` is the raw
+// emitter for an already-parsed IR.
+export {
+  compileSpice,
+  compileDesign,
+  BUILTIN_MODEL_CARDS,
+} from "./emit/spice.js";
+export type { SpiceArtifacts, CompileSpiceOptions } from "./emit/spice.js";
+
 // Differential-fuzzer outcome reporting (for #43).
 export { parseOutcome, parseOutcomeBytes, fnv1a64, type ParseOutcome } from "./outcome.js";
 

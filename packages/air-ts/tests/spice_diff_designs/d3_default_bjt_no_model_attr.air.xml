@@ -1,0 +1,54 @@
+<system name="d3_default_models" ir_version="0.1">
+  <metadata>
+    <title>Default model fallbacks: NPN/NMOS/D with no spice_model attribute</title>
+  </metadata>
+  <nets>
+    <net id="1" role="power" nominal_voltage="9V"/>
+    <net id="20" role="analog_signal"/>
+    <net id="3" role="digital_signal"/>
+    <net id="100" role="analog_signal"/>
+    <net id="gnd" role="ground"/>
+  </nets>
+  <components>
+    <component id="V1" type="voltage_source">
+      <pin name="p" net="1"/>
+      <pin name="n" net="gnd"/>
+      <value>9V</value>
+    </component>
+    <component id="R1" type="resistor">
+      <pin name="1" net="1"/>
+      <pin name="2" net="20"/>
+      <value>3.3k</value>
+    </component>
+    <component id="Q_DEFAULT" type="bjt">
+      <pin name="C" net="20"/>
+      <pin name="B" net="3"/>
+      <pin name="E" net="gnd"/>
+    </component>
+    <component id="M_DEFAULT" type="mosfet">
+      <pin name="G" net="3"/>
+      <pin name="D" net="100"/>
+      <pin name="S" net="gnd"/>
+    </component>
+    <component id="D_DEFAULT" type="diode">
+      <pin name="a" net="20"/>
+      <pin name="c" net="100"/>
+    </component>
+  </components>
+  <tests>
+    <test id="probe_all">
+      <run duration="1ms"/>
+      <setup>
+        <set_voltage net="3" value="5V"/>
+      </setup>
+      <assert_voltage net="20" min="0V" max="9V"/>
+      <assert_voltage net="100" min="0V" max="9V"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="analog" default="true">
+      <backend type="ngspice"/>
+      <run test="probe_all"/>
+    </profile>
+  </simulation_profiles>
+</system>

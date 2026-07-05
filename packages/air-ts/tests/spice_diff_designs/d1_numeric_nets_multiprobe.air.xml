@@ -1,0 +1,51 @@
+<system name="d1_numeric_nets" ir_version="0.1">
+  <metadata>
+    <title>Numeric-net divider with two probes</title>
+  </metadata>
+  <nets>
+    <net id="1" role="power" nominal_voltage="12V"/>
+    <net id="2" role="analog_signal"/>
+    <net id="10" role="analog_signal"/>
+    <net id="gnd" role="ground"/>
+  </nets>
+  <components>
+    <component id="R_TOP" type="resistor">
+      <pin name="1" net="1"/>
+      <pin name="2" net="2"/>
+      <value>10k</value>
+    </component>
+    <component id="R_MID" type="resistor">
+      <pin name="1" net="2"/>
+      <pin name="2" net="10"/>
+      <value>4.7k</value>
+    </component>
+    <component id="R_BOT" type="resistor">
+      <pin name="1" net="10"/>
+      <pin name="2" net="gnd"/>
+      <value>2.2k</value>
+    </component>
+    <component id="C_FILT" type="capacitor">
+      <pin name="1" net="10"/>
+      <pin name="2" net="gnd"/>
+      <value>100nF</value>
+    </component>
+    <component id="V_SRC" type="voltage_source">
+      <pin name="p" net="1"/>
+      <pin name="n" net="gnd"/>
+      <value>12V</value>
+    </component>
+  </components>
+  <tests>
+    <test id="divider_probe">
+      <run duration="50ms"/>
+      <assert_voltage net="2" min="0V" max="12V"/>
+      <assert_voltage net="10" min="0V" max="12V"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="analog" default="true">
+      <backend type="ngspice"/>
+      <run test="divider_probe"/>
+    </profile>
+  </simulation_profiles>
+</system>

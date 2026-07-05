@@ -1,0 +1,46 @@
+<system name="d5_loadstep_ldo" ir_version="0.1">
+  <metadata>
+    <title>LDO behavioural source + generic_load load-step PULSE; renode-only profile</title>
+  </metadata>
+  <nets>
+    <net id="1" role="power" nominal_voltage="5V"/>
+    <net id="2" role="power" nominal_voltage="3.3V"/>
+    <net id="gnd" role="ground"/>
+  </nets>
+  <components>
+    <component id="V_IN" type="voltage_source">
+      <pin name="p" net="1"/>
+      <pin name="n" net="gnd"/>
+      <value>5V</value>
+    </component>
+    <component id="U_LDO" type="ldo">
+      <pin name="in" net="1"/>
+      <pin name="out" net="2"/>
+      <pin name="gnd" net="gnd"/>
+      <property name="vout" value="3.3V"/>
+      <property name="iout_max" value="500mA"/>
+      <property name="v_dropout" value="0.25V"/>
+      <property name="iq" value="15uA"/>
+    </component>
+    <component id="LOAD_STEP" type="generic_load">
+      <pin name="p" net="2"/>
+      <pin name="n" net="gnd"/>
+      <value>1mA</value>
+    </component>
+  </components>
+  <tests>
+    <test id="transient">
+      <run duration="10ms"/>
+      <setup>
+        <load_step component="LOAD_STEP" from="1mA" to="100mA" at="2ms" rise="5us"/>
+      </setup>
+      <assert_voltage net="2" min="3.0V" max="3.4V"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="renode_only" default="true">
+      <backend type="renode"/>
+      <run test="transient"/>
+    </profile>
+  </simulation_profiles>
+</system>

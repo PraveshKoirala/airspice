@@ -1,0 +1,42 @@
+<system name="d7_or_chain" ir_version="0.1">
+  <metadata>
+    <title>Python or-chain falsy fallthrough: empty set_current and empty current property</title>
+  </metadata>
+  <nets>
+    <net id="v33" role="power" nominal_voltage="3.3V"/>
+    <net id="gnd" role="ground"/>
+  </nets>
+  <components>
+    <component id="V_33" type="voltage_source">
+      <pin name="p" net="v33"/>
+      <pin name="n" net="gnd"/>
+      <value>3.3V</value>
+    </component>
+    <component id="LOADA" type="generic_load">
+      <pin name="p" net="v33"/>
+      <pin name="n" net="gnd"/>
+      <property name="current" value="10mA"/>
+    </component>
+    <component id="LOADB" type="generic_load">
+      <pin name="p" net="v33"/>
+      <pin name="n" net="gnd"/>
+      <property name="current" value=""/>
+      <value>5mA</value>
+    </component>
+  </components>
+  <tests>
+    <test id="or_chain">
+      <run duration="10ms"/>
+      <setup>
+        <set_current component="LOADA"/>
+      </setup>
+      <assert_voltage net="v33" min="3.0V" max="3.6V"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="analog" default="true">
+      <backend type="ngspice"/>
+      <run test="or_chain"/>
+    </profile>
+  </simulation_profiles>
+</system>

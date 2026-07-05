@@ -28,6 +28,21 @@ export interface CorpusDesign {
   modelPath: string;
   canonicalPath: string;
   diagnosticsPath: string;
+  /**
+   * SPICE netlist fixture (`<design>/netlist.cir`). Present ONLY for designs the
+   * oracle compiled -- i.e. valid designs (no error-severity diagnostics). A
+   * failing design's absence here IS the expected output (#9 refusal gate).
+   */
+  netlistPath: string;
+  /** True iff `netlist.cir` exists on disk for this design. */
+  hasNetlist: boolean;
+  /**
+   * SPICE probes descriptor fixture (`<design>/report/probes.json`). Present
+   * only for valid designs whose default profile has an ngspice backend.
+   */
+  probesPath: string;
+  /** True iff `report/probes.json` exists on disk for this design. */
+  hasProbes: boolean;
 }
 
 /** Discover every corpus design directory that has an input.air.xml. */
@@ -39,6 +54,8 @@ export function discoverDesigns(): CorpusDesign[] {
     const dir = join(CORPUS_DIR, entry.name);
     const inputPath = join(dir, "input.air.xml");
     if (!existsSync(inputPath)) continue;
+    const netlistPath = join(dir, "netlist.cir");
+    const probesPath = join(dir, "report", "probes.json");
     designs.push({
       name: entry.name,
       dir,
@@ -46,6 +63,10 @@ export function discoverDesigns(): CorpusDesign[] {
       modelPath: join(dir, "model.json"),
       canonicalPath: join(dir, "canonical.air.xml"),
       diagnosticsPath: join(dir, "diagnostics.json"),
+      netlistPath,
+      hasNetlist: existsSync(netlistPath),
+      probesPath,
+      hasProbes: existsSync(probesPath),
     });
   }
   designs.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
