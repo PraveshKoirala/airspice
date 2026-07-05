@@ -456,7 +456,68 @@ def _runner_text(name: str, result: dict[str, object]) -> str:
     text = f"{name}: {status}\n"
     for diagnostic in result.get("diagnostics", []):
         text += f"  [{diagnostic.get('severity')}] {diagnostic.get('message')}\n"
+    # Issue #64: also surface per-report diagnostics (e.g. NGSPICE_NOT_FOUND
+    # info attached to reports[*]["diagnostics"] by the simulator). This is
+    # additive to the top-level rendering above -- the top level rarely carries
+    # backend-degradation signals, so without this the text CLI silently hides
+    # them and misleads a newcomer into thinking a real transient ran.
+    text += _format_report_diagnostics(result)
     return text
+
+
+def _format_report_diagnostics(result: dict[str, object]) -> str:
+    """Render per-report diagnostics for `air simulate` / `air check` (issue #64).
+
+    Handles both shapes:
+    - flat simulate:  result["reports"] = [ {test, backend, diagnostics, ...}, ... ]
+    - nested check:   result["simulation"] = { "reports": [ ... ] }
+    Each report gets a header line (test id + backend) so multiple reports don't
+    blur together, followed by its diagnostics. Info severity is included (that
+    is what NGSPICE_NOT_FOUND uses). Emits nothing when there are no reports or
+    no per-report diagnostics -- pure additive on top of the existing top-level
+    rendering.
+    """
+    reports = _collect_reports(result)
+    if not reports:
+        return ""
+    text = ""
+    for report in reports:
+        diagnostics = report.get("diagnostics", []) if isinstance(report, dict) else []
+        if not diagnostics:
+            continue
+        test_id = report.get("test") if isinstance(report, dict) else None
+        backend = report.get("backend") if isinstance(report, dict) else None
+        header_bits = []
+        if test_id:
+            header_bits.append(f"test={test_id}")
+        if backend:
+            header_bits.append(f"backend={backend}")
+        header = f"  report ({', '.join(header_bits)}):" if header_bits else "  report:"
+        text += header + "\n"
+        for diagnostic in diagnostics:
+            if not isinstance(diagnostic, dict):
+                continue
+            severity = diagnostic.get("severity")
+            code = diagnostic.get("code")
+            message = diagnostic.get("message")
+            code_bit = f" {code}" if code else ""
+            text += f"    [{severity}]{code_bit} {message}\n"
+    return text
+
+
+def _collect_reports(result: dict[str, object]) -> list[object]:
+    """Return reports from a simulate or check result, else []."""
+    if not isinstance(result, dict):
+        return []
+    reports = result.get("reports")
+    if isinstance(reports, list):
+        return reports
+    simulation = result.get("simulation")
+    if isinstance(simulation, dict):
+        nested = simulation.get("reports")
+        if isinstance(nested, list):
+            return nested
+    return []
 
 
 def _repair_session_start(design: Path, provider: str, model: str | None, report: Path | None, out_dir: Path, as_json: bool) -> int:
