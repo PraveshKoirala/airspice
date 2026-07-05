@@ -623,9 +623,23 @@ def discover_corpus_names(tree_root: Optional[Path]) -> Optional[list[str]]:
             names.add(entry.name)
         elif entry.is_file():
             names.add(entry.stem)
-    # Filter out generic names that would cause mass false-positives.
+    # Filter out generic names that would cause mass false-positives. These are
+    # NON-design files/dirs that live under tests/golden_corpus/ whose stem is an
+    # ordinary word or corpus-metadata token, not a design:
+    #   README            the corpus doc
+    #   index             generic
+    #   ENGINE_VERSIONS   the ngspice version-pin metadata file (existed since #4)
+    #   tolerances        tests/golden_corpus/tolerances.json — the issue #15
+    #                     cross-engine parity CONFIG, not a design
+    # Without these discards, R4 would flag every use of the word "tolerances" or
+    # the token "ENGINE_VERSIONS" in the parity scripts (compare_reports.py /
+    # sim_parity.mjs) as a "golden-corpus design name in product source" — pure
+    # false positives (both are corpus METADATA, referenced by name necessarily).
+    # Same class of generic-stem exclusion as README.
     names.discard("README")
     names.discard("index")
+    names.discard("ENGINE_VERSIONS")
+    names.discard("tolerances")
     # Only keep plausible identifiers (avoids matching noise).
     good = sorted(n for n in names if re.fullmatch(r"[A-Za-z0-9_-]{3,}", n or ""))
     return good
