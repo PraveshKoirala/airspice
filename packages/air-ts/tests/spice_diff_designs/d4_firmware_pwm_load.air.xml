@@ -1,0 +1,63 @@
+<system name="d4_firmware_pwm" ir_version="0.1">
+  <metadata>
+    <title>Firmware PWM stimulus + generic_load DC + current source; mixed-signal profile</title>
+  </metadata>
+  <nets>
+    <net id="1" role="power" nominal_voltage="3.3V"/>
+    <net id="2" role="digital_signal"/>
+    <net id="3" role="analog_signal"/>
+    <net id="gnd" role="ground"/>
+  </nets>
+  <components>
+    <component id="V_3V3" type="voltage_source">
+      <pin name="p" net="1"/>
+      <pin name="n" net="gnd"/>
+      <value>3.3V</value>
+    </component>
+    <component id="R_GATE" type="resistor">
+      <pin name="1" net="2"/>
+      <pin name="2" net="gnd"/>
+      <value>100k</value>
+    </component>
+    <component id="I_BIAS" type="current_source">
+      <pin name="p" net="1"/>
+      <pin name="n" net="3"/>
+      <value>1mA</value>
+    </component>
+    <component id="LOAD1" type="generic_load">
+      <pin name="p" net="1"/>
+      <pin name="n" net="gnd"/>
+      <value>50mA</value>
+    </component>
+    <component id="U_MCU" type="mcu" part="ESP32-C3">
+      <pin name="3V3" net="1"/>
+      <pin name="GND" net="gnd"/>
+      <pin name="GPIO7" net="2" function="GPIO_OUT"/>
+    </component>
+  </components>
+  <firmware>
+    <project id="fw" target="U_MCU" framework="platformio" language="cpp">
+      <board>esp32-c3-devkitm-1</board>
+    </project>
+    <task id="pwm_task" target="fw">
+      <period>40us</period>
+      <write_gpio pin="GPIO7" value="high"/>
+      <delay duration="12us"/>
+      <write_gpio pin="GPIO7" value="low"/>
+      <delay duration="28us"/>
+    </task>
+  </firmware>
+  <tests>
+    <test id="pwm_probe">
+      <run duration="4ms"/>
+      <assert_voltage net="3" min="0V" max="3.3V"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="mixed" default="true">
+      <backend type="ngspice"/>
+      <backend type="renode"/>
+      <run test="pwm_probe"/>
+    </profile>
+  </simulation_profiles>
+</system>

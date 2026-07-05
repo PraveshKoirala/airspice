@@ -1,0 +1,58 @@
+<system name="d2_bjt_mosfet_mixed" ir_version="0.1">
+  <metadata>
+    <title>Mixed passives + NPN BJT + PMOS + diode using builtin models</title>
+  </metadata>
+  <nets>
+    <net id="1" role="power" nominal_voltage="5V"/>
+    <net id="2" role="analog_signal"/>
+    <net id="3" role="digital_signal"/>
+    <net id="4" role="analog_signal"/>
+    <net id="gnd" role="ground"/>
+  </nets>
+  <components>
+    <component id="V1" type="voltage_source">
+      <pin name="p" net="1"/>
+      <pin name="n" net="gnd"/>
+      <value>5V</value>
+    </component>
+    <component id="R_B" type="resistor">
+      <pin name="1" net="3"/>
+      <pin name="2" net="2"/>
+      <value>1k</value>
+    </component>
+    <component id="R_C" type="resistor">
+      <pin name="1" net="1"/>
+      <pin name="2" net="4"/>
+      <value>2.2k</value>
+    </component>
+    <component id="Q1" type="bjt" spice_model="NPN">
+      <pin name="C" net="4"/>
+      <pin name="B" net="2"/>
+      <pin name="E" net="gnd"/>
+    </component>
+    <component id="M1" type="mosfet" spice_model="PMOS">
+      <pin name="G" net="3"/>
+      <pin name="D" net="4"/>
+      <pin name="S" net="1"/>
+    </component>
+    <component id="D1" type="diode">
+      <pin name="a" net="4"/>
+      <pin name="c" net="gnd"/>
+    </component>
+  </components>
+  <tests>
+    <test id="switch_probe">
+      <run duration="2ms"/>
+      <setup>
+        <set_voltage net="3" value="3.3V"/>
+      </setup>
+      <assert_voltage net="4" min="0V" max="5V"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="analog" default="true">
+      <backend type="ngspice"/>
+      <run test="switch_probe"/>
+    </profile>
+  </simulation_profiles>
+</system>
