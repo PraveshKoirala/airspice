@@ -79,12 +79,16 @@ jobs:
         run: |
           node scripts/fuzz_diff.mjs --seed 1 --cases 1000 --json-out run_a.json
           node scripts/fuzz_diff.mjs --seed 1 --cases 1000 --json-out run_b.json
-          if ! cmp -s run_a.json run_b.json; then
+          if cmp -s run_a.json run_b.json; then
+            echo "deterministic: seed 1 produced byte-identical output twice"
+          else
             echo "::error::fuzzer is non-deterministic: seed 1 produced different output on two runs"
-            diff run_a.json run_b.json || true
+            # Show the first differing lines for triage. `diff` exits nonzero on a
+            # difference; that is expected here, so guard it with `if` (not the
+            # R2-banned OR-true idiom) and always fail the step afterwards.
+            if diff run_a.json run_b.json; then :; fi
             exit 1
           fi
-          echo "deterministic: seed 1 produced byte-identical output twice"
 
       # PR / push cadence: 1,000 seeded cases. Exit non-zero on any NEW divergence.
       - name: PR fuzz campaign (1,000 cases)
