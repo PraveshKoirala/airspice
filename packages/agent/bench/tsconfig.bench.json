@@ -1,0 +1,12 @@
+{
+  "//": "tsx reads `paths` from this tsconfig (via TSX_TSCONFIG_PATH in the bench npm script) so the bench CLI resolves the bare `air-ts` specifier (used by prompts.ts) to air-ts SOURCE, and air-ts's own `fast-xml-parser` import to the agent's installed copy — the same aliases the Vitest config declares. Resolution-only; tsx compiles the .ts on load.",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "baseUrl": "..",
+    "paths": {
+      "air-ts": ["../air-ts/src/index.ts"],
+      "fast-xml-parser": ["./node_modules/fast-xml-parser/src/fxp.js"]
+    }
+  }
+}

@@ -63,6 +63,7 @@ export {
 export {
   airContract,
   chatSystemInstruction,
+  repairSystemInstruction,
   GOLDEN_DESIGN,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_OPENAI_MODEL,

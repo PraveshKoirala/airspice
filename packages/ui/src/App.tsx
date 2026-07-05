@@ -2,13 +2,14 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import type { Node, Edge } from 'reactflow';
-import { Activity, FileCode, FolderTree, RadioTower, Zap } from 'lucide-react';
+import { Activity, FileCode, FolderTree, RadioTower } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Toolbar from './components/Toolbar';
 import XmlEditor from './components/Editor';
 import Graph from './components/Graph';
 import ResultPanel from './components/ResultPanel';
 import ChatRepl from './components/ChatRepl';
+import RepairPanel from './components/RepairPanel';
 import SettingsPanel from './components/SettingsPanel';
 import Landing from './pages/Landing';
 import type { ApiError, Diagnostic, ValidationResult } from './types/api';
@@ -428,29 +429,13 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
     }
   };
 
-  const handleRepair = async () => {
-    setIsBusy(true);
-    const saved = await persistDesign();
-    if (!saved) {
-      setIsBusy(false);
-      return;
-    }
-    addLog(`Running AI repair for ${saved.design}`, 'warning');
-    try {
-      const response = await axios.post(`${API_BASE}/ai-repair`, {
-        design: saved.design,
-        provider: 'mock',
-        out: 'generated/ui_repair.patch.xml',
-        apply_out: 'generated/ui_fixed.air.xml',
-      });
-      addLog(response.data.success ? 'Repair patch generated and validated.' : 'Repair did not produce a valid patch.', response.data.success ? 'success' : 'warning');
-      setActiveTab('repair');
-    } catch (error) {
-      const apiError = error as ApiError;
-      addLog(`Repair failed: ${apiError.response?.data?.detail || apiError.message}`, 'error');
-    } finally {
-      setIsBusy(false);
-    }
+  // The autonomous repair loop runs ENTIRELY in the browser now (issue #19): the
+  // Repair tab's RepairPanel drives the client-side loop (simulate → diagnose →
+  // patch → re-simulate) against the same gate + engine the agent uses, and
+  // applies each gated fix through the design store's single write path. This
+  // REPLACES the old backend /ai-repair round-trip (which violated zero-backend).
+  const handleRepair = () => {
+    setActiveTab('repair');
   };
 
   // The old backend /agent/chat round-trip was replaced by the browser agent
@@ -482,11 +467,13 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
       return <ArtifactsPanel artifacts={artifacts} />;
     }
     if (activeTab === 'repair') {
-      return <InfoPanel icon={<Zap size={18} />} title="Repair Workflow" items={[
-        'AI repair writes generated/ui_repair.patch.xml.',
-        'Validated output is written to generated/ui_fixed.air.xml.',
-        'Open the validation and simulation tabs after applying a patch.',
-      ]} />;
+      return (
+        <RepairPanel
+          provider={agentProvider}
+          {...(agentModel ? { model: agentModel } : {})}
+          theme={theme}
+        />
+      );
     }
     if (activeTab === 'settings') {
       return (

@@ -104,3 +104,33 @@ export type {
   RunEndReason,
   RunConversationOptions,
 } from "./tools/index.js";
+
+export { repairSystemInstruction } from "./tools/index.js";
+
+// The autonomous repair loop (issue #19): the flagship simulate → diagnose →
+// patch → re-simulate loop, run entirely client-side, every fix through the #18
+// gate. Fresh context per iteration, semantic no-progress detection, and #45
+// convergence awareness. See ./repair/index.ts.
+export {
+  runRepairLoop,
+  isFixed,
+  DEFAULT_MAX_ITERATIONS,
+  DEFAULT_CONTEXT_CHAR_BUDGET,
+  assembleRepairContext,
+  diagnosticSignature,
+  signaturesEqual,
+  evaluateDesign,
+  assertBudget,
+} from "./repair/index.js";
+export type {
+  RepairStopReason,
+  RepairResult,
+  RepairIteration,
+  RepairLoopOptions,
+  RepairLoopEvent,
+  AppliedStep,
+  AttemptSummary,
+  DesignEvaluation,
+  DiagnosticSignature,
+  RepairContextInput,
+} from "./repair/index.js";
