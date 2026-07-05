@@ -1,0 +1,73 @@
+<system name="gt106_adc_esp32c3_photoresistor" ir_version="0.1">
+  <metadata>
+    <title>ESP32-C3 LDR</title>
+    <description>Golden build for issue #106 build-spec corpus. Known-good, ERC-clean, simulates to the spec sim_assertion on ngspice.</description>
+    <author>issue-106</author>
+  </metadata>
+  <nets>
+    <net id="gnd" role="ground"/>
+    <net id="v3v3" role="power" nominal_voltage="3.3V"/>
+    <net id="light_sense" role="analog_signal"/>
+  </nets>
+  <components>
+    <component id="V_3V3" type="voltage_source">
+      <value>3.3V</value>
+      <pin name="p" net="v3v3"/>
+      <pin name="n" net="gnd"/>
+    </component>
+    <component id="R_LDR" type="resistor" part="LDR_GL5528">
+      <value>10k</value>
+      <pin name="1" net="v3v3"/>
+      <pin name="2" net="light_sense"/>
+    </component>
+    <component id="R_FIXED" type="resistor">
+      <value>10k</value>
+      <pin name="1" net="light_sense"/>
+      <pin name="2" net="gnd"/>
+    </component>
+    <component id="U_MCU" type="mcu" part="ESP32-C3">
+      <pin name="3V3" net="v3v3"/>
+      <pin name="GND" net="gnd"/>
+      <pin name="GPIO0" net="light_sense" function="ADC1_CH0"/>
+    </component>
+  </components>
+  <firmware>
+    <project id="fw_main" target="U_MCU" framework="platformio" language="cpp">
+      <board>esp32-c3-devkitm-1</board>
+      <source_tree path="firmware/"/>
+    </project>
+    <binding id="adc_binding">
+      <signal name="sense"/>
+      <component ref="U_MCU"/>
+      <peripheral>ADC1</peripheral>
+      <channel>ADC1_CH0</channel>
+      <net>light_sense</net>
+    </binding>
+    <task id="read_sense" target="fw_main">
+      <period>1s</period>
+      <read_adc binding="adc_binding" into="v_raw"/>
+    </task>
+  </firmware>
+  <analog>
+    <subsystem id="s">
+      <uses component="V_3V3"/>
+      <uses component="R_LDR"/>
+      <uses component="R_FIXED"/>
+      <probe id="probe_light_sense" net="light_sense" quantity="voltage"/>
+    </subsystem>
+  </analog>
+  <tests>
+    <test id="t">
+      <setup><set_voltage net="v3v3" value="3.3V"/></setup>
+      <run duration="1ms"/>
+      <assert_voltage net="light_sense" min="1.6V" max="1.7V"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="analog_only" default="true">
+      <backend type="ngspice"/>
+      <include subsystem="s"/>
+      <run test="t"/>
+    </profile>
+  </simulation_profiles>
+</system>

@@ -1,0 +1,22 @@
+{
+  "id": "pwr_esp32wroom_lipo_ldo",
+  "title": "LiPo-powered ESP32-WROOM node",
+  "category": "power",
+  "prompt": "I'm building a LiPo-powered ESP32-WROOM-32 node. Take the battery (3.0-4.2 V), regulate it down to a stable 3.3 V rail sized for the WROOM's peak draw, and run the module from that rail. For the bench check assume a nominal 3.7 V battery.",
+  "mcu": "esp32_wroom_32",
+  "fidelity": "faithful",
+  "criteria": {
+    "required_components": [
+      { "type": "mcu", "count": 1, "part": "ESP32-WROOM-32" },
+      { "type": "ldo", "count": 1 }
+    ],
+    "connectivity": [
+      "regulator(in=<vbat>, out=<v3v3>, gnd=gnd)",
+      "mcu_powered(mcu=ESP32-WROOM-32, rail=<v3v3>)"
+    ],
+    "firmware_intent": [],
+    "erc_clean": true,
+    "sim_assertion": { "net": "v3v3", "min_v": 3.2, "max_v": 3.4 }
+  },
+  "turn_budget": 4
+}

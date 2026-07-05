@@ -1,0 +1,28 @@
+{
+  "id": "adc_esp32c3_photoresistor",
+  "title": "ESP32-C3 ambient light sensor",
+  "category": "adc_frontend",
+  "prompt": "I want my ESP32-C3 to sense ambient light with a GL5528 photoresistor (LDR). Put the LDR in a divider with a fixed resistor so brighter light changes the voltage on one of the ADC pins, keeping the input inside 3.3 V. Read the light level in firmware. Use the LDR's ~10k typical resistance at moderate indoor light for the bench check.",
+  "mcu": "esp32_c3",
+  "fidelity": "abstracted",
+  "abstraction": {
+    "part": "LDR_GL5528",
+    "primitive": "resistor_divider",
+    "reason": "the photoresistor is a #105 behavioral parameterized resistor (R at the tested illuminance), not a datasheet optical SPICE model"
+  },
+  "criteria": {
+    "required_components": [
+      { "type": "mcu", "count": 1, "part": "ESP32-C3" },
+      { "type": "resistor", "count": 2 }
+    ],
+    "connectivity": [
+      "series_divider(high=<v3v3>, tap=<light_sense>, low=gnd)",
+      "adc_input(net=<light_sense>, mcu=ESP32-C3)"
+    ],
+    "firmware_intent": [ "read_adc(net=<light_sense>)" ],
+    "erc_clean": true,
+    "sim_assertion": { "net": "light_sense", "min_v": 1.6, "max_v": 1.7 }
+  },
+  "turn_budget": 4,
+  "golden": "golden/adc_esp32c3_photoresistor/design.air.xml"
+}

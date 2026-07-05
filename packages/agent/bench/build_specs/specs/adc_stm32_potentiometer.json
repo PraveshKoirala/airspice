@@ -1,0 +1,23 @@
+{
+  "id": "adc_stm32_potentiometer",
+  "title": "STM32 reads a potentiometer knob",
+  "category": "adc_frontend",
+  "prompt": "I've got an STM32F103 Blue Pill and a panel potentiometer wired as a knob across the 3.3 V rail. I want the wiper voltage to go into one of the STM32's analog inputs so firmware can read the knob position. Set up the pot as an adjustable divider feeding the ADC. Assume the knob is centered for the bench test.",
+  "mcu": "stm32_f103",
+  "fidelity": "faithful",
+  "criteria": {
+    "required_components": [
+      { "type": "mcu", "count": 1, "part": "STM32F103" },
+      { "type": "resistor", "count": 2 }
+    ],
+    "connectivity": [
+      "series_divider(high=<v3v3>, tap=<wiper>, low=gnd)",
+      "adc_input(net=<wiper>, mcu=STM32F103)"
+    ],
+    "firmware_intent": [ "read_adc(net=<wiper>)" ],
+    "erc_clean": true,
+    "sim_assertion": { "net": "wiper", "min_v": 1.6, "max_v": 1.7 }
+  },
+  "turn_budget": 4,
+  "golden": "golden/adc_stm32_potentiometer/design.air.xml"
+}

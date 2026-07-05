@@ -1,0 +1,25 @@
+{
+  "id": "pwm_stm32_rc_debounce",
+  "title": "RC-debounced button on STM32",
+  "category": "filter_pwm",
+  "prompt": "The pushbutton on my STM32F103 project is bouncing and firmware sees spurious presses. Add hardware debouncing: a pull-up resistor holds the input high when the button is open, the button pulls it to ground when pressed, and an RC low-pass smooths the edge before it reaches the GPIO input. For the bench check, with the button open the debounced input should rest near the 3.3 V rail.",
+  "mcu": "stm32_f103",
+  "fidelity": "faithful",
+  "criteria": {
+    "required_components": [
+      { "type": "mcu", "count": 1, "part": "STM32F103" },
+      { "type": "resistor", "count": 2 },
+      { "type": "capacitor", "count": 1 }
+    ],
+    "connectivity": [
+      "pullup(net=<btn_raw>, to=<v3v3>)",
+      "rc_lowpass(in=<btn_raw>, out=<btn_debounced>)",
+      "gpio_input(net=<btn_debounced>, mcu=STM32F103)"
+    ],
+    "firmware_intent": [ "read_gpio(net=<btn_debounced>)" ],
+    "erc_clean": true,
+    "sim_assertion": { "net": "btn_debounced", "min_v": 3.2, "max_v": 3.4 }
+  },
+  "turn_budget": 4,
+  "golden": "golden/pwm_stm32_rc_debounce/design.air.xml"
+}

@@ -1,0 +1,28 @@
+{
+  "id": "adc_atmega_thermistor",
+  "title": "Arduino thermistor temperature read",
+  "category": "adc_frontend",
+  "prompt": "On an Arduino Uno (ATmega328) I want to measure temperature with a 10k NTC thermistor. Wire the thermistor and a fixed resistor as a divider off the 5 V rail so the junction feeds an analog input, and have the sketch read it. Assume room temperature (25 C) for the bench check.",
+  "mcu": "atmega328",
+  "fidelity": "abstracted",
+  "abstraction": {
+    "part": "NTC_10K_3977",
+    "primitive": "resistor_divider",
+    "reason": "the thermistor is a #105 behavioral parameterized resistor (R at the tested temperature), not a datasheet thermal SPICE model"
+  },
+  "criteria": {
+    "required_components": [
+      { "type": "mcu", "count": 1, "part": "ATmega328P" },
+      { "type": "resistor", "count": 2 }
+    ],
+    "connectivity": [
+      "series_divider(high=<vcc>, tap=<therm_sense>, low=gnd)",
+      "adc_input(net=<therm_sense>, mcu=ATmega328P)"
+    ],
+    "firmware_intent": [ "read_adc(net=<therm_sense>)" ],
+    "erc_clean": true,
+    "sim_assertion": { "net": "therm_sense", "min_v": 2.475, "max_v": 2.525 }
+  },
+  "turn_budget": 4,
+  "golden": "golden/adc_atmega_thermistor/design.air.xml"
+}

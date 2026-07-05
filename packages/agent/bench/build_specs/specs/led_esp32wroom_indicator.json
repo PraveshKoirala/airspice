@@ -1,0 +1,24 @@
+{
+  "id": "led_esp32wroom_indicator",
+  "title": "ESP32-WROOM two indicator LEDs",
+  "category": "led_driver",
+  "prompt": "On my ESP32-WROOM-32 I want two indicator LEDs, say a green 'ok' and a red 'fault', each on its own GPIO with a series resistor to ground. Firmware should be able to light either one independently.",
+  "mcu": "esp32_wroom_32",
+  "fidelity": "faithful",
+  "criteria": {
+    "required_components": [
+      { "type": "mcu", "count": 1, "part": "ESP32-WROOM-32" },
+      { "type": "resistor", "count": 2 },
+      { "type": "diode", "count": 2 }
+    ],
+    "connectivity": [
+      "current_limit_resistor(gpio=<ok_drive>, load=<ok_anode>)",
+      "current_limit_resistor(gpio=<fault_drive>, load=<fault_anode>)",
+      "series_diode(anode=<ok_anode>, cathode=gnd)",
+      "series_diode(anode=<fault_anode>, cathode=gnd)"
+    ],
+    "firmware_intent": [ "write_gpio(net=<ok_drive>)", "write_gpio(net=<fault_drive>)" ],
+    "erc_clean": true
+  },
+  "turn_budget": 4
+}

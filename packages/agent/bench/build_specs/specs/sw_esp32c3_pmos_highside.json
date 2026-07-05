@@ -1,0 +1,25 @@
+{
+  "id": "sw_esp32c3_pmos_highside",
+  "title": "ESP32-C3 high-side PMOS power switch",
+  "category": "switching",
+  "prompt": "I want to cut power to a downstream 5 V load entirely with a high-side P-channel MOSFET so the load's ground stays connected. The PMOS source is on the 5 V rail, the drain feeds the load, and my ESP32-C3 GPIO controls the gate to turn the rail on. For the bench check assume the gate is pulled low so the switch is fully on.",
+  "mcu": "esp32_c3",
+  "fidelity": "faithful",
+  "criteria": {
+    "required_components": [
+      { "type": "mcu", "count": 1, "part": "ESP32-C3" },
+      { "type": "mosfet", "count": 1 },
+      { "type": "resistor", "count": 1 }
+    ],
+    "connectivity": [
+      "gpio_output(net=<gate_drive>, mcu=ESP32-C3)",
+      "high_side_switch(sw=mosfet, control=<gate_drive>, load=<load_hi>, rail=<v5>)",
+      "series_element(type=resistor, a=<load_hi>, b=gnd)"
+    ],
+    "firmware_intent": [ "write_gpio(net=<gate_drive>)" ],
+    "erc_clean": true,
+    "sim_assertion": { "net": "load_hi", "min_v": 4.7, "max_v": 5.05 }
+  },
+  "turn_budget": 4,
+  "golden": "golden/sw_esp32c3_pmos_highside/design.air.xml"
+}

@@ -1,0 +1,27 @@
+{
+  "id": "sw_esp32c3_npn_relay",
+  "title": "ESP32-C3 drives a relay via NPN",
+  "category": "switching",
+  "prompt": "I need my ESP32-C3 to switch a 5 V relay coil on and off. The GPIO can't drive a coil directly, so use an NPN transistor as a low-side switch: GPIO to the base through a base resistor, the relay coil between 5 V and the collector, and a freewheeling diode across the coil to catch the turn-off spike. Firmware energizes the relay when active. For the bench check drive the base on.",
+  "mcu": "esp32_c3",
+  "fidelity": "faithful",
+  "criteria": {
+    "required_components": [
+      { "type": "mcu", "count": 1, "part": "ESP32-C3" },
+      { "type": "bjt", "count": 1 },
+      { "type": "resistor", "count": 2 },
+      { "type": "diode", "count": 1 }
+    ],
+    "connectivity": [
+      "gpio_output(net=<base_drive>, mcu=ESP32-C3)",
+      "series_element(type=resistor, a=<base_drive>, b=<base>)",
+      "low_side_switch(sw=bjt, control=<base>, load=<coil_low>, common=gnd)",
+      "flyback_diode(across=<coil_low>, rail=<v5>)"
+    ],
+    "firmware_intent": [ "write_gpio(net=<base_drive>)" ],
+    "erc_clean": true,
+    "sim_assertion": { "net": "coil_low", "min_v": 0.0, "max_v": 0.4 }
+  },
+  "turn_budget": 4,
+  "golden": "golden/sw_esp32c3_npn_relay/design.air.xml"
+}

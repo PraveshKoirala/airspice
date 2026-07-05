@@ -1,0 +1,25 @@
+{
+  "id": "sw_atmega_bss138_lowside",
+  "title": "Arduino low-side MOSFET load switch",
+  "category": "switching",
+  "prompt": "On my Arduino Uno (ATmega328) I want to switch a resistive load (a small heater strip) on the 5 V rail using a logic-level N-channel MOSFET as a low-side switch. The GPIO drives the gate, the load sits between 5 V and the drain, and the source goes to ground. Firmware turns the load on. Assume the gate is driven high for the bench test.",
+  "mcu": "atmega328",
+  "fidelity": "faithful",
+  "criteria": {
+    "required_components": [
+      { "type": "mcu", "count": 1, "part": "ATmega328P" },
+      { "type": "mosfet", "count": 1 },
+      { "type": "resistor", "count": 1 }
+    ],
+    "connectivity": [
+      "gpio_output(net=<gate_drive>, mcu=ATmega328P)",
+      "low_side_switch(sw=mosfet, control=<gate_drive>, load=<load_low>, common=gnd)",
+      "series_element(type=resistor, a=<v5>, b=<load_low>)"
+    ],
+    "firmware_intent": [ "write_gpio(net=<gate_drive>)" ],
+    "erc_clean": true,
+    "sim_assertion": { "net": "load_low", "min_v": 0.0, "max_v": 0.3 }
+  },
+  "turn_budget": 4,
+  "golden": "golden/sw_atmega_bss138_lowside/design.air.xml"
+}
