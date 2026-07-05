@@ -1,0 +1,10 @@
+<?xml version="1.0" ?>
+<system ir_version="0.1" name="s">
+  <components>
+    <component id="V1" type="voltage_source">
+      <value>5V</value>
+      <pin name="p" net="a"/>
+      <pin name="n" net="b"/>
+    </component>
+  </components>
+</system>

@@ -10,6 +10,9 @@ build/
 *.log
 node_modules/
 dist/
+.venv/
+.venv*/
+venv/
 .pytest_cache/
 *.egg-info/
 .claude/settings.local.json

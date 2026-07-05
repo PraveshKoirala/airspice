@@ -218,9 +218,19 @@ def process_normalize_cases(writer: Writer) -> None:
         if input_path.name.endswith(".expected.canon.xml"):
             continue
         input_text = input_path.read_text(encoding="utf-8")
+        base = input_path.name[: -len(".air.xml")]
         canon = normalize_canonical(input_text)
-        out = input_path.with_name(input_path.name[: -len(".air.xml")] + ".expected.canon.xml")
-        writer.write(out, canon)
+        writer.write(input_path.with_name(base + ".expected.canon.xml"), canon)
+        # Second-pass reference (normalize(normalize(x))). For almost every case
+        # this equals the first pass (idempotence). It DIVERGES only where the
+        # oracle itself is not reparse-stable -- the CPython 3.12 minidom bug
+        # that writes raw tab/LF/CR into ATTRIBUTE values (they collapse to
+        # spaces on the next parse). Committing the oracle's OWN second pass
+        # makes the parity test assert that air-ts tracks the oracle's
+        # fixed-point behavior EXACTLY, rather than a blanket idempotence claim
+        # that is false for that input. See normalize_parity.test.ts.
+        canon2 = normalize_canonical(canon)
+        writer.write(input_path.with_name(base + ".idem2.canon.xml"), canon2)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -228,6 +238,24 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--check", action="store_true",
                         help="Fail if a reference is stale (do not rewrite).")
     args = parser.parse_args(argv)
+
+    # VERSION PIN (PR #87 rework r1): a subset of these references -- the ones
+    # exercising literal tab/LF/CR in ATTRIBUTE values -- are Python-version
+    # dependent, because CPython's minidom changed its attribute control-char
+    # escaping in 3.13 (gh-124061): 3.12 writes them RAW, 3.13+ char-ref-escapes
+    # them. CI pins Python 3.12 (.github/workflows/*.yml), and the golden corpus
+    # is generated on 3.12, so 3.12 is authoritative. Generating on 3.13+ will
+    # emit different bytes for attr_whitespace_charrefs / add_charref_attrs and
+    # those references will then be stale in CI. Regenerate on 3.12; a bump of
+    # CI's Python is an oracle-first change that moves these golden bytes.
+    if sys.version_info[:2] != (3, 12):
+        print(
+            f"WARNING: running on Python {sys.version_info.major}."
+            f"{sys.version_info.minor}, but CI pins 3.12. The attribute-"
+            "whitespace references are minidom-version-dependent (gh-124061) and "
+            "may drift against CI. Regenerate on 3.12 before committing.",
+            file=sys.stderr,
+        )
 
     writer = Writer(check=args.check)
     process_patch_designs(writer)

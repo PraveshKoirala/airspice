@@ -4,7 +4,9 @@
     <net id="1" role="power"/>
     <net id="10" role="ground"/>
     <net id="2" role="analog_signal"/>
-    <net id="w" note="tab&#9;lf&#10;cr&#13;end" role="analog_signal"/>
+    <net id="w" note="tab	lf
+cr
+end" role="analog_signal"/>
   </nets>
   <components>
     <component id="R1" type="resistor">
