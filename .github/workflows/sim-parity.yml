@@ -1,0 +1,143 @@
+name: sim-parity
+
+# Cross-engine simulation parity (issue #15). Measures numerical drift between the
+# TWO engines that simulate AIR designs — native ngspice (the reference, frozen in
+# the golden corpus by scripts/export_golden.py at the ENGINE_VERSIONS pin) and the
+# in-browser WASM engine (eecircuit-engine / ngspice 45.2, #13/#14) — CONTINUOUSLY,
+# so users never discover the drift. Two engines, one corpus, tolerance-based.
+#
+# What runs (both engines on the corpus):
+#   1. scripts/sim_parity.mjs  drives the FULL browser pipeline (compile air-ts #9
+#      -> WASM ngspice worker sim-wasm #13 -> report air-ts report.ts #14) in a
+#      REAL headless Chromium over every corpus design + the #41 ground-truth
+#      circuits, writing browser reports to a temp dir. Zero backend.
+#   2. scripts/compare_reports.py diffs the browser reports against the committed
+#      native reference reports using tests/golden_corpus/tolerances.json (the
+#      single source of truth for tolerances), fails on any divergence beyond
+#      tolerance, and writes a readable per-signal diff table to the job summary.
+#
+# The native reference is the ALREADY-COMMITTED corpus (native ngspice, pinned in
+# ENGINE_VERSIONS). Re-running native ngspice live is the required `corpus-check`
+# job's contract; here we ENFORCE the version pin (amendment 1): the ngspice this
+# runner sees MUST equal the ENGINE_VERSIONS pin, or the job fails before any
+# comparison — different ngspice versions have different default tolerances and
+# stepping behaviour, and comparing across them manufactures noise that pressures
+# tolerance-loosening. Both engine versions are recorded loudly in the summary;
+# they DO differ (native 42 vs browser 45.2) — that is the point, and the
+# tolerances absorb the benign drift.
+#
+# jsdom/node cannot host a WASM Web Worker, so parity MUST be measured in a real
+# browser (epic #12 binding decision 1: the WASM engine runs only in the worker).
+# No COOP/COEP headers: the single-threaded WASM build needs none (decision 2).
+#
+# Maintainer note: once green, add `sim-parity` to the required status checks for
+# `main`.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: sim-parity-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  sim-parity:
+    name: sim-parity (WASM vs native ngspice on the corpus)
+    runs-on: ubuntu-latest
+    # < 10 min budget (issue #15 acceptance criterion); the parity capture + diff
+    # runs in ~2 min locally, so give generous headroom without masking a hang.
+    timeout-minutes: 10
+    # Official Playwright container: Chromium + all system libraries preinstalled
+    # and version-matched to @playwright/test (pinned to the EXACT 1.58.2 the ui
+    # package uses, matching ui-sim.yml). Ubuntu noble here == ubuntu-latest, so
+    # its apt ngspice is the SAME version the corpus was generated with.
+    container:
+      image: mcr.microsoft.com/playwright:v1.58.2-noble
+    steps:
+      - uses: actions/checkout@v4
+
+      # Version-pin ENFORCEMENT (issue #15 amendment 1). The ngspice this job sees
+      # MUST equal tests/golden_corpus/ENGINE_VERSIONS. Install it and assert the
+      # version BEFORE any comparison runs; a mismatch fails immediately.
+      - name: Install native ngspice and enforce the version pin
+        shell: bash
+        run: |
+          set -euo pipefail
+          apt-get update
+          apt-get install -y ngspice
+          PIN=$(grep '^ngspice=' tests/golden_corpus/ENGINE_VERSIONS | cut -d= -f2 | tr -d '[:space:]')
+          # Capture the version banner without OR-true (which would swallow a real
+          # failure): run ngspice under `set +e`, keep its output, restore -e.
+          set +e
+          RAW=$(ngspice --version 2>/dev/null)
+          set -e
+          echo "ngspice --version:"; printf '%s\n' "$RAW" | head -n 5
+          FOUND=$(printf '%s\n' "$RAW" | grep -oiE 'ngspice-[0-9]+' | head -n1 | grep -oE '[0-9]+' | head -n1)
+          echo "ENGINE_VERSIONS pin=$PIN, runner ngspice=$FOUND"
+          if [ -z "$FOUND" ]; then
+            echo "FAIL: could not determine the runner's ngspice version." >&2
+            exit 1
+          fi
+          if [ "$FOUND" != "$PIN" ]; then
+            echo "FAIL (version-drift gate): runner ngspice $FOUND != ENGINE_VERSIONS pin $PIN." >&2
+            echo "Comparing across ngspice versions manufactures noise (amendment 1)." >&2
+            exit 1
+          fi
+          {
+            echo "## sim-parity: native ngspice version gate"
+            echo ""
+            echo "- ENGINE_VERSIONS pin: **$PIN**"
+            echo "- runner apt ngspice: **$FOUND** (matches — gate PASSED)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: packages/ui/package-lock.json
+
+      # The browser pipeline consumes air-ts + sim-wasm from SOURCE (Vite aliases)
+      # and dynamic-imports eecircuit-engine from packages/ui/node_modules, so the
+      # ui-only install is sufficient (same as ui-sim.yml).
+      - name: Install ui dependencies
+        working-directory: packages/ui
+        run: npm ci
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # BROWSER SIDE: run every corpus design + ground-truth circuit through the
+      # real Chromium + WASM ngspice pipeline; write reports to a temp dir. The
+      # OUT_DIR is emitted on the last stdout line for the comparison step.
+      - name: Capture browser (WASM) reports over the corpus
+        id: capture
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT=$(mktemp -d)
+          node scripts/sim_parity.mjs --out "$OUT"
+          echo "out_dir=$OUT" >> "$GITHUB_OUTPUT"
+
+      # COMPARE: browser vs the committed native reference, per tolerances.json.
+      # Fails on any corpus divergence beyond tolerance or any ground-truth physics
+      # failure; writes the per-signal diff table + version pinning to the summary.
+      - name: Compare browser vs native ngspice (tolerances.json)
+        shell: bash
+        run: python scripts/compare_reports.py --browser-dir "${{ steps.capture.outputs.out_dir }}"
+
+      - name: Upload browser reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sim-parity-browser-reports
+          path: ${{ steps.capture.outputs.out_dir }}
+          retention-days: 7
+          if-no-files-found: ignore

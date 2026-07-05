@@ -1,0 +1,44 @@
+{
+  "_about": "Cross-engine simulation parity tolerances (issue #15). THE single source of truth for how much numerical divergence between the native reference engine (ngspice, pinned in ENGINE_VERSIONS) and the in-browser WASM engine (eecircuit-engine / ngspice 45.2) is accepted before the sim-parity CI job fails. This file is NOT a golden fixture: it is parity CONFIG, not oracle output, so scripts/export_golden.py's --check skips it (it is in the exporter's IGNORED_PARITY_FILES set). Every entry that loosens beyond `defaults` MUST carry a written `justification`; 'it was flaky' is not a justification (AGENTS.md / issue #15 guardrail).",
+
+  "engine_pins": {
+    "_about": "Recorded for the job summary and the version-drift gate (issue #15 amendment 1). The native engine version MUST equal tests/golden_corpus/ENGINE_VERSIONS; the browser engine version is informational (a bump is an oracle-first PR). compare_reports.py fails immediately if native_ngspice != the ENGINE_VERSIONS pin, BEFORE any numeric comparison, because different ngspice versions have different default tolerances and stepping behaviour and comparing across them manufactures noise that pressures tolerance-loosening.",
+    "native_ngspice": "42",
+    "browser_engine": "eecircuit-engine@1.7.0",
+    "browser_ngspice": "45.2"
+  },
+
+  "defaults": {
+    "_about": "Applied to every numeric field unless a field/design rule overrides. rtol/atol match the #14 report-parity tolerance (rtol 1e-3) with a small absolute floor; DC/op values are compared relatively. Transient waveforms are NEVER compared point-by-point — the report already reduces each probed signal to assertion-relevant measurements (final/min/max + their times), and THOSE are what is compared (issue #15: measurement-level comparison is the contract).",
+    "rtol": 1e-3,
+    "atol": 1e-6
+  },
+
+  "field_tolerances": {
+    "time_of_min": {
+      "abs_tol_s": 1.0,
+      "justification": "DIVERGENCE A (formalized honestly). On a numerically FLAT signal every sample time is a valid argmin/argmax, so the reported extremum-TIME is engine-arbitrary while the extremum VALUE is exact. Concrete corpus case: esp32_battery_sensor/battery_adc_nominal probes `battery_sense`, which is flat at 1.04211V across the ENTIRE `.tran 1u 500ms` window (0..0.5s); native ngspice 42 reports time_of_max=0s (first sample) and eecircuit 45.2 reports 2.28e-06s (a different equally-valid sample) — the VALUE 1.04211V is byte-identical. The abs tolerance is therefore applied ONLY to the `time_of_min`/`time_of_max` fields and is sized to span the whole transient window (max 500ms in the corpus), with 2x headroom -> 1.0s. It does NOT relax the extremum VALUE (compared at rtol) nor the report STRUCTURE (byte-exact), so it cannot mask a real stats bug: a signal that is NOT flat has a well-defined extremum time that both engines must agree on within this window, and the value/structure checks stay strict."
+    },
+    "time_of_max": {
+      "abs_tol_s": 1.0,
+      "justification": "See time_of_min: same divergence A, same flat-signal engine-arbitrary argmax, same 1.0s window-spanning abs tolerance. Value and structure remain strict."
+    }
+  },
+
+  "expected_divergences": {
+    "_about": "NARROW, self-invalidating per-design exceptions for genuine converge-vs-NOT divergences (NOT value tolerances). Each entry names ONE design + ONE test and pins the EXACT convergence shapes both engines produce today. compare_reports.py requires BOTH engines to still produce those exact shapes: if the browser starts converging (the #45 browser-side ladder landed), or diverges differently, the exception no longer matches and the job FAILS, forcing this entry to be removed or re-justified. It is not a blanket skip — every OTHER field of the excepted report is still compared normally.",
+    "complex_bms": {
+      "test": "charge_cycle",
+      "native_converged": true,
+      "browser_converged": false,
+      "browser_terminal": true,
+      "browser_backend": "builtin_dc_fallback",
+      "justification": "DIVERGENCE B (formalized honestly). This is a real engine capability gap, not a value skew: native ngspice 42 solves charge_cycle's operating point (convergence.converged=true, backend=ngspice), but the browser's eecircuit 45.2 reports `singular matrix: check node charge_ctrl` and its dynamic-gmin / true-gmin / source-stepping all fail, so the browser cannot solve it AS-WRITTEN. The browser has no #45 convergence-aid ladder (gmin/source-stepping via injected .options) — that ladder lives native-side in simulator.py; the browser honestly reports terminal non-convergence and falls back to the analytic DC solver (backend=builtin_dc_fallback) rather than fabricating a waveform. Both #14 and its independent verifier confirmed the eecircuit singular-matrix stderr directly. This is NOT absorbed by a numeric tolerance (there is no waveform to compare); it is pinned as a documented, narrow exception.",
+      "follow_up": "Browser-side convergence ladder (eecircuit .options gmin/source-stepping injection) is tracked as follow-up to #45. When it lands, charge_cycle will converge in the browser too, native_converged/browser_converged will both be true, this exception will stop matching, and the job will fail until this entry is removed."
+    }
+  },
+
+  "per_design": {
+    "_about": "Reserved for design-specific numeric-tolerance overrides (rtol/atol) beyond `defaults`. EMPTY today: every converging corpus design agrees with the native reference within the default rtol (the corpus is DC/op-dominated, so the only real divergences are A and B above). Any future entry here MUST carry a `justification` explaining the ROOT CAUSE (usually .options or an engine-version behaviour), never 'flaky'."
+  }
+}

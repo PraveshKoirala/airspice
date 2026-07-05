@@ -29,3 +29,5 @@ tests/golden_corpus/** linguist-generated=true
 tests/fuzz_regressions/**  text eol=lf
 tests/xml_security/**      text eol=lf
 scripts/fuzz_diff.mjs      text eol=lf
+# The sim-parity capture script (issue #15) runs on Node on Linux CI too.
+scripts/sim_parity.mjs     text eol=lf

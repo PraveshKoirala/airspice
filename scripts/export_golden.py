@@ -70,6 +70,17 @@ from air.validation import has_errors, validate_ir, validate_tree  # noqa: E402
 CORPUS_DIR = REPO_ROOT / "tests" / "golden_corpus"
 ENGINE_VERSIONS_PATH = CORPUS_DIR / "ENGINE_VERSIONS"
 
+# Non-fixture files that live UNDER tests/golden_corpus/ but are NOT exporter
+# output: parity CONFIG, not oracle output. `--check` regenerates the corpus and
+# byte/tolerance-diffs it against the committed tree; a file the exporter never
+# writes would otherwise be flagged "present in committed corpus, MISSING from
+# regeneration". `tolerances.json` (issue #15) is the single source of truth for
+# cross-engine (native vs WASM) simulation tolerances and is hand-authored +
+# reviewed, so it is excluded from the reproducibility diff. This is a
+# comparator-only exclusion: nothing here generates, reads, or mutates a fixture,
+# so it cannot let a corrupted fixture pass (the mutation self-test still bites).
+IGNORED_PARITY_FILES = frozenset({"tolerances.json"})
+
 # Tolerance for simulation float payloads (report JSON + waveform CSV numbers).
 RTOL = 1e-6
 ATOL = 1e-12
@@ -475,7 +486,15 @@ def _compare_numeric_text(expected: str, actual: str, rel: Path) -> list[str]:
 
 
 def _iter_files(root: Path) -> set[Path]:
-    return {p.relative_to(root) for p in root.rglob("*") if p.is_file()}
+    # Exclude non-fixture parity-config files (e.g. tolerances.json, issue #15):
+    # they live under the corpus dir but are hand-authored config, not exporter
+    # output, so they must not be expected in a fresh regeneration (see
+    # IGNORED_PARITY_FILES). Everything else is a generated fixture and is diffed.
+    return {
+        p.relative_to(root)
+        for p in root.rglob("*")
+        if p.is_file() and p.name not in IGNORED_PARITY_FILES
+    }
 
 
 def compare_trees(committed: Path, fresh: Path) -> list[str]:
