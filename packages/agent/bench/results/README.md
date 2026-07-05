@@ -40,6 +40,47 @@ through:
 So the loop drives a real provider to a real gated fix; a full unattended 6-case
 baseline needs quota headroom the free tier does not give in one sitting.
 
+## 2026-07-05 — OpenAI (`2026-07-05-openai.json`)
+
+**Honest status: BLOCKED — the OpenAI key has no billing quota
+(`insufficient_quota`), NOT a model-quality or loop failure.** This run was an
+attempt to complete #19's ≥4/6 target with a paid OpenAI key after the Gemini
+free-tier key was quota-exhausted. The intended model was **`gpt-4o`** (a
+capable tool-use model, forced via `--model gpt-4o` — the provider's default is
+`gpt-4o-mini`, which we deliberately did not use).
+
+What the run actually observed (real numbers, not fabricated):
+
+| case | outcome | tokens | note |
+|------|---------|--------|------|
+| bad_adc_divider | provider_error | 0 | 429 `insufficient_quota` before any tokens |
+| i2c_without_pullups | provider_error | 0 | 429 `insufficient_quota` before any tokens |
+| invalid_pin_function | provider_error | 0 | 429 `insufficient_quota` before any tokens |
+| missing_ground | provider_error | 0 | 429 `insufficient_quota` before any tokens |
+| overloaded_3v3_rail | provider_error | 0 | 429 `insufficient_quota` before any tokens |
+| phase3_failure | provider_error | 0 | 429 `insufficient_quota` before any tokens |
+
+Committed number: **0/6 fixed, 6/6 quota-blocked** — every case failed at the
+FIRST chat-completions call with **zero tokens spent**, which is the fingerprint
+of a billing/quota block, not the model failing to fix.
+
+Root cause (probed directly, key redacted):
+- `GET /v1/models/gpt-4o` → **200** (the key authenticates and the model is
+  listed — this is the "probe works" signal, but a GET does not consume quota).
+- `POST /v1/chat/completions` (gpt-4o AND gpt-4o-mini) → **429** with body
+  `{"type":"insufficient_quota","code":"insufficient_quota","message":"You
+  exceeded your current quota, please check your plan and billing details."}`.
+- No `retry-after` / `x-ratelimit-*` headers — this is account billing
+  exhaustion, not a transient per-minute rate-limit, so the loop's
+  provider-error retries cannot recover it.
+
+`provider_error` is the DISTINCT loop stop reason for exactly this (auth / quota
+/ network) — it is not scored as the model failing to repair. As with the Gemini
+disclosure above, the misses here are a quota problem, not capability: no chat
+call ever reached the model, so this run says **nothing** about gpt-4o's repair
+quality. The ≥4/6 target remains OPEN pending a funded OpenAI key (or an
+Anthropic key).
+
 ### Maintainer checklist — completing the live baseline
 
 To land a full ≥4/6 baseline, run with a **paid** key (or a key with fresh daily

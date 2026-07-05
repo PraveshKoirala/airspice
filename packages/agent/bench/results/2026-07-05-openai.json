@@ -1,0 +1,65 @@
+{
+  "provider": "openai",
+  "model": "gpt-4o",
+  "mode": "live",
+  "date": "2026-07-05",
+  "maxIterations": 5,
+  "totalCases": 6,
+  "fixedCount": 0,
+  "cases": [
+    {
+      "name": "bad_adc_divider",
+      "fixed": false,
+      "iterations": 1,
+      "tokens": 0,
+      "stopReason": "provider_error",
+      "appliedPatches": 0,
+      "message": "Stopped: the provider errored (auth / quota / network) after 1 iteration(s)."
+    },
+    {
+      "name": "i2c_without_pullups",
+      "fixed": false,
+      "iterations": 1,
+      "tokens": 0,
+      "stopReason": "provider_error",
+      "appliedPatches": 0,
+      "message": "Stopped: the provider errored (auth / quota / network) after 1 iteration(s)."
+    },
+    {
+      "name": "invalid_pin_function",
+      "fixed": false,
+      "iterations": 1,
+      "tokens": 0,
+      "stopReason": "provider_error",
+      "appliedPatches": 0,
+      "message": "Stopped: the provider errored (auth / quota / network) after 1 iteration(s)."
+    },
+    {
+      "name": "missing_ground",
+      "fixed": false,
+      "iterations": 1,
+      "tokens": 0,
+      "stopReason": "provider_error",
+      "appliedPatches": 0,
+      "message": "Stopped: the provider errored (auth / quota / network) after 1 iteration(s)."
+    },
+    {
+      "name": "overloaded_3v3_rail",
+      "fixed": false,
+      "iterations": 1,
+      "tokens": 0,
+      "stopReason": "provider_error",
+      "appliedPatches": 0,
+      "message": "Stopped: the provider errored (auth / quota / network) after 1 iteration(s)."
+    },
+    {
+      "name": "phase3_failure",
+      "fixed": false,
+      "iterations": 1,
+      "tokens": 0,
+      "stopReason": "provider_error",
+      "appliedPatches": 0,
+      "message": "Stopped: the provider errored (auth / quota / network) after 1 iteration(s)."
+    }
+  ]
+}
