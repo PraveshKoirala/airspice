@@ -147,7 +147,7 @@ describe("PWM PULSE emission (post-#59, byte-exact vs oracle)", () => {
 
   it("a frequency sweep emits the compensated plateau byte-for-byte", () => {
     expect(pwmStimCard("2us", "10us")).toBe("PULSE(0 3.3 0 1us 1us 1us 10us)");
-    expect(pwmStimCard("9us", "10us")).toBe("PULSE(0 3.3 0 1us 1us 8us 10us)");
+    expect(pwmStimCard("8us", "10us")).toBe("PULSE(0 3.3 0 1us 1us 7us 10us)");
     expect(pwmStimCard("25us", "100us")).toBe("PULSE(0 3.3 0 1us 1us 24us 100us)");
     expect(pwmStimCard("500us", "1ms")).toBe("PULSE(0 3.3 0 1us 1us 499us 1ms)");
   });
@@ -170,10 +170,34 @@ describe("PWM PULSE emission (post-#59, byte-exact vs oracle)", () => {
     expect(pwmStimCard("20us", "10us")).toBe("DC 3.3");
   });
 
-  it("near-100% duty keeps its (deliberately un-#74-fixed) plateau: 1s/2s -> PW 999.999ms", () => {
-    // Bug-for-bug parity: the oracle does NOT special-case near-100% truncation
-    // (#74 lands oracle-first later); the port must emit the same 999.999ms card.
+  it("50% duty at 0.5Hz keeps a normal trapezoid: 1s/2s -> PW 999.999ms", () => {
+    // 1s/2s is 50% duty (ton far below period - 1us), so it stays a NORMAL
+    // trapezoid with fixed 1us edges and PW = ton - 1us = 999.999ms. This is the
+    // #59 form, unchanged by the #74 near-100% guard, and byte-identical to the
+    // oracle.
     expect(pwmStimCard("1s", "2s")).toBe("PULSE(0 3.3 0 1us 1us 999.999ms 2s)");
+  });
+
+  it("near-100% duty (#74) mirrors the sub-edge triangle: span == period, no fall-edge truncation", () => {
+    // For period - 1us < ton < period the normal span ton + 1us would overrun
+    // the period and ngspice would truncate the fall edge at the wrap. The #74
+    // guard shrinks the edges to period-ton and widens PW to 2*ton-period, so the
+    // span is exactly the period. Byte-exact against the live oracle.
+    expect(pwmStimCard("9.5us", "10us")).toBe("PULSE(0 3.3 0 500ns 500ns 9us 10us)");
+    expect(pwmStimCard("9.9us", "10us")).toBe("PULSE(0 3.3 0 100ns 100ns 9.8us 10us)");
+    expect(pwmStimCard("9.999us", "10us")).toBe("PULSE(0 3.3 0 1000ps 1000ps 9.998us 10us)");
+  });
+
+  it("the near-100% band boundary: 8.999us stays a normal trapezoid, 9us tips into the #74 triangle", () => {
+    // The band is `ton > period - 1us`. In IEEE-754 doubles parseQuantity("10us")
+    // is 9.999...e-6, so the normal span `9us + 1us` (1e-5) strictly exceeds the
+    // parsed period and 9us/10us tips into the #74 branch (edges period-ton, PW
+    // 2*ton-period); 8.999us/10us stays a normal fixed-1us-edge trapezoid. Both
+    // emit duty 0.9 exactly. Byte-exact against the live oracle on BOTH sides --
+    // this is the parity-critical boundary case (Python and JS share the same
+    // double representation of "10us", so they classify 9us identically).
+    expect(pwmStimCard("8.999us", "10us")).toBe("PULSE(0 3.3 0 1us 1us 7.999us 10us)");
+    expect(pwmStimCard("9us", "10us")).toBe("PULSE(0 3.3 0 1000ns 1000ns 8us 10us)");
   });
 
   it("never emits a non-positive plateau across a sweep (ngspice would choke)", () => {

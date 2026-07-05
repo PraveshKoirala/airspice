@@ -28,9 +28,9 @@
  *     source would abort ngspice).
  *   - MCU firmware stimulus (PULSE / DC) is emitted between the test sources and
  *     the component loop, in `firmware_tasks` document order.
- *   - The PWM PULSE math is the post-#59 duty-compensated form (see `pwmPulse`).
- *     Bug-for-bug: the near-100%-duty truncation corner (#74) is deliberately
- *     NOT fixed here -- parity means preserving it until it lands oracle-first.
+ *   - The PWM PULSE math is the post-#59 duty-compensated form, including the
+ *     near-100%-duty triangle corner (#74; see `pwmPulse`). Both are ported from
+ *     the oracle for byte parity.
  *   - Float rendering goes through `formatQuantity` / `spiceValue` from #7, which
  *     reproduce CPython's `"%.6g"` and the `M`->`Meg` rewrite byte-for-byte.
  *
@@ -351,13 +351,22 @@ function mcuStimulusLines(ir: SystemIR): string[] {
  * independent of frequency.
  *
  * Degenerate cases (guarded so ngspice never sees a non-positive/zero-period
- * plateau), verbatim from the oracle:
- *   - `ton <= 0` (0% duty)          -> `DC 0`  (flat rail, no pulse)
- *   - `ton >= period` (>=100% duty) -> `DC {amplitude}`
- *   - `0 < ton <= PWM_EDGE_S`       -> shrink edges to `ton`, `PW = 0` (triangle)
+ * plateau and the emitted trapezoid never overruns the period), verbatim from
+ * the oracle:
+ *   - `ton <= 0` (0% duty)                 -> `DC 0`  (flat rail, no pulse)
+ *   - `ton >= period` (>=100% duty)        -> `DC {amplitude}`
+ *   - `0 < ton <= PWM_EDGE_S`              -> shrink edges to `ton`, `PW = 0`
+ *                                             (sub-edge triangle)
+ *   - `period - PWM_EDGE_S < ton < period` -> shrink edges to `period-ton` and
+ *                                             widen `PW = 2*ton-period` so the
+ *                                             span is exactly the period
+ *                                             (near-100% triangle, #74)
  *
- * Bug-for-bug: the near-100%-duty truncation corner (#74) is deliberately NOT
- * corrected -- the oracle preserves it, so this port must too.
+ * The near-100% branch (#74) mirrors the sub-edge triangle at the top end: the
+ * normal span `ton + PWM_EDGE_S` would overrun the period and ngspice would
+ * truncate the fall edge at the wrap, so we set `TR = TF = period - ton` and
+ * `PW = 2*ton - period`; the high-area `PW + (TR+TF)/2 = ton` still gives duty
+ * `ton/period`, and the span is exactly the period.
  */
 function pwmPulse(ton: string, period: string, amplitude = "3.3"): string {
   const tonS = parseQuantity(ton, "s");
@@ -379,6 +388,14 @@ function pwmPulse(ton: string, period: string, amplitude = "3.3"): string {
     // triangle area (TR+TF)/2 == ton (duty preserved) and PW stays > 0-safe.
     edgeS = tonS;
     pwS = 0.0;
+  } else if (tonS > periodS - edgeS) {
+    // Near-100% duty (#74): the normal span ton + PWM_EDGE_S would overrun the
+    // period and ngspice would truncate the fall edge at the wrap. Mirror the
+    // sub-edge triangle at the top end -- shrink the edges to period-ton and
+    // widen the plateau to 2*ton-period so the span is exactly the period and
+    // the high-area stays ton (duty preserved).
+    edgeS = periodS - tonS;
+    pwS = 2.0 * tonS - periodS;
   } else {
     pwS = tonS - edgeS;
   }
