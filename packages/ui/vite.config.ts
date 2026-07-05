@@ -11,10 +11,14 @@ export default defineConfig({
       // source entry, aliased here (issue #10 / epic #6). air-ts is strict ESM
       // TypeScript with zero DOM dependency, so Vite compiles + bundles it (and
       // its worker import) directly -- no separate build/publish step, which
-      // keeps the `ui` CI job (npm ci in packages/ui only) working. air-ts's one
-      // runtime dep, fast-xml-parser, is declared in packages/ui/package.json so
-      // it resolves here too.
+      // keeps the `ui` CI job (npm ci in packages/ui only) working.
       'air-ts': fileURLToPath(new URL('../air-ts/src/index.ts', import.meta.url)),
+      // air-ts source imports `fast-xml-parser`. Pin it to the UI's own copy so
+      // Vite (and the worker bundle) resolves it from packages/ui/node_modules
+      // -- packages/air-ts/node_modules is NOT installed in the `ui` CI job.
+      'fast-xml-parser': fileURLToPath(
+        new URL('./node_modules/fast-xml-parser/src/fxp.js', import.meta.url),
+      ),
     },
   },
   // Module workers so the air-ts engine worker can `import` air-ts as ESM.
