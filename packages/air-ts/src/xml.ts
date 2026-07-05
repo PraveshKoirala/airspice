@@ -92,6 +92,12 @@ export function parseXml(xmlText: string): XmlElement {
     );
   }
 
+  // Numeric-character-reference gate (PR #77 rework round 1): expat REJECTS a
+  // char ref whose code point fails the XML 1.0 Char production ("reference to
+  // invalid character number"), while fast-xml-parser resolves-and-drops it.
+  // Enforce the oracle's accept/reject decision before handing FXP the input.
+  rejectInvalidCharRefs(xmlText);
+
   const parser = new XMLParser({
     // Ordered array-of-nodes representation: each node is a single-key object,
     // e.g. { system: [ ...children ], ":@": { "@_name": "x" } }.
@@ -108,11 +114,15 @@ export function parseXml(xmlText: string): XmlElement {
     cdataPropName: false as unknown as string,
     // Resolve entities. processEntities handles the 5 predefined XML entities;
     // htmlEntities additionally resolves numeric char refs (&#65; / &#x42;),
-    // which expat also resolves for valid XML.
-    // PARITY (pre-#43 gap, follow-up filed): htmlEntities also resolves named
-    // HTML entities such as &nbsp; that expat REJECTS as undefined. The corpus
-    // uses none of these, so corpus parity is unaffected; #43's fuzzer contract
-    // will formalize entity handling in docs/xml_security.md.
+    // which expat also resolves for valid XML. Numeric refs to XML-invalid
+    // code points are REJECTED before this parser runs (rejectInvalidCharRefs
+    // above), matching expat's "reference to invalid character number".
+    // PARITY (pre-#43 gap, issue #75): htmlEntities also resolves named HTML
+    // entities such as &nbsp; that expat REJECTS as undefined, and FXP accepts
+    // malformed reference syntax (&#X42; resolved, &#; left literal, bare &)
+    // that expat rejects as not-well-formed. The corpus uses none of these, so
+    // corpus parity is unaffected; #43's fuzzer contract will formalize entity
+    // handling in docs/xml_security.md.
     processEntities: true,
     htmlEntities: true,
     ignorePiTags: true,
@@ -162,6 +172,70 @@ function enforceSecurity(xmlText: string): void {
   if (/<!ENTITY/i.test(xmlText)) {
     throw new XmlSecurityError("entity declarations are not permitted");
   }
+}
+
+// --- Numeric character reference gate (PR #77 rework round 1) --------------- #
+
+/**
+ * Reject numeric character references to XML-1.0-invalid code points, exactly
+ * as expat does ("reference to invalid character number").
+ *
+ * PROVENANCE (oracle, `xml.etree.ElementTree.fromstring`, run at rework time):
+ *   REJECT: &#0; &#8; &#11; &#12; &#27; &#31; (C0 controls other than 9/A/D),
+ *           &#55296;..&#57343; (surrogates D800-DFFF), &#65534; &#65535;
+ *           (FFFE/FFFF), &#1114112; (0x110000) and anything larger.
+ *   ACCEPT: &#9; &#10; &#13; &#32; &#127; &#55295; (D7FF), &#57344; (E000),
+ *           &#65533; (FFFD), &#65536; (10000), &#1114111; (10FFFF), hex forms
+ *           with either-case hex digits (&#xD7FF; / &#xd7ff;).
+ *   CONTEXT: refs are NOT processed (and never rejected) inside comments,
+ *           CDATA sections, and processing instructions; they ARE processed in
+ *           element text and attribute values. `&amp;#8;` is not a reference.
+ *
+ * The scan runs on raw text AFTER the well-formedness gate, with the three
+ * unprocessed span kinds stripped first. In well-formed XML a literal `<` is
+ * impossible outside markup, so `<!--`, `<![CDATA[` and `<?` always open a real
+ * span, and the lazy matches end at the true terminators (a well-formed comment
+ * cannot contain `--`, character data cannot contain `]]>`).
+ *
+ * Malformed reference SYNTAX (&#X42;, &#;, bare &) is a different expat error
+ * class ("not well-formed") and stays in the #75 accept-vs-reject family --
+ * FXP resolves or keeps those literally; see the parser-options PARITY note.
+ */
+function rejectInvalidCharRefs(xmlText: string): void {
+  // Spans in which expat does not process character references.
+  const scannable = xmlText.replace(
+    /<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<\?[\s\S]*?\?>/g,
+    "",
+  );
+  // Syntactically valid numeric char refs only: decimal or lowercase-x hex.
+  const charRef = /&#(?:([0-9]+)|x([0-9a-fA-F]+));/g;
+  let m: RegExpExecArray | null;
+  while ((m = charRef.exec(scannable)) !== null) {
+    const cp =
+      m[1] !== undefined
+        ? parseInt(m[1], 10)
+        : parseInt(m[2] as string, 16);
+    if (!isXmlChar(cp)) {
+      throw new XmlParseError(
+        `reference to invalid character number: ${m[0]}`,
+      );
+    }
+  }
+}
+
+/**
+ * XML 1.0 `Char` production:
+ * #x9 | #xA | #xD | [#x20-#xD7FF] | [#xE000-#xFFFD] | [#x10000-#x10FFFF].
+ */
+function isXmlChar(cp: number): boolean {
+  return (
+    cp === 0x9 ||
+    cp === 0xa ||
+    cp === 0xd ||
+    (cp >= 0x20 && cp <= 0xd7ff) ||
+    (cp >= 0xe000 && cp <= 0xfffd) ||
+    (cp >= 0x10000 && cp <= 0x10ffff)
+  );
 }
 
 function enforceDepth(el: XmlElement, depth: number): void {
