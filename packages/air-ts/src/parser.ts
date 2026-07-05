@@ -74,35 +74,41 @@ export function parseTree(rawRoot: XmlElement): SystemIR {
     created_at: childText(metadataEl, "created_at"),
   };
 
-  const nets: Record<string, Net> = {};
+  // All keyed collections are Maps: insertion (document) order for every key
+  // type, mirroring Python dicts. Plain objects would iterate integer-like keys
+  // (pin names "1"/"2", numeric ids) numerically first -- observable in
+  // validation's emission order and pins[0] access (issue #8 rework round 1;
+  // see model.ts header). Map.set matches Python dict assignment on duplicate
+  // keys: last value wins, first insertion position kept.
+  const nets = new Map<string, Net>();
   for (const net of findAllPath(root, "nets", "net")) {
     if (!hasAttr(net, "id")) continue;
     const id = attr(net, "id");
-    nets[id] = {
+    nets.set(id, {
       id,
       role: attr(net, "role", ""),
       nominal_voltage: net.attrib.has("nominal_voltage")
         ? attr(net, "nominal_voltage")
         : null,
-    };
+    });
   }
 
-  const powerDomains: Record<string, PowerDomain> = {};
+  const powerDomains = new Map<string, PowerDomain>();
   for (const domain of findAllPath(root, "power_domains", "domain")) {
     if (!hasAttr(domain, "id")) continue;
     const id = attr(domain, "id");
-    powerDomains[id] = {
+    powerDomains.set(id, {
       id,
       net: attr(domain, "net", ""),
       nominal: domain.attrib.has("nominal") ? attr(domain, "nominal") : null,
       source: domain.attrib.has("source") ? attr(domain, "source") : null,
-    };
+    });
   }
 
-  const components: Record<string, Component> = {};
+  const components = new Map<string, Component>();
   for (const element of findAllPath(root, "components", "component")) {
     const componentId = attr(element, "id", "");
-    const pins: Record<string, PinConnection> = {};
+    const pins = new Map<string, PinConnection>();
     for (const pin of findAll(element, "pin")) {
       const name = attr(pin, "name", "");
       // net = net || node || ref || "" (Python `or`-chain on attribute values).
@@ -112,20 +118,20 @@ export function parseTree(rawRoot: XmlElement): SystemIR {
           pin.attrib.get("node"),
           pin.attrib.get("ref"),
         ) ?? "";
-      pins[name] = {
+      pins.set(name, {
         name,
         net,
         function: pin.attrib.has("function") ? attr(pin, "function") : null,
-      };
+      });
     }
-    const properties: Record<string, string> = {};
+    const properties = new Map<string, string>();
     for (const prop of findAll(element, "property")) {
-      properties[attr(prop, "name", "")] = attr(prop, "value", "");
+      properties.set(attr(prop, "name", ""), attr(prop, "value", ""));
     }
     const valueEl = find(element, "value");
     const valueText =
       valueEl !== null ? elementText(valueEl) : "";
-    components[componentId] = {
+    components.set(componentId, {
       id: componentId,
       type: attr(element, "type", ""),
       part: element.attrib.has("part") ? attr(element, "part") : null,
@@ -139,7 +145,7 @@ export function parseTree(rawRoot: XmlElement): SystemIR {
       value: valueEl !== null && valueText ? valueText.trim() : null,
       pins,
       properties,
-    };
+    });
   }
 
   const analog: AnalogSubsystem[] = [];
@@ -156,7 +162,7 @@ export function parseTree(rawRoot: XmlElement): SystemIR {
     });
   }
 
-  const interfaces: Record<string, Interface> = {};
+  const interfaces = new Map<string, Interface>();
   for (const iface of findAllPath(root, "interfaces", "interface")) {
     const data: Record<string, InterfaceDatum> = {};
     for (const child of childElements(iface)) {
@@ -171,17 +177,17 @@ export function parseTree(rawRoot: XmlElement): SystemIR {
       }
     }
     const id = attr(iface, "id", "");
-    interfaces[id] = { id, type: attr(iface, "type", ""), data };
+    interfaces.set(id, { id, type: attr(iface, "type", ""), data });
   }
 
-  const firmwareProjects: Record<string, FirmwareProject> = {};
-  const firmwareBindings: Record<string, FirmwareBinding> = {};
-  const firmwareTasks: Record<string, FirmwareTask> = {};
+  const firmwareProjects = new Map<string, FirmwareProject>();
+  const firmwareBindings = new Map<string, FirmwareBinding>();
+  const firmwareTasks = new Map<string, FirmwareTask>();
   const firmwareEl = find(root, "firmware");
   if (firmwareEl !== null) {
     for (const project of findAll(firmwareEl, "project")) {
       const projectId = attr(project, "id", "");
-      firmwareProjects[projectId] = {
+      firmwareProjects.set(projectId, {
         id: projectId,
         target: attr(project, "target", ""),
         framework: attr(project, "framework", ""),
@@ -190,18 +196,18 @@ export function parseTree(rawRoot: XmlElement): SystemIR {
         // NOTE: read as an ATTRIBUTE. When source_tree is a child element
         // (<source_tree path="..."/>) there is no attribute, so this is "".
         source_tree: attr(project, "source_tree", ""),
-      };
+      });
     }
     for (const binding of findAll(firmwareEl, "binding")) {
       const bindingId = attr(binding, "id", "");
-      firmwareBindings[bindingId] = {
+      firmwareBindings.set(bindingId, {
         id: bindingId,
         signal: childAttr(binding, "signal", "name"),
         component: childAttr(binding, "component", "ref"),
         peripheral: childText(binding, "peripheral"),
         channel: childText(binding, "channel"),
         net: childText(binding, "net"),
-      };
+      });
     }
     for (const task of findAll(firmwareEl, "task")) {
       const taskId = attr(task, "id", "");
@@ -214,12 +220,12 @@ export function parseTree(rawRoot: XmlElement): SystemIR {
         if (text) op["text"] = text;
         operations.push(op);
       }
-      firmwareTasks[taskId] = {
+      firmwareTasks.set(taskId, {
         id: taskId,
         target: attr(task, "target", ""),
         period: childText(task, "period"),
         operations,
-      };
+      });
     }
   }
 
@@ -239,31 +245,36 @@ export function parseTree(rawRoot: XmlElement): SystemIR {
     });
   }
 
-  const tests: Record<string, Test> = {};
+  const tests = new Map<string, Test>();
   for (const test of findAllPath(root, "tests", "test")) {
     const testId = attr(test, "id", "");
-    const setup: Record<string, string> = {};
-    const setupEl = find(test, "setup");
-    const setupChildren = setupEl !== null ? childElements(setupEl) : [];
+    const setup = new Map<string, string>();
+    // PARITY (rework round 1 audit): the oracle iterates test.findall("./setup/*")
+    // -- the children of EVERY <setup> section under the test, not just the
+    // first. Same multi-section family as the DUPLICATE_ID scan (root cause B).
+    const setupChildren: XmlElement[] = [];
+    for (const setupEl of findAll(test, "setup")) {
+      for (const child of childElements(setupEl)) setupChildren.push(child);
+    }
     for (const child of setupChildren) {
       if (child.tag === "set_voltage") {
-        setup[attr(child, "net", child.tag)] = attr(child, "value", "");
+        setup.set(attr(child, "net", child.tag), attr(child, "value", ""));
       } else if (child.tag === "set_current") {
-        setup[`current:${attr(child, "component", "")}`] = attr(
+        setup.set(`current:${attr(child, "component", "")}`, attr(
           child,
           "value",
           "",
-        );
+        ));
       } else if (child.tag === "load_step") {
         const component = attr(child, "component", "");
-        setup[`load_step:${component}`] = [
+        setup.set(`load_step:${component}`, [
           attr(child, "from", ""),
           attr(child, "to", ""),
           attr(child, "at", "0s"),
           attr(child, "rise", "1us"),
-        ].join(",");
+        ].join(","));
       } else {
-        setup[attr(child, "net", child.tag)] = attr(child, "value", "");
+        setup.set(attr(child, "net", child.tag), attr(child, "value", ""));
       }
     }
     const assertions: Array<Record<string, string>> = [];
@@ -276,26 +287,26 @@ export function parseTree(rawRoot: XmlElement): SystemIR {
       }
     }
     const run = find(test, "run");
-    tests[testId] = {
+    tests.set(testId, {
       id: testId,
       description: childText(test, "description"),
       setup,
       duration: run !== null ? attr(run, "duration", "") : "",
       assertions,
-    };
+    });
   }
 
-  const profiles: Record<string, SimulationProfile> = {};
+  const profiles = new Map<string, SimulationProfile>();
   for (const profile of findAllPath(root, "simulation_profiles", "profile")) {
     const profileId = attr(profile, "id", "");
-    const props: Record<string, string> = {};
+    const props = new Map<string, string>();
     for (const p of findAll(profile, "property")) {
       const name = p.attrib.get("name");
       if (name) {
-        props[name] = attr(p, "value", "");
+        props.set(name, attr(p, "value", ""));
       }
     }
-    profiles[profileId] = {
+    profiles.set(profileId, {
       id: profileId,
       default: attr(profile, "default", "false").toLowerCase() === "true",
       backends: findAll(profile, "backend").map((b) => attr(b, "type", "")),
@@ -304,7 +315,7 @@ export function parseTree(rawRoot: XmlElement): SystemIR {
       ),
       tests: findAll(profile, "run").map((r) => attr(r, "test", "")),
       properties: props,
-    };
+    });
   }
 
   const exports: ExportTarget[] = findAllPath(root, "exports", "export").map(

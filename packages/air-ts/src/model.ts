@@ -8,8 +8,23 @@
  * the oracle serializes them as JSON `null`; keeping them present-and-null makes
  * the dump logic a direct mirror of `model_dump.py`.
  *
+ * DICT-MIRRORING COLLECTIONS ARE Map, NOT Record (issue #8 rework round 1).
+ * Python dicts iterate in insertion (document) order for EVERY key; plain JS
+ * objects iterate integer-like keys ("1", "2", "10") in ascending numeric order
+ * first, regardless of insertion. That divergence is invisible to model.json
+ * (its serializer sorts keys) but observable anywhere document-order iteration
+ * matters -- validation's diagnostic emission order, `pins[0]` positional
+ * access in the load budget, and float accumulation order. Since integer-like
+ * ids/pin names ("1"/"2" pins are the NORM for passives) are valid AIR, every
+ * keyed collection that mirrors a Python dict is a Map, whose iteration order
+ * is insertion order for all key types. `Map.set` also matches Python dict
+ * assignment on duplicate keys (last value wins, first insertion position kept).
+ *
  * `data` bags on Interface/Bridge hold heterogeneous XML-derived structures
  * (attribute maps, or arrays of them for repeated child tags); see parser.ts.
+ * They REMAIN plain Records deliberately: no code path iterates them where
+ * order is observable (validation reads fixed keys; serialization sorts keys),
+ * and their values are consumed via `asList` / direct key access.
  */
 
 export interface Metadata {
@@ -45,8 +60,8 @@ export interface Component {
   spice_model: string | null;
   spice_subckt: string | null;
   value: string | null;
-  pins: Record<string, PinConnection>;
-  properties: Record<string, string>;
+  pins: Map<string, PinConnection>;
+  properties: Map<string, string>;
 }
 
 /** A child-tag attribute map, or a repeated tag's attribute maps as an array. */
@@ -114,7 +129,7 @@ export interface Bridge {
 export interface Test {
   id: string;
   description: string;
-  setup: Record<string, string>;
+  setup: Map<string, string>;
   duration: string;
   assertions: Array<Record<string, string>>;
 }
@@ -125,7 +140,7 @@ export interface SimulationProfile {
   backends: string[];
   included_subsystems: string[];
   tests: string[];
-  properties: Record<string, string>;
+  properties: Map<string, string>;
 }
 
 export interface ExportTarget {
@@ -138,16 +153,16 @@ export interface SystemIR {
   ir_version: string;
   metadata: Metadata;
   requirements: Array<Record<string, string>>;
-  nets: Record<string, Net>;
-  power_domains: Record<string, PowerDomain>;
-  components: Record<string, Component>;
-  interfaces: Record<string, Interface>;
+  nets: Map<string, Net>;
+  power_domains: Map<string, PowerDomain>;
+  components: Map<string, Component>;
+  interfaces: Map<string, Interface>;
   analog: AnalogSubsystem[];
-  firmware_projects: Record<string, FirmwareProject>;
-  firmware_bindings: Record<string, FirmwareBinding>;
-  firmware_tasks: Record<string, FirmwareTask>;
+  firmware_projects: Map<string, FirmwareProject>;
+  firmware_bindings: Map<string, FirmwareBinding>;
+  firmware_tasks: Map<string, FirmwareTask>;
   bridges: Bridge[];
-  tests: Record<string, Test>;
-  simulation_profiles: Record<string, SimulationProfile>;
+  tests: Map<string, Test>;
+  simulation_profiles: Map<string, SimulationProfile>;
   exports: ExportTarget[];
 }

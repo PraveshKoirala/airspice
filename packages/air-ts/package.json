@@ -19,10 +19,15 @@
   ],
   "sideEffects": false,
   "scripts": {
+    "gen:registry": "node scripts/gen-registry.mjs",
+    "gen:registry:check": "node scripts/gen-registry.mjs --check",
     "build": "tsc -b",
+    "prebuild": "npm run gen:registry:check",
     "test": "vitest run",
+    "pretest": "npm run gen:registry:check",
     "test:watch": "vitest",
-    "typecheck": "tsc -b && tsc -p tsconfig.test.json"
+    "typecheck": "tsc -b && tsc -p tsconfig.test.json",
+    "pretypecheck": "npm run gen:registry:check"
   },
   "dependencies": {
     "fast-xml-parser": "^5.9.3"
