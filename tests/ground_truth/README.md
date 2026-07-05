@@ -32,20 +32,23 @@ ground-truth evidence — see #55).
 | `diode_forward_drop` | Vf @1 mA | 0.655 V | Shockley, generic .model D | pass |
 | `bjt_ce_bias` | collector V | 4.000 V | I_C=β·I_B=1 mA, 5−1 | pass |
 | `rc_step_response` | V@τ,2τ,5τ | 2.086 / 2.853 / 3.278 V | 3.3·(1−e^−t/τ) | pass |
-| `pwm_rc_average` | filtered avg | **1.650 V (want)** | D·Vstep, D=0.5 | **expected-fail #59** |
+| `pwm_rc_average` | filtered avg | 1.650 V | D·Vstep, D=0.5 | pass (#59 fixed oracle-first) |
 | `rc_lowpass_fc` | −3 dB @ fc | **0.7071 V (want)** | 1/√2 at fc=995 Hz | **expected-fail #62** |
 | `led_forward_drop` | red LED Vf | **1.8–2.2 V (want)** | LED datasheet | **expected-fail: validation-blocked `UNDEFINED_SPICE_MODEL` (#55 fixed; pass via #60)** |
 | `zener_clamp` | clamp V | **5.1 V (want)** | Zener BV | **expected-fail: validation-blocked `UNDEFINED_SPICE_MODEL` (#55 fixed; pass via #60)** |
 | `inverting_opamp_gain` | Vout | **−2.200 V (want)** | −Rf/Rin·Vin | **expected-fail: validation-blocked `UNDEFINED_SPICE_MODEL` (#55 fixed; pass via #60)** |
 
-9 passing + 5 documented expected-failures = 14 circuits.
+10 passing + 4 documented expected-failures = 14 circuits.
 
 ## Findings (oracle disagreements → filed issues)
 
-- **#59** — firmware→SPICE PWM stimulus emits the wrong duty cycle: the firmware
-  ON-time is mapped to the PULSE plateau width while fixed 1 µs edges are added,
-  so a 50 %-intended PWM averages to 60 % (1.98 V instead of 1.65 V). Caught by
-  `pwm_rc_average`.
+- **#59** (fixed oracle-first) — firmware→SPICE PWM stimulus emitted the wrong
+  duty cycle: the firmware ON-time was mapped to the PULSE plateau width while
+  fixed 1 µs edges were added, so a 50 %-intended PWM averaged to 60 % (1.98 V
+  instead of 1.65 V). `air/spice.py::_pwm_pulse` now compensates the ramp area
+  (`PW = ton − (TR+TF)/2`) so the emitted duty equals `ton/period`;
+  `pwm_rc_average` flips to a passing `mean_check` on the unchanged [1.55, 1.75] V
+  window.
 - **#62** — the compiler emits only `.tran` with DC sources, never `.ac`, so
   frequency-domain checks (RC −3 dB at fc, roll-off) are unverifiable. Caught by
   `rc_lowpass_fc`.
