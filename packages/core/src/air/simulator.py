@@ -23,6 +23,44 @@ class SignalStats:
 
 
 @dataclass(frozen=True)
+class LadderRung:
+    """One rung of the fixed, deterministic convergence-aid ladder (issue #45).
+
+    ``options`` are the extra ``.options`` tokens ADDED to the compiler's netlist
+    for this rung (rung 1's are empty: the design exactly as written). ``relaxes``
+    marks the rung that trades accuracy for convergence (rung 4), so the report
+    can say so — silent accuracy loss is the failure this ladder prevents.
+    """
+
+    rung: int
+    name: str
+    options: tuple[str, ...]
+    relaxes: bool = False
+
+
+# The ladder is FIXED and FINITE: max 4 rungs, no randomized elements, no
+# adaptive/per-circuit tuning. Order and every option are justified against the
+# ngspice-46 manual in docs/convergence_ladder.md (do NOT change one without the
+# other). Rung 1 is ALWAYS the design as written (parity requirement): an
+# already-converging design is solved here and its measurements never change.
+# Rungs 2->3 walk ngspice's own documented aid order (manual §11.3.5: gmin
+# stepping then source stepping), escalated beyond their defaults; rung 4 is the
+# only rung that changes the answer's character (Gear method + reltol relaxed one
+# notch), so it is last and it is always reported.
+CONVERGENCE_LADDER: tuple[LadderRung, ...] = (
+    LadderRung(1, "as-written", ()),
+    LadderRung(2, "gmin stepping", ("gminsteps=1", "itl1=500")),
+    LadderRung(3, "source stepping", ("srcsteps=10", "gminsteps=1", "itl1=500")),
+    LadderRung(
+        4,
+        "Gear + relaxed reltol",
+        ("method=gear", "reltol=0.005", "srcsteps=10", "gminsteps=1", "itl1=500", "itl4=100"),
+        relaxes=True,
+    ),
+)
+
+
+@dataclass(frozen=True)
 class NgspiceRun:
     """Outcome of an ngspice invocation.
 
@@ -88,10 +126,23 @@ def simulate_analog(ir: SystemIR, profile_id: str, out_dir: Path) -> dict[str, o
 
         _clear_test_waveforms_explicit(out_dir / "waveforms", test, all_probe_nets)
         compile_result = compile_spice(ir, out_dir, test, extra_probes=list(extra_probe_nets))
-        ngspice_run = run_ngspice(out_dir / "spice" / "main.cir", out_dir / "reports" / f"{test.id}.ngspice.log")
+        # Convergence-aid ladder (issue #45): run as-written first, always; if that
+        # does not converge, escalate the documented ngspice aids in a fixed order.
+        # The winning rung's run + waveforms are what the report is built from, and
+        # a `convergence` section records every attempt (which rung succeeded, or
+        # that the ladder was exhausted). See docs/convergence_ladder.md.
+        ladder = run_convergence_ladder(
+            out_dir / "spice" / "main.cir",
+            out_dir / "reports" / f"{test.id}.ngspice.log",
+            out_dir / "waveforms",
+            test,
+            all_probe_nets,
+        )
+        ngspice_run = ladder.run
+        convergence = _convergence_section(ladder)
         measured = _measure_dc(ir, test)
         stats = _stats_from_measurements(measured)
-        waveform_stats = _read_ngspice_waveforms_explicit(out_dir / "waveforms", test, all_probe_nets)
+        waveform_stats = ladder.waveform_stats
         if waveform_stats:
             stats.update(waveform_stats)
             measured.update({name: signal.final for name, signal in waveform_stats.items()})
@@ -107,6 +158,12 @@ def simulate_analog(ir: SystemIR, profile_id: str, out_dir: Path) -> dict[str, o
         sim_diagnostics: list[Diagnostic] = []
         if ngspice_run.failed:
             sim_diagnostics.append(_ngspice_failure_diagnostic(builder, test.id, ngspice_run))
+        # Terminal convergence failure (issue #45): the ladder tried every rung and
+        # none converged. Surface a topology-directed remediation (SIM-010) in
+        # addition to NGSPICE_FAILED's raw exit/stderr, so the user and the repair
+        # agent are pointed at the topology, not at value-twiddling.
+        if convergence["terminal"]:
+            sim_diagnostics.append(_terminal_convergence_diagnostic(builder, test.id))
         if used_ngspice:
             # ngspice wrote whitespace-delimited wrdata; normalize each probe CSV
             # into the canonical comma+header form the UI/readback consume.
@@ -135,6 +192,7 @@ def simulate_analog(ir: SystemIR, profile_id: str, out_dir: Path) -> dict[str, o
             "test": test.id,
             "status": test_status,
             "backend": backend,
+            "convergence": convergence,
             "measurements": {name: format_quantity(value, _unit_for_signal(name)) for name, value in measured.items()},
             "measurement_stats": _serialize_stats(stats),
             "diagnostics": [d.to_dict() for d in report_diagnostics],
@@ -225,13 +283,20 @@ def _ngspice_missing_diagnostic(builder: DiagnosticBuilder, test_id: str) -> Dia
     )
 
 
-def run_ngspice(netlist: Path, log_path: Path) -> NgspiceRun:
+def run_ngspice(netlist: Path, log_path: Path, extra_options: list[str] | None = None) -> NgspiceRun:
     """Run ngspice in batch mode, returning a structured outcome.
 
     Returns ``NgspiceRun(attempted=False)`` when no ngspice binary is reachable
     (the legitimate fallback trigger). When ngspice runs, the real exit code and
     captured stdout/stderr are returned so the caller can tell a clean run from a
     hard failure instead of collapsing both into a single boolean.
+
+    ``extra_options`` are convergence-aid ``.options`` tokens (issue #45's
+    ladder). They are ADDED to the compiler's netlist for this one invocation:
+    the base ``main.cir`` is never mutated (so rung 1 is always the design
+    exactly as written, and the ladder is auditable), and a rung-specific netlist
+    carrying the extra ``.options`` line is written alongside it and run instead.
+    An empty/None list runs the unmodified base netlist (rung 1).
     """
     from .tools import ngspice_path
 
@@ -239,9 +304,39 @@ def run_ngspice(netlist: Path, log_path: Path) -> NgspiceRun:
     if not ngspice:
         return NgspiceRun(attempted=False)
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    result = subprocess.run([ngspice, "-b", netlist.name], capture_output=True, text=True, cwd=netlist.parent)
+    run_netlist = netlist
+    if extra_options:
+        run_netlist = _write_ladder_netlist(netlist, extra_options)
+    result = subprocess.run([ngspice, "-b", run_netlist.name], capture_output=True, text=True, cwd=run_netlist.parent)
     log_path.write_text(result.stdout + result.stderr, encoding="utf-8")
     return NgspiceRun(attempted=True, returncode=result.returncode, stdout=result.stdout, stderr=result.stderr)
+
+
+def _write_ladder_netlist(netlist: Path, extra_options: list[str]) -> Path:
+    """Write a rung-specific netlist = the base deck + one extra ``.options`` line.
+
+    The extra ``.options`` line is inserted immediately after the compiler's
+    ``.options filetype=ascii`` line (so it participates in the same OP/tran
+    solve) without removing anything the compiler emitted. The base netlist is
+    left untouched; the rung deck is written next to it as ``main.rung.cir`` so
+    the exact deck each rung ran is inspectable after the fact.
+    """
+    text = netlist.read_text(encoding="utf-8")
+    option_line = ".options " + " ".join(extra_options)
+    lines = text.splitlines()
+    inserted = False
+    out_lines: list[str] = []
+    for line in lines:
+        out_lines.append(line)
+        if not inserted and line.strip().lower().startswith(".options"):
+            out_lines.append(option_line)
+            inserted = True
+    if not inserted:
+        # No base .options line (defensive): prepend after the title comment.
+        out_lines.insert(1 if out_lines else 0, option_line)
+    rung_netlist = netlist.with_name("main.rung.cir")
+    rung_netlist.write_text("\n".join(out_lines) + "\n", encoding="utf-8")
+    return rung_netlist
 
 
 def _ngspice_failure_diagnostic(builder: DiagnosticBuilder, test_id: str, run: NgspiceRun) -> Diagnostic:
@@ -263,6 +358,141 @@ def _ngspice_failure_diagnostic(builder: DiagnosticBuilder, test_id: str, run: N
             "Inspect the generated netlist for undefined models/subcircuits",
             "Ensure every device line references a defined .model/.subckt",
             "Check the ngspice log for the failing line",
+        ],
+    )
+
+
+@dataclass
+class LadderOutcome:
+    """Result of walking the convergence-aid ladder for one test.
+
+    ``run`` / ``waveform_stats`` are the winning rung's outputs (or the last rung
+    tried, on terminal failure). ``attempts`` is the ordered per-rung record that
+    becomes the report's ``convergence.attempts``. ``winning_rung`` is the
+    LadderRung that converged, or ``None`` when the ladder was exhausted or
+    ngspice was never run (missing binary).
+    """
+
+    run: NgspiceRun
+    waveform_stats: dict[str, SignalStats]
+    attempts: list[dict[str, object]]
+    winning_rung: LadderRung | None
+
+
+def run_convergence_ladder(
+    netlist: Path,
+    log_path: Path,
+    wave_dir: Path,
+    test: Test,
+    probe_nets: list[str],
+) -> LadderOutcome:
+    """Run the fixed convergence-aid ladder (issue #45), stopping at first success.
+
+    Rung 1 is ALWAYS the netlist exactly as written. Each subsequent rung ADDS
+    that rung's ``.options`` (see CONVERGENCE_LADDER / docs/convergence_ladder.md)
+    and re-runs. A rung "converges" when ngspice exits 0 AND its transient
+    produced readable waveform data; otherwise the ladder climbs to the next
+    rung. Between rungs the probe waveforms are cleared so a later rung never
+    reads a stale/partial CSV from an aborted earlier rung. The ladder is finite
+    and deterministic — no randomness, no adaptive tuning.
+
+    If ngspice is not installed (``run.attempted is False`` on rung 1), there is
+    nothing to escalate: the ladder returns immediately with a single rung-1
+    attempt marked ``ngspice_missing`` so the caller takes the documented DC
+    fallback path. This keeps the ladder out of the ngspice-not-installed case.
+    """
+    attempts: list[dict[str, object]] = []
+    last_run = NgspiceRun(attempted=False)
+    last_stats: dict[str, SignalStats] = {}
+    for rung in CONVERGENCE_LADDER:
+        _clear_test_waveforms_explicit(wave_dir, test, probe_nets)
+        run = run_ngspice(netlist, log_path, extra_options=list(rung.options))
+        if not run.attempted:
+            # No ngspice binary: not a convergence question at all. Record a
+            # single rung-1 attempt and hand back to the DC-fallback path.
+            attempts.append(
+                {"rung": rung.rung, "name": rung.name, "options": list(rung.options),
+                 "converged": False, "ngspice_missing": True}
+            )
+            return LadderOutcome(run=run, waveform_stats={}, attempts=attempts, winning_rung=None)
+        stats = _read_ngspice_waveforms_explicit(wave_dir, test, probe_nets)
+        converged = run.returncode == 0 and bool(stats)
+        attempts.append(
+            {"rung": rung.rung, "name": rung.name, "options": list(rung.options),
+             "converged": converged}
+        )
+        last_run, last_stats = run, stats
+        if converged:
+            return LadderOutcome(run=run, waveform_stats=stats, attempts=attempts, winning_rung=rung)
+    # Ladder exhausted: no rung converged. Hand back the last rung's run so the
+    # existing NGSPICE_FAILED path still records the raw exit/stderr.
+    return LadderOutcome(run=last_run, waveform_stats=last_stats, attempts=attempts, winning_rung=None)
+
+
+def _convergence_section(outcome: LadderOutcome) -> dict[str, object]:
+    """Serialize a LadderOutcome into the report's ``convergence`` object.
+
+    Deterministic and JSON-plain (issue #45). ``aids_required`` (rung >= 2) is the
+    flag the UI turns into the "numerical aids required" note and the flag the
+    repair agent (#19) reads to know a rung>=2 success is NOT a design defect.
+    ``terminal`` marks an exhausted ladder (topology-directed remediation, not
+    raw stderr). When ngspice was never run (missing binary) the section is a
+    single not-converged rung-1 attempt with no note — the DC-fallback path owns
+    that case.
+    """
+    winning = outcome.winning_rung
+    rung_no = winning.rung if winning else None
+    aids_required = bool(winning and winning.rung >= 2)
+    ngspice_ran = any(not a.get("ngspice_missing") for a in outcome.attempts)
+    terminal = ngspice_ran and winning is None
+    note: str | None = None
+    if aids_required and winning is not None:
+        note = (
+            f"numerical aids required (rung {winning.rung}: {winning.name}); "
+            "accuracy may be reduced - see docs/convergence_ladder.md"
+        )
+        if winning.relaxes:
+            note += " (error tolerance was relaxed one notch to reach convergence)"
+    elif terminal:
+        note = (
+            "did not converge after every numerical aid; this usually means a "
+            "topology problem (floating node / missing DC path to ground), not a "
+            "value problem - inspect the topology before adjusting values"
+        )
+    return {
+        "attempts": outcome.attempts,
+        "converged": winning is not None,
+        "rung": rung_no,
+        "aids_required": aids_required,
+        "terminal": terminal,
+        "note": note,
+    }
+
+
+def _terminal_convergence_diagnostic(builder: DiagnosticBuilder, test_id: str) -> Diagnostic:
+    """Terminal convergence failure (SIM-010): the ladder was exhausted.
+
+    A design that survives every numerical aid usually has a topology defect, not
+    a value defect. The message/remediation are topology-directed (floating node
+    / missing ground path), NOT the raw ngspice stderr (which NGSPICE_FAILED
+    still carries for debugging). Rendered via the registry loader so the message
+    and registry/diagnostics.json can never drift (docs/diagnostics_spec.md).
+    """
+    from .diagnostics_registry import render_message, severity_for
+
+    code = "SIM-010"
+    rungs = len(CONVERGENCE_LADDER)
+    return builder.make(
+        severity_for(code),
+        "simulation",
+        code,
+        render_message(code, test_id=test_id, rungs=rungs),
+        [test_id],
+        observed={"ladder_rungs": rungs},
+        suggested_actions=[
+            "Check for floating nodes (a net reachable only through capacitors)",
+            "Ensure every node has a DC path to ground",
+            "Add the missing ground connection or a high-value bleeder resistor, then re-simulate",
         ],
     )
 

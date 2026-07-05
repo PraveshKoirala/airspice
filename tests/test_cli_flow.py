@@ -335,7 +335,10 @@ class NgspiceHonestyTests(unittest.TestCase):
         # ngspice ran and FAILED (exit 1) -> the report must reflect the failure,
         # NOT a clean builtin-DC 'passed'. A structured NGSPICE_FAILED diagnostic
         # must carry the exit code and the stderr tail identifying the cause.
-        def fake_run(netlist: Path, log_path: Path) -> NgspiceRun:
+        # The convergence ladder (#45) calls run_ngspice with extra_options per
+        # rung; a run that fails on EVERY rung exhausts the ladder, so the mock
+        # accepts (and ignores) extra_options and the report is a terminal failure.
+        def fake_run(netlist: Path, log_path: Path, extra_options=None) -> NgspiceRun:
             return NgspiceRun(
                 attempted=True,
                 returncode=1,
@@ -356,6 +359,15 @@ class NgspiceHonestyTests(unittest.TestCase):
         self.assertEqual(ngspice_diags[0]["severity"], "error")
         self.assertEqual(ngspice_diags[0]["observed"]["returncode"], 1)
         self.assertIn("no simulations run", ngspice_diags[0]["observed"]["stderr_tail"])
+        # #45: failing every rung is a TERMINAL convergence failure -> the report's
+        # convergence section is marked terminal and a SIM-010 topology-directed
+        # diagnostic is emitted alongside NGSPICE_FAILED (not raw stderr).
+        self.assertTrue(report["convergence"]["terminal"])
+        self.assertFalse(report["convergence"]["converged"])
+        self.assertEqual(len(report["convergence"]["attempts"]), len(simulator.CONVERGENCE_LADDER))
+        sim010 = [d for d in report["diagnostics"] if d["code"] == "SIM-010"]
+        self.assertEqual(len(sim010), 1)
+        self.assertEqual(sim010[0]["severity"], "error")
 
     def test_assertion_on_unmeasurable_net_reports_no_measurement(self) -> None:
         # An assertion on a net the DC fallback cannot solve (a capacitor-only
