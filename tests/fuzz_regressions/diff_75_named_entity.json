@@ -1,0 +1,18 @@
+{
+  "issue": "#75",
+  "note": "undefined named entity: expat rejects, fast-xml-parser resolves/keeps-literal",
+  "expect": "diverge-known",
+  "classifiedKnown": "#75",
+  "diverges": true,
+  "mismatchKind": "decision",
+  "ts": {
+    "status": "accept",
+    "modelHash": "62ad40900bece78a"
+  },
+  "py": {
+    "codes": [],
+    "reason": "XmlParseError: undefined entity: line 1, column 51",
+    "status": "reject"
+  },
+  "input": "<system name=\"t\" ir_version=\"0.1\"><metadata><title>&nbsp;</title></metadata></system>"
+}

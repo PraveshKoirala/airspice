@@ -1,0 +1,23 @@
+{
+  "issue": "SEC-008",
+  "note": "numeric char ref to an XML-1.0-invalid code point rejected by both engines",
+  "expect": "reject-agree",
+  "classifiedKnown": null,
+  "diverges": false,
+  "mismatchKind": null,
+  "ts": {
+    "status": "reject",
+    "codes": [
+      "SEC-008"
+    ],
+    "reason": "XmlParseError: reference to invalid character number: &#8;"
+  },
+  "py": {
+    "codes": [
+      "SEC-008"
+    ],
+    "reason": "XmlSecurityError: reference to invalid character number: &#8;",
+    "status": "reject"
+  },
+  "input": "<system name=\"t\" ir_version=\"0.1\"><metadata><title>a&#8;b</title></metadata></system>"
+}

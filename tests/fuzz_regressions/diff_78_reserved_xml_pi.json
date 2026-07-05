@@ -1,0 +1,18 @@
+{
+  "issue": "#78",
+  "note": "reserved 'xml' PI target mid-document: expat rejects",
+  "expect": "diverge-known",
+  "classifiedKnown": "#78",
+  "diverges": true,
+  "mismatchKind": "decision",
+  "ts": {
+    "status": "accept",
+    "modelHash": "62ad40900bece78a"
+  },
+  "py": {
+    "codes": [],
+    "reason": "XmlParseError: XML or text declaration not at start of entity: line 1, column 34",
+    "status": "reject"
+  },
+  "input": "<system name=\"t\" ir_version=\"0.1\"><?xml v?></system>"
+}

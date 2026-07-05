@@ -117,7 +117,20 @@ export {
 export type { SpiceArtifacts, CompileSpiceOptions } from "./emit/spice.js";
 
 // Differential-fuzzer outcome reporting (for #43).
-export { parseOutcome, fnv1a64, type ParseOutcome } from "./outcome.js";
+export { parseOutcome, parseOutcomeBytes, fnv1a64, type ParseOutcome } from "./outcome.js";
+
+// Byte-level XML security entry points (UTF-8-only gate for untrusted bytes).
+export { decodeXmlBytes, parseXmlBytes } from "./xml.js";
+
+// Shared XML security contract limits (single source of truth with the oracle;
+// docs/xml_security.md). Exported so callers and tests reference the same caps.
+export {
+  MAX_INPUT_BYTES,
+  MAX_DEPTH,
+  MAX_ATTR_COUNT,
+  MAX_ATTR_VALUE_LEN,
+  MAX_ELEMENT_COUNT,
+} from "./xml.js";
 
 // Error types (so callers can distinguish refusal kinds).
 export { XmlParseError, XmlSecurityError } from "./xml.js";

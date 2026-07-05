@@ -18,3 +18,14 @@ tests/golden_corpus/** linguist-generated=true
 
 # PowerShell scripts run on Windows; keep CRLF for them.
 *.ps1   text eol=crlf
+
+# The differential fuzzer (issue #43) archives byte-sensitive fixtures: shrunk
+# reproducers whose recorded model hashes / rejection codes depend on exact
+# bytes (a literal tab in an attribute value, a deep-nesting doc whose element
+# count is checked, CR handling). Hostile XML-security fixtures are likewise
+# byte-compared across BOTH engines. Force LF everywhere so a Windows checkout
+# never rewrites a \n to \r\n and shifts a hash or a byte count. The fuzzer's
+# own mjs script runs on Node on Linux CI, so it is LF too.
+tests/fuzz_regressions/**  text eol=lf
+tests/xml_security/**      text eol=lf
+scripts/fuzz_diff.mjs      text eol=lf

@@ -1,0 +1,17 @@
+{
+  "issue": "#80",
+  "note": "two <setup> blocks in one <test>: FIXED upstream (PR #79/issue #8) -- air-ts now merges all <setup> children like the oracle, so both engines AGREE. Kept as a regression GUARD: if the parser.ts findAll(test,'setup') fix is reverted, this fixture (and a fresh campaign) catch it.",
+  "expect": "accept-agree",
+  "classifiedKnown": null,
+  "diverges": false,
+  "mismatchKind": null,
+  "ts": {
+    "status": "accept",
+    "modelHash": "a29498eb63630fc1"
+  },
+  "py": {
+    "modelHash": "a29498eb63630fc1",
+    "status": "accept"
+  },
+  "input": "<system name=\"t\" ir_version=\"0.1\"><tests><test id=\"x\"><setup><set_voltage net=\"a\" value=\"1V\"/></setup><setup><set_voltage net=\"b\" value=\"2V\"/></setup></test></tests></system>"
+}
