@@ -12,6 +12,8 @@ import { parseTree } from "./parser.js";
 import { canonicalizeTree } from "./canonicalizer.js";
 import { serializeModel } from "./model_dump.js";
 import type { SystemIR } from "./model.js";
+import { validateAll, serializeDiagnostics as serializeDiagnosticsList } from "./validate/index.js";
+import type { Diagnostic } from "./validate/index.js";
 
 /**
  * Parse AIR XML into the typed SystemIR model.
@@ -45,9 +47,55 @@ export function parseRawTree(root: XmlElement): SystemIR {
   return parseTree(root);
 }
 
+/**
+ * Validate AIR XML: parse once, then run the oracle's
+ * `validate_tree(tree) + validate_ir(ir)` over the raw tree and typed model.
+ * Returns the ordered diagnostics list (empty === no findings).
+ *
+ * PARITY: validation runs on the RAW tree for schema checks and the parsed
+ * model for semantic/electrical checks, exactly like export_golden.py
+ * (`ir, tree = parse_file(...)` then `validate_tree(tree) + validate_ir(ir)`).
+ */
+export function validate(xmlText: string): Diagnostic[] {
+  const root = parseXml(xmlText);
+  const ir = parseTree(root);
+  return validateAll(root, ir);
+}
+
+/**
+ * Validate and serialize to the byte-exact `diagnostics.json` string (with the
+ * `success` flag and trailing newline), matching the golden corpus fixture.
+ */
+export function validateToJson(xmlText: string): string {
+  return serializeDiagnosticsList(validate(xmlText));
+}
+
 export { parseXml };
 export { serializeModel };
 export { canonicalizeTree };
+
+// Validation surface (issue #8): the diagnostics contract the agent layer trusts.
+export {
+  validateAll,
+  validateTree,
+  validateIr,
+  buildTreeSchemaView,
+  buildDiagnosticsPayload,
+  serializeDiagnostics,
+  hasErrors,
+} from "./validate/index.js";
+export type { Diagnostic, Severity, TreeSchemaView } from "./validate/index.js";
+
+// Registry surface (compiled from registry/ at build time; no runtime fetch).
+export {
+  MCUS,
+  COMPONENT_SPECS,
+  PASSIVE_TYPES,
+  SUPPORTED_SPICE_TYPES,
+  BUILTIN_SPICE_MODELS,
+  BUILTIN_SPICE_SUBCKTS,
+} from "./registry/index.js";
+export type { ComponentSpec, McuSpec, PeripheralSpec } from "./registry/index.js";
 
 // Re-export the typed model so consumers get the schema types from the facade.
 export type * from "./model.js";
