@@ -80,6 +80,24 @@ class FuzzRegressionTests(unittest.TestCase):
                 outcome = evaluate(raw).to_dict()
                 self.assertEqual(outcome["status"], "reject")
 
+    def test_accept_agree_fixtures_still_agree(self) -> None:
+        # The 'accept-agree' fixtures record a divergence that was FIXED upstream
+        # (e.g. #80 multiple-<setup>). They are kept as regression guards: the
+        # oracle must still ACCEPT with the recorded hash, and the recorded
+        # air-ts hash must EQUAL it (a reverted fix would re-diverge and fail).
+        for meta_path in _fixtures():
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            if meta.get("expect") != "accept-agree":
+                continue
+            with self.subTest(fixture=meta_path.stem):
+                raw = meta_path.with_suffix(".air.xml").read_bytes()
+                outcome = evaluate(raw).to_dict()
+                self.assertEqual(outcome["status"], "accept")
+                self.assertEqual(outcome["modelHash"], meta["py"]["modelHash"])
+                # The recorded engines agreed; the guard is that they still do.
+                self.assertEqual(meta["ts"]["modelHash"], meta["py"]["modelHash"])
+                self.assertFalse(meta["diverges"])
+
 
 if __name__ == "__main__":
     unittest.main()

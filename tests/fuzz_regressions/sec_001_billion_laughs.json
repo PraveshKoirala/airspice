@@ -2,7 +2,7 @@
   "issue": "SEC-001",
   "note": "billion-laughs entity payload rejected before expansion by both engines",
   "expect": "reject-agree",
-  "classifiedKnown": "#75",
+  "classifiedKnown": null,
   "diverges": false,
   "mismatchKind": null,
   "ts": {

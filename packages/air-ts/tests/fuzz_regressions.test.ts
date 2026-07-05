@@ -25,7 +25,9 @@ const REGRESSION_DIR = join(HERE, "..", "..", "..", "tests", "fuzz_regressions")
 interface RegMeta {
   issue: string;
   expect?: string;
+  diverges?: boolean;
   ts: { status: string; modelHash?: string; codes?: string[] };
+  py: { status: string; modelHash?: string; codes?: string[] };
 }
 
 function fixtures(): string[] {
@@ -50,6 +52,14 @@ describe("fuzz regression corpus (air-ts side)", () => {
         expect(out.modelHash).toBe(meta.ts.modelHash);
       } else if (out.status === "reject" && meta.ts.status === "reject") {
         expect(out.codes.slice().sort()).toEqual((meta.ts.codes ?? []).slice().sort());
+      }
+      // 'accept-agree' fixtures record a FIXED divergence (e.g. #80): air-ts
+      // must still agree with the oracle. If the parser fix is reverted, air-ts
+      // re-diverges and this fails -- the regression guard.
+      if (meta.expect === "accept-agree") {
+        expect(out.status).toBe("accept");
+        if (out.status === "accept") expect(out.modelHash).toBe(meta.py.modelHash);
+        expect(meta.diverges).toBe(false);
       }
     });
   }
