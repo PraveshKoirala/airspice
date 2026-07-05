@@ -15,6 +15,13 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
+    /* The UI consumes the TypeScript engine (packages/air-ts) through its
+       source entry. This path mapping mirrors the Vite alias in vite.config.ts
+       so `import { ... } from 'air-ts'` type-checks (issue #10 / epic #6). */
+    "paths": {
+      "air-ts": ["../air-ts/src/index.ts"]
+    },
+
     /* Linting */
     "noUnusedLocals": true,
     "noUnusedParameters": true,

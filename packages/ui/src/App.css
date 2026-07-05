@@ -206,6 +206,32 @@ body {
   border-color: rgba(245, 158, 11, 0.45);
 }
 
+.workspace-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Engine mode badge (issue #10): shows whether the schematic + validation are
+   computed locally (air-ts Web Worker) or via the backend. */
+.engine-badge {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.engine-badge.local {
+  color: #0f766e;
+  border-color: rgba(15, 118, 110, 0.45);
+}
+
+.engine-badge.server {
+  color: var(--text-muted, #64748b);
+}
+
 .design-path-bar {
   min-height: 42px;
   display: grid;

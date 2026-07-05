@@ -11,6 +11,7 @@ import ResultPanel from './components/ResultPanel';
 import ChatRepl from './components/ChatRepl';
 import Landing from './pages/Landing';
 import type { ApiError, ChatHistoryEntry, Diagnostic, ValidationResult } from './types/api';
+import { getEngine, ENGINE_MODE } from './engine';
 import './App.css';
 
 interface LogEntry {
@@ -195,20 +196,50 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
     }, ...prev]);
   };
 
+  // Live schematic + validation off the engine facade (issue #10). In
+  // VITE_ENGINE=local this runs air-ts in a Web Worker with NO backend; in
+  // =server it hits the FastAPI endpoints. Debounced ~150ms so typing in Monaco
+  // never blocks on a (re)parse, and the keystroke->schematic latency is
+  // measured with performance.now (acceptance criterion: <200ms on complex_bms).
   useEffect(() => {
-    const timer = setTimeout(async () => {
-      if (!xml.trim()) return;
-      try {
-        const response = await axios.post(`${API_BASE}/graph`, { xml });
-        if (response.data.success) {
-          setNodes(response.data.nodes);
-          setEdges(response.data.edges);
-        }
-      } catch (error) {
-        console.error('Failed to update graph:', error);
-      }
-    }, 250);
-    return () => clearTimeout(timer);
+    const engine = getEngine();
+    if (!xml.trim()) return;
+    let cancelled = false;
+    const t0 = performance.now();
+    const timer = setTimeout(() => {
+      // Schematic: compute the graph and feed the Schematic tab.
+      engine
+        .toGraph(xml)
+        .then((graph) => {
+          if (cancelled) return;
+          setNodes(graph.nodes);
+          setEdges(graph.edges);
+          const ms = performance.now() - t0;
+          // Marks are visible in the browser Performance panel and logged so the
+          // latency number is reproducible for the PR evidence.
+          performance.measure?.('air:keystroke->graph', { start: t0, end: performance.now() });
+          console.debug(`[engine:${ENGINE_MODE}] keystroke->schematic ${ms.toFixed(1)}ms`);
+        })
+        .catch((error) => {
+          // Malformed XML mid-edit is expected; keep the last good schematic.
+          if (!cancelled) console.debug('graph update skipped:', (error as Error).message);
+        });
+      // Validation: compute diagnostics live so the Validation tab reflects the
+      // current XML without a separate round trip. Best-effort; the explicit
+      // Validate button still runs the full backend workflow in server mode.
+      engine
+        .validate(xml)
+        .then((result) => {
+          if (!cancelled) setValidation(result);
+        })
+        .catch((error) => {
+          if (!cancelled) console.debug('validation update skipped:', (error as Error).message);
+        });
+    }, 150);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [xml]);
 
   // The editor XML is the source of truth. Persist it to a working design file
@@ -234,6 +265,28 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
 
   const handleValidate = async () => {
     setIsBusy(true);
+    // In local (zero-backend) mode, validate the live XML through the engine
+    // facade -- no persist-to-disk, no server. In server mode, keep the existing
+    // persist + path-based /validate workflow byte-for-byte.
+    if (ENGINE_MODE === 'local') {
+      addLog('Validating (local engine)', 'info');
+      try {
+        const result = await getEngine().validate(xml);
+        setValidation(result);
+        const diagnostics = result.diagnostics || [];
+        if (result.success) {
+          addLog('Validation passed.', 'success');
+        } else {
+          diagnostics.forEach((diagnostic: Diagnostic) => addLog(`${diagnostic.code}: ${diagnostic.message}`, 'error'));
+        }
+        setActiveTab('validation');
+      } catch (error) {
+        addLog(`Validation failed: ${(error as Error).message}`, 'error');
+      } finally {
+        setIsBusy(false);
+      }
+      return;
+    }
     const saved = await persistDesign();
     if (!saved) {
       setIsBusy(false);
@@ -428,7 +481,10 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
               <span className="eyebrow">AIR Workspace</span>
               <h1>ESP32 Battery Sensor</h1>
             </div>
-            <div className={`run-state ${isBusy ? 'busy' : 'idle'}`}>{isBusy ? 'Running' : 'Ready'}</div>
+            <div className="workspace-status">
+              <span className={`engine-badge ${ENGINE_MODE}`} title={`Engine: ${ENGINE_MODE}`} data-testid="engine-mode">{ENGINE_MODE === 'local' ? 'Local engine' : 'Server engine'}</span>
+              <div className={`run-state ${isBusy ? 'busy' : 'idle'}`}>{isBusy ? 'Running' : 'Ready'}</div>
+            </div>
           </div>
           <div className="design-path-bar">
             <span>Design</span>

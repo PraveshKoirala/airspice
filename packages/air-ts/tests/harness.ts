@@ -43,6 +43,12 @@ export interface CorpusDesign {
   probesPath: string;
   /** True iff `report/probes.json` exists on disk for this design. */
   hasProbes: boolean;
+  /**
+   * Graph fixture (`<design>/graph.json`). Present for EVERY design -- the
+   * graph compiler runs before validation, so failing designs have one too
+   * (#10 parity target).
+   */
+  graphPath: string;
 }
 
 /** Discover every corpus design directory that has an input.air.xml. */
@@ -67,6 +73,7 @@ export function discoverDesigns(): CorpusDesign[] {
       hasNetlist: existsSync(netlistPath),
       probesPath,
       hasProbes: existsSync(probesPath),
+      graphPath: join(dir, "graph.json"),
     });
   }
   designs.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));

@@ -14,6 +14,7 @@ import { serializeModel } from "./model_dump.js";
 import type { SystemIR } from "./model.js";
 import { validateAll, serializeDiagnostics as serializeDiagnosticsList } from "./validate/index.js";
 import type { Diagnostic } from "./validate/index.js";
+import { buildGraphData, serializeGraph as serializeGraphIr, type GraphData } from "./emit/graph.js";
 
 /**
  * Parse AIR XML into the typed SystemIR model.
@@ -70,9 +71,36 @@ export function validateToJson(xmlText: string): string {
   return serializeDiagnosticsList(validate(xmlText));
 }
 
+/**
+ * Parse AIR XML and build the schematic-graph payload (`{ nodes, edges }`) the
+ * UI's Schematic tab renders -- the local, in-process replacement for the
+ * backend's `POST /graph`. Mirrors the oracle: `parse_string(xml)` then
+ * `build_graph_data(ir)`.
+ */
+export function toGraph(xmlText: string): GraphData {
+  const root = parseXml(xmlText);
+  const ir = parseTree(root);
+  return buildGraphData(ir);
+}
+
+/**
+ * Parse AIR XML and serialize to the byte-exact `graph.json` string (trailing
+ * newline included), matching the golden-corpus fixture.
+ */
+export function toGraphJson(xmlText: string): string {
+  const root = parseXml(xmlText);
+  const ir = parseTree(root);
+  return serializeGraphIr(ir);
+}
+
 export { parseXml };
 export { serializeModel };
 export { canonicalizeTree };
+
+// Graph emitter surface (issue #10): the schematic-graph the UI renders, plus
+// its byte-exact serializer for parity.
+export { buildGraphData, serializeGraph, inferNetRole } from "./emit/graph.js";
+export type { GraphData } from "./emit/graph.js";
 
 // Validation surface (issue #8): the diagnostics contract the agent layer trusts.
 export {
