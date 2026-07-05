@@ -200,7 +200,7 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
   // VITE_ENGINE=local this runs air-ts in a Web Worker with NO backend; in
   // =server it hits the FastAPI endpoints. Debounced ~150ms so typing in Monaco
   // never blocks on a (re)parse, and the keystroke->schematic latency is
-  // measured with performance.now (acceptance criterion: <200ms on complex_bms).
+  // measured with performance.now (acceptance criterion: <200ms).
   useEffect(() => {
     const engine = getEngine();
     if (!xml.trim()) return;
