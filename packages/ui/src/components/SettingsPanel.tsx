@@ -35,11 +35,23 @@ type ValidateState =
 interface SettingsPanelProps {
   /** Malformed-tool-call events observed this session (recovery-ladder counter). */
   malformedToolCallCount?: number;
+  /** The provider the agent panel uses (mock = keyless demo). */
+  agentProvider?: NetworkProviderId | 'mock';
+  /** The model the agent panel uses. */
+  agentModel?: string | undefined;
+  /** Notify the workspace that the agent provider changed. */
+  onAgentProviderChange?: (provider: NetworkProviderId | 'mock') => void;
+  /** Notify the workspace that the agent model changed. */
+  onAgentModelChange?: (model: string | undefined) => void;
 }
 
 const vault = new KeyVault();
 
-const SettingsPanel: React.FC<SettingsPanelProps> = ({ malformedToolCallCount = 0 }) => {
+const SettingsPanel: React.FC<SettingsPanelProps> = ({
+  malformedToolCallCount = 0,
+  onAgentProviderChange,
+  onAgentModelChange,
+}) => {
   const [provider, setProvider] = useState<NetworkProviderId>('anthropic');
   const catalog = MODEL_CATALOG[provider];
   const [model, setModel] = useState<string>(catalog.defaultModel);
@@ -58,6 +70,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ malformedToolCallCount = 
     setKeyInput('');
     setValidate({ status: 'idle' });
     setStoredMask(vault.masked(next));
+    // Drive the agent panel to this provider + its default model.
+    onAgentProviderChange?.(next);
+    onAgentModelChange?.(MODEL_CATALOG[next].defaultModel);
   };
 
   const effectiveModel = freeTextModel.trim() !== '' ? freeTextModel.trim() : model;
@@ -127,7 +142,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ malformedToolCallCount = 
           <span>Model</span>
           <select
             value={model}
-            onChange={(e) => setModel(e.target.value)}
+            onChange={(e) => {
+              setModel(e.target.value);
+              if (freeTextModel.trim() === '') onAgentModelChange?.(e.target.value);
+            }}
             disabled={freeTextModel.trim() !== ''}
             data-testid="model-picker"
           >
@@ -143,7 +161,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ malformedToolCallCount = 
             type="text"
             placeholder="e.g. a newly released model id"
             value={freeTextModel}
-            onChange={(e) => setFreeTextModel(e.target.value)}
+            onChange={(e) => {
+              setFreeTextModel(e.target.value);
+              onAgentModelChange?.(e.target.value.trim() !== '' ? e.target.value.trim() : model);
+            }}
             data-testid="model-override"
           />
         </label>

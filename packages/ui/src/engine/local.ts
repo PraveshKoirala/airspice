@@ -74,12 +74,13 @@ class LocalEngine implements AirEngine {
     return this.call('validate', xml) as Promise<DiagnosticsPayload>;
   }
 
-  async simulate(xml: string): Promise<LocalSimulationResult> {
+  async simulate(xml: string, signal?: AbortSignal): Promise<LocalSimulationResult> {
     // #14: the full zero-backend pipeline (compile -> WASM ngspice -> report).
     // Dynamic-import so the sim-wasm client + its ~20MB WASM chunk load ONLY on
     // the first Run, not at app start when this engine module is first touched.
+    // #18: `signal` cancels an in-flight run (Stop button / per-call timeout).
     const { simulateLocal } = await import('./simulate');
-    return simulateLocal(xml);
+    return simulateLocal(xml, signal);
   }
 
   applyPatch(): Promise<never> {

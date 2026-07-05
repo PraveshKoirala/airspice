@@ -11,10 +11,13 @@ import ResultPanel from './components/ResultPanel';
 import ChatRepl from './components/ChatRepl';
 import SettingsPanel from './components/SettingsPanel';
 import Landing from './pages/Landing';
-import type { ApiError, ChatHistoryEntry, Diagnostic, ValidationResult } from './types/api';
+import type { ApiError, Diagnostic, ValidationResult } from './types/api';
 import { getEngine, ENGINE_MODE, getRun } from './engine';
 import { waveformCsv } from 'air-ts';
 import type { SimulationReport as OracleReport } from 'air-ts';
+import { useDesignStore } from './agent/designStore';
+import { useAgentSettings } from './agent/agentSettings';
+import type { NetworkProviderId } from 'agent';
 import './App.css';
 
 interface LogEntry {
@@ -179,7 +182,16 @@ const DEFAULT_XML = `<?xml version="1.0" encoding="UTF-8"?>
 function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', toggleTheme: () => void }) {
   const [activeTab, setActiveTab] = useState('schematic');
   const [designPath, setDesignPath] = useState(DEFAULT_DESIGN);
-  const [xml, setXml] = useState<string>(DEFAULT_XML);
+  // The design XML is owned by the versioned design store (issue #18): the agent
+  // writes it ONLY via applyValidated (a gated ValidatedDesign) and the human
+  // edits it via setUserXml. Seed the store with the default design once.
+  const xml = useDesignStore((s) => s.xml);
+  const setUserXml = useDesignStore((s) => s.setUserXml);
+  useEffect(() => {
+    if (useDesignStore.getState().xml === '') setUserXml(DEFAULT_XML);
+    // Seeding is a one-time init; setUserXml is stable (store setter).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -187,7 +199,12 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
   const [waveforms, setWaveforms] = useState<WaveformData[]>([]);
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [isBusy, setIsBusy] = useState(false);
-  const [chatHistory, setChatHistory] = useState<ChatHistoryEntry[]>([]);
+  // BYOK agent config (issue #17/#18). Provider/model are picked in Settings; the
+  // key lives only in the browser vault. Default to the mock provider so the
+  // panel works with no key (deterministic demo / the CI-parity flow).
+  const [agentProvider, setAgentProvider] = useState<NetworkProviderId | 'mock'>('mock');
+  const [agentModel, setAgentModel] = useState<string | undefined>(undefined);
+  const malformedCount = useAgentSettings((s) => s.malformedCount);
 
   const artifacts = useMemo(() => {
     const paths = new Set<string>();
@@ -436,71 +453,17 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
     }
   };
 
-  const handleCommand = async (command: string) => {
-    addLog(`Agent: ${command}`, 'info');
-    const response = await axios.post(`${API_BASE}/agent/chat`, {
-      message: command,
-      history: chatHistory,
-      provider: 'gemini',
-    });
-    const data = response.data;
-    if (!data.success) {
-      addLog(`Agent error: ${data.error}`, 'error');
-      throw new Error(data.error);
-    }
-    setChatHistory(data.history);
-    const fullResponse = data.response;
-    const xmlMatch = fullResponse.match(/```xml\n([\s\S]*?)\n```/) || fullResponse.match(/(<system[\s\S]*?<\/system>)/);
-    if (xmlMatch) {
-      let extractedXml = xmlMatch[1] || xmlMatch[0];
-      let attempts = 0;
-      const MAX_ATTEMPTS = 2;
-
-      while (attempts < MAX_ATTEMPTS) {
-        const normalized = await axios.post(`${API_BASE}/normalize-xml`, { xml: extractedXml });
-        if (normalized.data.success) {
-          setXml(normalized.data.xml);
-          setValidation({ success: true, diagnostics: normalized.data.diagnostics || [] });
-          addLog('AI XML applied successfully.', 'success');
-          setActiveTab('schematic');
-          return fullResponse
-            .replace(/```xml[\s\S]*?```/g, '\n(Design updated in schematic workspace)')
-            .replace(/<system[\s\S]*?<\/system>/g, '\n(Design updated in schematic workspace)')
-            .trim();
-        }
-
-        attempts++;
-        addLog(`AI XML attempt ${attempts} failed validation. Requesting fix...`, 'warning');
-        
-        const errorCtx = normalized.data.diagnostics?.map((d: Diagnostic) => `${d.code}: ${d.message}`).join('\n') || normalized.data.error;
-        const retryResp = await axios.post(`${API_BASE}/agent/chat`, {
-          message: `The XML you just generated failed AIR validation with these errors:\n${errorCtx}\n\nPlease fix the XML and provide only the corrected <system> block.`,
-          history: chatHistory,
-          provider: 'gemini',
-        });
-        
-        if (!retryResp.data.success) break;
-        
-        const retryFull = retryResp.data.response;
-        const retryMatch = retryFull.match(/```xml\n([\s\S]*?)\n```/) || retryFull.match(/(<system[\s\S]*?<\/system>)/);
-        if (!retryMatch) break;
-        extractedXml = retryMatch[1] || retryMatch[0];
-      }
-
-      // If we reach here, validation failed even after retries
-      addLog('AI XML rejected after self-healing attempts.', 'error');
-      setActiveTab('validation');
-      return 'The generated XML was rejected because it did not pass AIR validation. I opened the diagnostics panel so you can see the errors.';
-    }
-    return fullResponse;
-  };
+  // The old backend /agent/chat round-trip was replaced by the browser agent
+  // tool runtime (issue #18): the ChatRepl panel drives runConversation directly
+  // against the client-side gate + tools, and applies designs ONLY through the
+  // design store's single write path (applyValidated / a gated ValidatedDesign).
 
   const renderPanel = () => {
     if (activeTab === 'schematic') {
       return <Graph nodes={nodes} edges={edges} />;
     }
     if (activeTab === 'editor') {
-      return <XmlEditor xml={xml} onChange={(value) => setXml(value || '')} theme={theme} />;
+      return <XmlEditor xml={xml} onChange={(value) => setUserXml(value || '')} theme={theme} />;
     }
     if (activeTab === 'simulation') {
       return <SimulationPanel simulation={simulation} waveforms={waveforms} />;
@@ -526,7 +489,15 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
       ]} />;
     }
     if (activeTab === 'settings') {
-      return <SettingsPanel />;
+      return (
+        <SettingsPanel
+          malformedToolCallCount={malformedCount}
+          agentProvider={agentProvider}
+          agentModel={agentModel}
+          onAgentProviderChange={setAgentProvider}
+          onAgentModelChange={setAgentModel}
+        />
+      );
     }
     return null;
   };
@@ -555,7 +526,11 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
           <ResultPanel logs={logs} />
         </div>
       </main>
-      <ChatRepl onCommand={handleCommand} />
+      <ChatRepl
+        provider={agentProvider}
+        {...(agentModel ? { model: agentModel } : {})}
+        theme={theme}
+      />
     </div>
   );
 }

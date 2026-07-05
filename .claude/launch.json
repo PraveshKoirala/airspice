@@ -6,6 +6,13 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "packages/ui", "run", "dev"],
       "port": 5173
+    },
+    {
+      "name": "ui-local",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "packages/ui", "run", "dev"],
+      "port": 5173,
+      "env": { "VITE_ENGINE": "local" }
     }
   ]
 }

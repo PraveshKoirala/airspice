@@ -47,8 +47,12 @@ export interface AirEngine {
    * #14: run the design's default ngspice profile in the browser and return the
    * oracle-schema report + the run id its waveforms are retained under. Local
    * engine: real WASM pipeline. Server engine: throws NotImplementedError.
+   *
+   * #18: an optional AbortSignal cancels an in-flight run (the agent Stop button
+   * and per-call simulation timeout). Cancel terminates + respawns the WASM
+   * worker (ADR 0011), so the abort returns in well under 500ms.
    */
-  simulate(xml: string): Promise<LocalSimulationResult>;
+  simulate(xml: string, signal?: AbortSignal): Promise<LocalSimulationResult>;
   /** #11: apply a patch. Throws NotImplementedError today. */
   applyPatch(xml: string, patch: string): Promise<never>;
   /** Which engine backs this instance ("local" | "server"). */
