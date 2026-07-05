@@ -231,7 +231,7 @@ def _pwm_pulse(ton: str, period: str, amplitude: str = "3.3") -> str:
     Then ``V_avg = A * ton / period = D * A`` exactly, independent of frequency.
 
     Degenerate cases (guarded so ngspice never sees a non-positive/zero-period
-    plateau):
+    plateau, and so the emitted trapezoid never overruns the period):
 
     * ``ton <= 0`` (0% duty) -> a flat DC low; no pulse.
     * ``ton >= period`` (>=100% duty) -> a flat DC high; no pulse.
@@ -239,6 +239,25 @@ def _pwm_pulse(ton: str, period: str, amplitude: str = "3.3") -> str:
       compensation, e.g. a sub-2us on-time): fixed 1us edges cannot represent it,
       so shrink the edges to ``TR = TF = ton`` with ``PW = 0`` -- a pure triangle
       whose high-area ``(TR + TF) / 2 = ton`` still gives duty ``ton/period``.
+    * ``period - PWM_EDGE_S < ton < period`` (near-100% duty): the normal
+      emission's span ``TR + PW + TF = ton + PWM_EDGE_S`` would exceed the period,
+      so ngspice truncates the fall edge at the period wrap and the effective duty
+      falls short by up to ``PWM_EDGE_S / (2 * period)`` (issue #74). Mirror-
+      symmetric to the sub-edge triangle: shrink the edges to ``TR = TF =
+      period - ton`` and set ``PW = 2*ton - period`` so the span is exactly
+      ``period`` (no truncation) and the high-area ``PW + (TR + TF) / 2 =
+      (2*ton - period) + (period - ton) = ton`` still gives duty ``ton/period``.
+      Both edge widths stay in ``(0, PWM_EDGE_S)`` and ``PW`` stays in
+      ``(period - 2*PWM_EDGE_S, period)``, so ngspice never sees a non-positive
+      plateau. ``ton >= period`` is the DC-high case above; just below the band
+      (``ton + PWM_EDGE_S <= period``) the normal trapezoid still fits and is
+      kept. The boundary is evaluated in IEEE-754 doubles, so e.g. 9us/10us --
+      whose exact-arithmetic span ``9us + 1us`` equals the period -- tips into
+      this branch because ``parse_quantity("10us")`` is a hair below ``10e-6``;
+      it still emits the intended duty exactly, just via the mirror triangle
+      rather than a fixed-edge trapezoid. The air-ts port shares this double
+      representation, so both engines classify every ``ton``/``period`` pair
+      identically (byte parity holds at the boundary).
     """
     ton_s = parse_quantity(ton, "s")
     period_s = parse_quantity(period, "s")
@@ -256,6 +275,14 @@ def _pwm_pulse(ton: str, period: str, amplitude: str = "3.3") -> str:
         # triangle area (TR+TF)/2 == ton (duty preserved) and PW stays > 0-safe.
         edge_s = ton_s
         pw_s = 0.0
+    elif ton_s > period_s - edge_s:
+        # Near-100% duty (#74): the normal span ton + PWM_EDGE_S would overrun
+        # the period and ngspice would truncate the fall edge at the wrap. Mirror
+        # the sub-edge triangle at the top end -- shrink the edges to period-ton
+        # and widen the plateau to 2*ton-period so the span is exactly the period
+        # and the high-area stays ton (duty preserved).
+        edge_s = period_s - ton_s
+        pw_s = 2.0 * ton_s - period_s
     else:
         pw_s = ton_s - edge_s
 
