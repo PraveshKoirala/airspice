@@ -24,10 +24,35 @@ export default defineConfig({
       'fast-xml-parser': fileURLToPath(
         new URL('./node_modules/fast-xml-parser/src/fxp.js', import.meta.url),
       ),
+      // The dev-only /sim-lab route consumes the sim-wasm client (issue #13)
+      // through its source entry, aliased here. sim-wasm is worker-only: the
+      // WASM engine loads ONLY inside its Web Worker (never the main thread),
+      // and the ~20MB WASM is a lazy Vite chunk, so importing the client here
+      // does NOT pull the engine into the app's initial bundle.
+      'sim-wasm': fileURLToPath(new URL('../sim-wasm/src/index.ts', import.meta.url)),
     },
   },
   // Module workers so the air-ts engine worker can `import` air-ts as ESM.
   worker: {
     format: 'es',
+  },
+  optimizeDeps: {
+    // eecircuit-engine (the WASM ngspice engine used by the dev-only /sim-lab
+    // route via sim-wasm) is ~20MB with the WASM inlined. Excluding it from
+    // Vite's dep pre-bundler keeps the engine.worker.ts dynamic import()
+    // resolving it as a lazy chunk (not eagerly optimized), which is how the
+    // sim-wasm harness build produces a separate WASM chunk. It is only loaded
+    // inside the Web Worker, on demand.
+    exclude: ['eecircuit-engine'],
+  },
+  server: {
+    fs: {
+      // Allow serving files from the sibling port packages (air-ts, sim-wasm)
+      // whose source we consume via the aliases above. Vite's dev server
+      // restricts @fs reads to the project root by default; the sim-wasm engine
+      // worker (packages/sim-wasm/src/engine.worker.ts) lives outside it, so the
+      // dev-only /sim-lab route needs the monorepo packages/ dir allow-listed.
+      allow: [fileURLToPath(new URL('..', import.meta.url))],
+    },
   },
 })

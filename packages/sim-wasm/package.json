@@ -1,0 +1,42 @@
+{
+  "name": "sim-wasm",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ngspice WASM analog simulation engine in a Web Worker (issue #13). Wraps eecircuit-engine (ngspice 45.2, MIT) behind a typed, worker-only, capability-advertising protocol. Fire-and-forget analog only; halt/alter/resume is deferred to issue #88 behind the same protocol (ADR 0011).",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./worker": {
+      "import": "./src/engine.worker.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b && tsc -p tsconfig.test.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:browser": "playwright test",
+    "test:browser:install": "playwright install --with-deps chromium firefox"
+  },
+  "dependencies": {
+    "eecircuit-engine": "1.7.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.58.2",
+    "@types/node": "^22.20.0",
+    "typescript": "~5.6.3",
+    "vite": "^8.0.12",
+    "vitest": "^3.2.4"
+  }
+}

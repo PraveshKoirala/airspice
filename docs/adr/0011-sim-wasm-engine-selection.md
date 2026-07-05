@@ -1,16 +1,33 @@
-# ADR 0011: sim-wasm engine selection (ngspice → WASM) and the halt/alter/resume block
+# ADR 0011: sim-wasm engine selection (ngspice → WASM) — adopt eecircuit for analog; control deferred to #88
 
 ## Status
 
-**Blocked — P0 architectural finding** (2026-07-05)
+**Accepted (SPLIT decision)** (2026-07-05)
 
 This ADR records the evaluation required by issue #13 and epic #12 binding decision 5.
-The conclusion is that **neither available path satisfies the hard requirement
+The evaluation found that **neither available path satisfies the hard requirement
 (mid-transient halt / alter / resume) under the epic's binding constraints
-(worker-only + single-threaded WASM + no SharedArrayBuffer/COOP+COEP)**. Per
-`AGENTS.md` "prime directive" and the issue's own guardrail ("do NOT ship a
-fire-and-forget engine pretending to meet the requirement"), no engine was shipped.
-The finding, its evidence, and the recommended next step are below.
+(worker-only + single-threaded WASM + no SharedArrayBuffer/COOP+COEP)** — evidence
+below. That was escalated as a P0 (issue #13) and the **epic owner accepted it and
+split the issue** (ruling: issue #13 comment 4885120883):
+
+1. **Adopt `eecircuit-engine`** (MIT, ngspice 45.2) wrapped behind our typed,
+   worker-only protocol for **fire-and-forget analog simulation** — all that M2
+   (#14/#15/#25), M3, and M4–M7 require. The engine advertises
+   `capabilities.control = false` (see `packages/sim-wasm/src/protocol.ts`).
+2. **Defer the control-capable engine** (halt/alter/resume) to a dedicated
+   single-threaded `--with-ngshared` ASYNCIFY build spike — **issue #88**, gated
+   before M8. It slots in behind the SAME protocol later: the `capabilities` hook
+   plus the reserved `SimControl` message shape make adding control ADDITIVE, not
+   a rewrite (existing `run`/`cancel`/`preload` consumers do not change; M8 co-sim
+   feature-detects on `capabilities.control`).
+3. **Keep binding decision 2** (single-threaded, no SharedArrayBuffer) — preserves
+   zero-backend / trivial static hosting and avoids the cross-origin-isolation
+   conflict with BYOK direct-fetch (ADR 0008).
+
+`packages/sim-wasm` implements items 1–2 of this decision. The original P0 finding,
+its test evidence, and the deferred-work recommendation are retained below unchanged
+— they are the justification for the split and the spec for #88.
 
 ## Context
 
@@ -133,15 +150,21 @@ Path B's control model has two sub-paths, and **both are blocked**:
    deliverable ("commit the full reproducible Dockerfile … never a mystery .wasm blob")
    cannot be satisfied and validated in-session.
 
-## Decision
+## Original P0 finding (pre-split; retained as the justification for #88)
 
-**Do not ship an engine.** Neither path meets the hard requirement under the binding
-constraints. Shipping eecircuit-engine wired behind our protocol would deliver working
-analog simulation but a **fire-and-forget** control API — exactly what the issue and
-`AGENTS.md` prohibit. Per the prime directive, this is escalated as a **P0 architectural
-finding** on #13 rather than routed around.
+At evaluation time the recommendation was **do not ship an engine**, because neither
+path meets the hard requirement under the binding constraints, and shipping
+eecircuit-engine while claiming the control API is met would be a hollow green check —
+exactly what the issue and `AGENTS.md` prohibit. This was escalated as a **P0
+architectural finding** on #13 rather than routed around.
 
-## Recommended next step (for the epic owner to decide — needs a binding-decision change)
+The epic owner accepted the finding and **resolved it by the split at the top of this
+ADR**: eecircuit-engine is adopted for fire-and-forget analog now (with
+`capabilities.control = false`, honestly advertised), and the control-capable engine is
+carved out to **issue #88**, gated before M8. The recommendation below is the spec for
+that spike.
+
+## Recommended next step — now scoped as issue #88 (gated before M8)
 
 The single-threaded foreground `stop`/`alter`/`resume` model (Path B sub-path 2) is the
 *correct* architecture and is compatible with binding decision 2 **in principle**. It is

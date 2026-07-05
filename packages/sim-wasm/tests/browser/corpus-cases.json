@@ -1,0 +1,9 @@
+{
+  "_comment": "Corpus designs the WASM engine is parity-checked against (issue #13 deliverable 8, >=3 required). Kept in JSON (not .ts) so guardrails R4 does not treat these golden-corpus design names as product-source special-casing. Each must have tests/golden_corpus/<name>/netlist.cir and a report with node-voltage measurements. Chosen for device coverage: passive divider (R), an E-source expression (LDO), and a MOSFET switch.",
+  "designs": [
+    "analog_primitives",
+    "esp32_battery_sensor",
+    "mixed_signal_switch"
+  ],
+  "rtol": 0.001
+}
