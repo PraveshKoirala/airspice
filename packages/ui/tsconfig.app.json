@@ -15,21 +15,13 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
-    /* The UI consumes the TypeScript engine (packages/air-ts) through its
-       source entry. This path mapping mirrors the Vite alias in vite.config.ts
-       so `import { ... } from 'air-ts'` type-checks (issue #10 / epic #6).
-       air-ts source imports `fast-xml-parser`; since we type-check its .ts
-       sources here (not a prebuilt .d.ts), map that dep to the UI's own copy so
-       it resolves from packages/ui/node_modules regardless of the importing
-       file's directory -- packages/air-ts/node_modules is NOT installed in the
-       `ui` CI job. */
-    "paths": {
-      "air-ts": ["../air-ts/src/index.ts"],
-      "agent": ["../agent/src/index.ts"],
-      "fast-xml-parser": ["./node_modules/fast-xml-parser"],
-      "sim-wasm": ["../sim-wasm/src/index.ts"],
-      "eecircuit-engine": ["./node_modules/eecircuit-engine"]
-    },
+    /* Workspaces refactor (issue #85): the UI's TS resolution for the sibling
+       packages (air-ts, agent, sim-wasm) now goes through the ordinary npm
+       workspace symlink at node_modules/<name>, and their transitive deps
+       (fast-xml-parser via air-ts, eecircuit-engine via sim-wasm) are hoisted
+       by npm. No `paths` overrides are needed -- the drift landmine from #85
+       (a consumer's fast-xml-parser copy not matching air-ts's declared
+       range) is gone because there's exactly one copy per name. */
 
     /* Linting */
     "noUnusedLocals": true,

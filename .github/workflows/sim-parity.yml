@@ -100,13 +100,12 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: packages/ui/package-lock.json
+          cache-dependency-path: package-lock.json
 
-      # The browser pipeline consumes air-ts + sim-wasm from SOURCE (Vite aliases)
-      # and dynamic-imports eecircuit-engine from packages/ui/node_modules, so the
-      # ui-only install is sufficient (same as ui-sim.yml).
-      - name: Install ui dependencies
-        working-directory: packages/ui
+      # Workspaces refactor (issue #85): root install; eecircuit-engine is
+      # hoisted from sim-wasm's declared deps, so both the sim-wasm engine
+      # worker and the ui's Vite build resolve the same copy.
+      - name: Install dependencies (workspaces, root)
         run: npm ci
 
       - name: Set up Python 3.12

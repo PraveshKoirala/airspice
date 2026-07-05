@@ -2,13 +2,22 @@
   "name": "airspice",
   "private": true,
   "version": "0.0.0",
-  "description": "Convenience scripts for the AirSpice reference engine (see docs/DEVELOPMENT.md). Not a published package.",
+  "description": "Convenience scripts + npm-workspace root for the AirSpice reference engine (see docs/DEVELOPMENT.md). Not a published package.",
+  "workspaces": [
+    "packages/air-ts",
+    "packages/agent",
+    "packages/sim-wasm",
+    "packages/ui"
+  ],
   "scripts": {
     "dev": "concurrently -n api,ui -c blue,green \"npm run dev:api\" \"npm run dev:ui\"",
     "dev:api": "air serve --host 127.0.0.1 --port 8000",
-    "dev:ui": "npm --prefix packages/ui run dev",
+    "dev:ui": "npm --workspace ui run dev",
     "test:py": "python -m pytest tests/",
-    "build:ui": "npm --prefix packages/ui run build",
+    "build:ui": "npm --workspace ui run build",
+    "build:air-ts": "npm --workspace air-ts run build",
+    "build:agent": "npm --workspace agent run build",
+    "build:sim-wasm": "npm --workspace sim-wasm run build",
     "fuzz": "node scripts/fuzz_diff.mjs --seed 1 --cases 1000",
     "fuzz:selftest": "node scripts/fuzz_diff.mjs --self-test",
     "fuzz:regressions": "node scripts/fuzz_diff.mjs --make-regressions"
