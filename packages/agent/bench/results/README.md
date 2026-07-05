@@ -6,6 +6,60 @@ tracked over time (issue #19 deliverable 4). The mock benchmark that validates
 the loop **mechanics** runs in CI (`tests/repair/bench.test.ts`, 6/6 fixed) and
 is not committed here — only live runs are.
 
+## 2026-07-05 — Anthropic `claude-sonnet-5` (`2026-07-05-anthropic.json`) — HEADLINE
+
+**Headline: 5/6 broken circuits autonomously fixed by `claude-sonnet-5`** — above
+the ≥4/6 target from issue #19. A funded Anthropic key drove the full 6-case set
+end to end (`npm run bench -- --provider anthropic --model claude-sonnet-5
+--max-iterations 5`); every fix went through the real air-ts gate. Each of the 5
+fixes converged in a **single iteration**.
+
+| case | outcome | iters | tokens | note |
+|------|---------|-------|--------|------|
+| bad_adc_divider | **FIXED** | 1 | 6601 | gated patch, first try |
+| i2c_without_pullups | provider_error | 1 | 5917 | **not a rate-limit / not model quality** — see below |
+| invalid_pin_function | **FIXED** | 1 | 5419 | gated patch, first try |
+| missing_ground | **FIXED** | 1 | 5411 | gated patch, first try |
+| overloaded_3v3_rail | **FIXED** | 1 | 5729 | gated patch, first try |
+| phase3_failure | **FIXED** | 1 | 6569 | gated patch, first try |
+
+**Totals:** 5/6 fixed, 35,646 tokens across the run. At `claude-sonnet-5`
+introductory pricing ($2 in / $10 out per MTok through 2026-08-31), the whole
+6-case run cost **≈ $0.10** (repair turns are input-heavy: a large design +
+diagnostics context per turn, a small patch out; the absolute ceiling if every
+token were billed at the output rate is ≈ $0.36).
+
+### The one miss is a real, diagnosed defect — not the model
+
+`i2c_without_pullups` fails **reproducibly** (confirmed in isolation with
+`--only i2c_without_pullups` + retries; ~5.5–5.9k tokens spent each time, so the
+model *does* engage and produce a patch). The stop reason `provider_error` is
+honest but generic; the captured underlying error is:
+
+```
+Provider returned 400: invalid_request_error —
+messages.0.content.1: unexpected `tool_use_id` found in `tool_result` blocks:
+toolu_...  Each `tool_result` block must have a corresponding `tool_use` block
+in the previous message.
+```
+
+Root cause: this case's fix needs **two** `propose_patch` tool calls in one turn
+(a pull-up for SDA and one for SCL). When a turn contains tool calls, the
+conversation runner reconstructs the assistant message as plain text
+(`conversation.ts` appends `{ role: "assistant", content: turn.text }`, dropping
+the `tool_use` blocks), then sends `tool_result` blocks referencing
+`tool_use_id`s that no longer have a matching `tool_use` — Anthropic's
+`/v1/messages` rejects it with a 400. The other five cases fix in a single turn
+whose first proposal validates clean, so they never send a `tool_result` back and
+never hit the bug.
+
+So the miss is a **multi-tool-turn conversation-reconstruction defect** in the
+Anthropic provider path (`packages/agent/src/tools/conversation.ts` line ~144 +
+`packages/agent/src/providers/anthropic.ts` `buildRequestBody`), NOT a rate-limit
+and NOT `claude-sonnet-5` failing to reason about the circuit. Fixing it (carry
+the assistant turn's `tool_use` blocks into the message history) would very
+plausibly bring this to 6/6.
+
 ## 2026-07-05 — Gemini (`2026-07-05-gemini.json`)
 
 **Honest status: PARTIAL baseline — blocked by free-tier daily quota, NOT model
