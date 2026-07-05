@@ -1,0 +1,7 @@
+<system name="s" ir_version="0.1">
+  <components>
+    <component id="R1" type="resistor"><parameter name="resistance" value="4.7k"/><pin name="1" net="a"/><pin name="2" net="b"/></component>
+    <component id="C1" type="capacitor"><parameter name="capacitance" value="100n"/><pin name="1" net="a"/><pin name="2" net="gnd"/></component>
+    <component id="V1" type="voltage_source"><parameter name="voltage" value="3.3"/><pin name="p" net="a"/><pin name="n" net="gnd"/></component>
+  </components>
+</system>

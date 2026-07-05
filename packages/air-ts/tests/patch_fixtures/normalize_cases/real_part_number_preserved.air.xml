@@ -1,0 +1,1 @@
+<system name="s" ir_version="0.1"><components><component id="U1" type="ldo" part="LM1117"><pin name="in" net="a"/></component></components></system>

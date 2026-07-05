@@ -1,0 +1,14 @@
+<system name="dark_activated_lamp" ir_version="0.1">
+  <nets>
+    <net id="vcc"><node component="R_LDR" pin="1"/><node component="R_LAMP" pin="1"/></net>
+    <net id="base"><node component="R_LDR" pin="2"/><node component="R_BIAS" pin="1"/><node component="Q1" pin="b"/></net>
+    <net id="collector"><node component="R_LAMP" pin="2"/><node component="Q1" pin="c"/></net>
+    <net id="gnd"><node component="R_BIAS" pin="2"/><node component="Q1" pin="e"/></net>
+  </nets>
+  <components>
+    <component id="R_LDR" type="resistor"><parameter name="resistance" value="10k"/></component>
+    <component id="R_BIAS" type="resistor"><parameter name="resistance" value="47k"/></component>
+    <component id="R_LAMP" type="resistor"><parameter name="resistance" value="220"/></component>
+    <component id="Q1" type="bjt"><parameter name="type" value="npn"/></component>
+  </components>
+</system>

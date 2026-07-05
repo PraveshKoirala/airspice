@@ -1,0 +1,27 @@
+<?xml version="1.0" ?>
+<system ir_version="0.1" name="s">
+  <nets>
+    <net id="gnd" role="ground">
+      <node component="R2" pin="2"/>
+    </net>
+    <net id="out" role="analog_signal">
+      <node component="R1" pin="2"/>
+      <node component="R2" pin="1"/>
+    </net>
+    <net id="vin" role="power">
+      <node component="R1" pin="1"/>
+    </net>
+  </nets>
+  <components>
+    <component id="R1" type="resistor">
+      <value>10k</value>
+      <pin name="1" net="vin"/>
+      <pin name="2" net="out"/>
+    </component>
+    <component id="R2" type="resistor">
+      <value>10k</value>
+      <pin name="1" net="out"/>
+      <pin name="2" net="gnd"/>
+    </component>
+  </components>
+</system>

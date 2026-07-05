@@ -1,0 +1,3 @@
+<patch id="empty">
+  <reason>A patch with only a reason and no operations is a no-op.</reason>
+</patch>

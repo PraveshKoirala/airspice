@@ -1,0 +1,53 @@
+{
+  "success": true,
+  "operations": [
+    {
+      "op": "replace",
+      "path": "/system/components/component[@id='R_TOP']/value",
+      "payload": "<value>1M</value>\n  "
+    },
+    {
+      "op": "replace",
+      "path": "/system/components/component[@id='R_BOTTOM']/value",
+      "payload": "<value>330k</value>\n  "
+    }
+  ],
+  "before": {
+    "errors": 1,
+    "warnings": 0,
+    "diagnostics": [
+      {
+        "id": "diag_00001",
+        "severity": "error",
+        "domain": "electrical",
+        "code": "ADC_INPUT_EXCEEDS_VREF",
+        "message": "ADC binding battery_adc_binding can expose battery_sense above 3.3V.",
+        "related_elements": [
+          "battery_adc_binding",
+          "battery_sense",
+          "U_MCU"
+        ],
+        "observed": {
+          "estimated_voltage": "3.81818V"
+        },
+        "expected": {
+          "max": "3.3V"
+        },
+        "suggested_actions": [
+          "Adjust divider values",
+          "Bind ADC after a divider",
+          "Use a higher ADC attenuation model"
+        ]
+      }
+    ]
+  },
+  "after": {
+    "errors": 0,
+    "warnings": 0,
+    "diagnostics": []
+  },
+  "resolved": [
+    "error:electrical:ADC_INPUT_EXCEEDS_VREF:battery_adc_binding,battery_sense,U_MCU"
+  ],
+  "introduced": []
+}

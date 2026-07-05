@@ -1,0 +1,11 @@
+<?xml version="1.0" ?>
+<system ir_version="0.1" name="s">
+  <components>
+    <component id="L1" type="generic_load">
+      <parameter name="current" value="10"/>
+      <value>10A</value>
+      <pin name="1" net="v"/>
+      <pin name="2" net="gnd"/>
+    </component>
+  </components>
+</system>

@@ -1,0 +1,5 @@
+<patch id="err_nonexistent">
+  <replace path="/system/components/component[@id='R_NOPE']/value">
+    <value>9k</value>
+  </replace>
+</patch>

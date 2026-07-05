@@ -1,0 +1,23 @@
+<?xml version="1.0" ?>
+<system ir_version="0.1" name="s">
+  <components>
+    <component id="C1" type="capacitor">
+      <parameter name="capacitance" value="100n"/>
+      <value>100n</value>
+      <pin name="1" net="a"/>
+      <pin name="2" net="gnd"/>
+    </component>
+    <component id="R1" type="resistor">
+      <parameter name="resistance" value="4.7k"/>
+      <value>4.7k</value>
+      <pin name="1" net="a"/>
+      <pin name="2" net="b"/>
+    </component>
+    <component id="V1" type="voltage_source">
+      <parameter name="voltage" value="3.3"/>
+      <value>3.3V</value>
+      <pin name="p" net="a"/>
+      <pin name="n" net="gnd"/>
+    </component>
+  </components>
+</system>

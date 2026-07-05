@@ -1,0 +1,6 @@
+<system name="slash_predicate" ir_version="0.1">
+  <nets>
+    <net id="x" role="power"/>
+    <net id="a/b" role="ground"/>
+  </nets>
+</system>

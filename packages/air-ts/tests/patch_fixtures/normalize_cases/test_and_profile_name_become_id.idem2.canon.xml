@@ -1,0 +1,14 @@
+<?xml version="1.0" ?>
+<system ir_version="0.1" name="s">
+  <tests>
+    <test id="t1" name="t1">
+      <run duration="1ms"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="pr" name="pr">
+      <backend type="ngspice"/>
+      <run test="t1"/>
+    </profile>
+  </simulation_profiles>
+</system>

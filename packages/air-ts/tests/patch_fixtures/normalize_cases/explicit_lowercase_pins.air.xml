@@ -1,0 +1,7 @@
+<system name="s" ir_version="0.1">
+  <components>
+    <component id="Q1" type="bjt"><pin name="b" net="base"/><pin name="c" net="col"/><pin name="e" net="gnd"/></component>
+    <component id="M1" type="mosfet"><pin name="g" net="gate"/><pin name="d" net="drain"/><pin name="s" net="gnd"/></component>
+    <component id="R1" type="resistor"><value>1k</value><pin name="a" net="x"/><pin name="b" net="y"/></component>
+  </components>
+</system>

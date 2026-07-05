@@ -1,0 +1,1 @@
+<system name="s" ir_version="0.1"><components><component id="R1" type="resistor"><parameter name="resistance" value=""/><parameter name="value" value="8k2"/><pin name="1" net="a"/><pin name="2" net="b"/></component></components></system>

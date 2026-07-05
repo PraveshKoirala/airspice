@@ -1,0 +1,6 @@
+<patch id="err_slash">
+  <reason>A slash inside the predicate value defeats the quote-blind rsplit in
+  _find_parent_required. Oracle: internal ElementPath TypeError. air-ts: clean
+  PatchError. Documented divergence (PR 87 rework r1, F2) -- both engines reject.</reason>
+  <remove path="nets/net[@id='a/b']"/>
+</patch>

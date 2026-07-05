@@ -1,0 +1,8 @@
+<patch id="add_charref_attrs">
+  <reason>Payload attrs carry tab/LF/CR via char refs: the preview payload must
+  use ET's padded refs, the applied canonical must use minidom's unpadded refs
+  (PR 87 rework r1, F1 -- the two serializer stages differ by design).</reason>
+  <add path="/system/nets">
+    <net id="w" note="tab&#9;lf&#10;cr&#13;end" role="analog_signal"/>
+  </add>
+</patch>

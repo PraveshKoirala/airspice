@@ -1,0 +1,9 @@
+<patch id="patch_fix_bad_adc_divider">
+  <reason>Reduce the bottom resistor so battery_sense is near 1.04V at 4.2V battery.</reason>
+  <replace path="/system/components/component[@id='R_TOP']/value">
+    <value>1M</value>
+  </replace>
+  <replace path="/system/components/component[@id='R_BOTTOM']/value">
+    <value>330k</value>
+  </replace>
+</patch>

@@ -119,8 +119,19 @@ export function serializeMinidomStyle(root: XmlElement): string {
   const lines: string[] = [];
   lines.push('<?xml version="1.0" ?>');
   writeElement(root, 0, lines);
-  // Drop blank lines (Python: keep lines whose strip() is truthy), join, add \n.
-  const kept = lines.filter((line) => line.trim() !== "");
+  // Drop blank lines (Python: `pretty.splitlines()` keeps lines whose strip()
+  // is truthy), join, add \n. The split must run over the FULL pretty string,
+  // not the pushed chunks: a text run containing embedded newlines (from &#10;
+  // char refs) creates interior lines inside a single chunk, and Python's
+  // splitlines sees -- and drops -- a blank interior line there (live oracle:
+  // <title>a&#10;  &#10;b</title> canonicalizes to "a\nb"). After
+  // escapeText's line-ending normalization no \r survives in text, and control
+  // chars in attributes are char-ref-escaped, so "\n" is the only separator --
+  // split("\n") is then equivalent to Python's splitlines (PR #87 rework r1, F1).
+  const kept = lines
+    .join("\n")
+    .split("\n")
+    .filter((line) => line.trim() !== "");
   return kept.join("\n") + "\n";
 }
 
@@ -184,21 +195,75 @@ function openTag(el: XmlElement): string {
 
 /**
  * Text escaping as minidom emits it: & < > escaped; quotes and apostrophes are
- * left literal in text content.
+ * left literal in text content; TAB stays literal.
+ *
+ * LINE-ENDING NORMALIZATION (PR #87 rework r1, F1 "pin the text path"): the
+ * oracle pipeline serializes the tree with ET.tostring (which writes \r in text
+ * LITERALLY) and re-parses through minidom, where expat applies XML 1.0
+ * line-ending normalization to character data: \r\n -> \n, then lone \r -> \n.
+ * A \r that entered text via a &#13; char ref therefore leaves the canonical
+ * form as a plain newline (live oracle: <title>cr&#13;end</title> canonicalizes
+ * to "cr\nend"). We reproduce that spec algorithm here, BEFORE escaping. This
+ * is canonicalizer-only: serialize.ts (the ET.tostring mirror used for patch
+ * preview payloads) keeps \r literal in text, matching ITS oracle stage.
  */
 function escapeText(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return s
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
 /**
  * Attribute-value escaping as minidom emits it: & < > and the double quote are
  * escaped; single quotes stay literal (minidom always quotes attrs with ").
- * (Tabs/newlines inside attribute values are normalized to spaces by the XML
- * parser at parse time; the corpus has none, and FXP does not reproduce that
- * expat normalization -- documented as a pre-#43 edge, out of corpus scope.)
+ * Literal TAB/LF/CR are written RAW (unescaped), matching the CI oracle.
+ *
+ * PYTHON-VERSION-DEPENDENT ORACLE (PR #87 rework r1, F1 -- corrected round 2):
+ * the oracle canonicalizer re-parses `ET.tostring(root)` through minidom, and
+ * minidom's handling of control chars in ATTRIBUTE values CHANGED across CPython:
+ *   - Python 3.12 (what CI pins, .github/workflows/*.yml python-version 3.12):
+ *     minidom writes a literal tab/LF/CR RAW -> note="tab<TAB>lf<LF>cr<CR>end".
+ *     This is a known CPython minidom bug (the output is NOT reparse-stable: a
+ *     raw LF in an attribute is normalized to a space by expat on the next
+ *     parse). The golden corpus and every parity job are generated on 3.12, so
+ *     3.12 IS the authoritative oracle for this port.
+ *   - Python 3.13+ (gh-124061): minidom now escapes them as UNPADDED char refs
+ *     &#9;/&#10;/&#13;, which IS reparse-stable.
+ * air-ts must match the oracle CI runs, byte-for-byte (AGENTS.md rule 4), so we
+ * emit the RAW 3.12 form here -- reproducing the oracle's behavior, including its
+ * non-reparse-stable quirk, rather than "fixing" it in the port. The first
+ * revision of this rework escaped the char refs (matching the local dev box's
+ * Python 3.14); that made air-ts diverge from the 3.12 CI oracle and the two
+ * attr fixtures went stale in CI. See docs and the version-dependency note on
+ * the attr_whitespace fixtures. When CI's Python is bumped to >=3.13, this
+ * function and those fixtures must switch to the char-ref form together (an
+ * oracle-first change, since it moves the golden bytes).
+ *
+ * LINE-ENDING NORMALIZATION applies to attribute values too, on BOTH versions:
+ * the oracle's ET.tostring writes the value and minidom re-parses it through
+ * expat, which normalizes \r\n->\n and lone \r->\n in attribute values just as
+ * it does in text (verified on 3.12: v="X&#13;Y" -> v="X<LF>Y", v="X&#13;&#10;Y"
+ * -> single <LF>). We reproduce that here, BEFORE escaping. \t and \n survive
+ * RAW on 3.12 after normalization.
+ *
+ * NB the serialize.ts ET.tostring mirror (patch preview payloads) is UNaffected:
+ * ElementTree's own _escape_attrib escapes \t\n\r as PADDED &#09;/&#10;/&#13; on
+ * ALL these Python versions (verified 3.12 and 3.14) and does NOT line-ending-
+ * normalize (it serializes the in-memory tree directly, no expat re-parse), so
+ * serialize.ts stays as is and matches ITS oracle stage.
+ *
+ * (Literal tabs/newlines in the ORIGINAL input's attributes are normalized to
+ * spaces by expat at parse time; FXP does not reproduce that -- the pre-#43
+ * parse-time edge, out of corpus scope. This function handles the chars that
+ * reach the tree via char refs, which both parsers preserve into the tree.)
  */
 function escapeAttr(s: string): string {
   return s
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")

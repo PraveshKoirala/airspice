@@ -1,0 +1,1 @@
+<system name="s" ir_version="0.1"><tests><test name="t1"><run duration="1ms"/></test></tests><simulation_profiles><profile name="pr"><backend type="ngspice"/></profile></simulation_profiles></system>

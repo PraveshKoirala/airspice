@@ -1,0 +1,1 @@
+ValueError: Unsupported patch operation: frobnicate

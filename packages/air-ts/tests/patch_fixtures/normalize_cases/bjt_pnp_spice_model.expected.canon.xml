@@ -1,0 +1,11 @@
+<?xml version="1.0" ?>
+<system ir_version="0.1" name="s">
+  <components>
+    <component id="Q2" spice_model="PNP" type="bjt">
+      <parameter name="type" value="PNP"/>
+      <pin name="B" net="base"/>
+      <pin name="C" net="col"/>
+      <pin name="E" net="vcc"/>
+    </component>
+  </components>
+</system>

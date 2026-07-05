@@ -1,0 +1,7 @@
+<patch id="err_conflict">
+  <reason>Two ops where the second targets what the first removed -- a conflict.</reason>
+  <remove path="/system/components/component[@id='R2']"/>
+  <replace path="/system/components/component[@id='R2']/value">
+    <value>3k</value>
+  </replace>
+</patch>

@@ -1,0 +1,48 @@
+<?xml version="1.0" ?>
+<system ir_version="0.1" name="dark_activated_lamp">
+  <nets>
+    <net id="base" role="analog_signal">
+      <node component="R_LDR" pin="2"/>
+      <node component="R_BIAS" pin="1"/>
+      <node component="Q1" pin="b"/>
+    </net>
+    <net id="collector" role="analog_signal">
+      <node component="R_LAMP" pin="2"/>
+      <node component="Q1" pin="c"/>
+    </net>
+    <net id="gnd" role="ground">
+      <node component="R_BIAS" pin="2"/>
+      <node component="Q1" pin="e"/>
+    </net>
+    <net id="vcc" role="power">
+      <node component="R_LDR" pin="1"/>
+      <node component="R_LAMP" pin="1"/>
+    </net>
+  </nets>
+  <components>
+    <component id="Q1" spice_model="NPN" type="bjt">
+      <parameter name="type" value="npn"/>
+      <pin name="B" net="base"/>
+      <pin name="C" net="collector"/>
+      <pin name="E" net="gnd"/>
+    </component>
+    <component id="R_BIAS" type="resistor">
+      <parameter name="resistance" value="47k"/>
+      <value>47k</value>
+      <pin name="1" net="base"/>
+      <pin name="2" net="gnd"/>
+    </component>
+    <component id="R_LAMP" type="resistor">
+      <parameter name="resistance" value="220"/>
+      <value>220</value>
+      <pin name="1" net="vcc"/>
+      <pin name="2" net="collector"/>
+    </component>
+    <component id="R_LDR" type="resistor">
+      <parameter name="resistance" value="10k"/>
+      <value>10k</value>
+      <pin name="1" net="vcc"/>
+      <pin name="2" net="base"/>
+    </component>
+  </components>
+</system>

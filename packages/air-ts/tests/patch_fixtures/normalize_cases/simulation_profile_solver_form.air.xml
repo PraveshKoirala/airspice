@@ -1,0 +1,6 @@
+<system name="s" ir_version="0.1">
+  <tests><test id="t_main"><run duration="5ms"/></test></tests>
+  <simulation_profiles>
+    <simulation_profile id="analog" solver="ngspice"/>
+  </simulation_profiles>
+</system>

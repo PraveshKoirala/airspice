@@ -163,3 +163,24 @@ export {
 // Error types (so callers can distinguish refusal kinds).
 export { XmlParseError, XmlSecurityError } from "./xml.js";
 export { AirParseError } from "./parser.js";
+
+// AI-XML normalizer (issue #11): coerce near-miss AI XML into strict AIR shape.
+// `normalize(xml)` returns the byte-exact canonical normalized document (the
+// oracle's save_design path); `normalizeTree` is the raw tree transform (shared
+// with the parser's model-build path). Kept SEPARATE from the patch stage.
+export { normalize, normalizeTree } from "./normalize/index.js";
+
+// Patch engine (issue #11): apply/preview XML patch documents against a design.
+// `applyPatch(design, patch)` returns the canonical patched XML;
+// `previewPatch(design, patch)` returns the structured diff + before/after
+// validation deltas (mirrors patch_design / patch_preview). `applyPatchTree` /
+// `patchOperations` are the raw-tree primitives; `PatchError` carries the
+// oracle's verbatim ValueError messages.
+export { applyPatch, previewPatch } from "./patch/facade.js";
+export type { PatchPreview, DiagnosticSummary } from "./patch/facade.js";
+export {
+  applyPatchTree,
+  patchOperations,
+  PatchError,
+} from "./patch/index.js";
+export type { PatchOperation } from "./patch/index.js";

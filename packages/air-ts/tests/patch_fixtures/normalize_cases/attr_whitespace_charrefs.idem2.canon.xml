@@ -1,0 +1,6 @@
+<?xml version="1.0" ?>
+<system ir_version="0.1" name="s">
+  <nets>
+    <net id="A" note="tab lf cr end" role="power"/>
+  </nets>
+</system>

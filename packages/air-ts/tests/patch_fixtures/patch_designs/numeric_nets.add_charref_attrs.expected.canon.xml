@@ -1,0 +1,23 @@
+<?xml version="1.0" ?>
+<system ir_version="0.1" name="numeric_probe">
+  <nets>
+    <net id="1" role="power"/>
+    <net id="10" role="ground"/>
+    <net id="2" role="analog_signal"/>
+    <net id="w" note="tab	lf
+cr
+end" role="analog_signal"/>
+  </nets>
+  <components>
+    <component id="R1" type="resistor">
+      <value>1k</value>
+      <pin name="1" net="1"/>
+      <pin name="2" net="2"/>
+    </component>
+    <component id="R2" type="resistor">
+      <value>2k</value>
+      <pin name="1" net="2"/>
+      <pin name="2" net="10"/>
+    </component>
+  </components>
+</system>

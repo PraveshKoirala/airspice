@@ -1,0 +1,11 @@
+<system name="s" ir_version="0.1">
+  <nets>
+    <net id="vin"><node component="R1" pin="1"/></net>
+    <net id="out"><node component="R1" pin="2"/><node component="R2" pin="1"/></net>
+    <net id="gnd"><node component="R2" pin="2"/></net>
+  </nets>
+  <components>
+    <component id="R1" type="resistor"><value>10k</value></component>
+    <component id="R2" type="resistor"><value>10k</value></component>
+  </components>
+</system>

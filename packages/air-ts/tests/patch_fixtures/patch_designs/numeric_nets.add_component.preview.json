@@ -1,0 +1,90 @@
+{
+  "success": false,
+  "operations": [
+    {
+      "op": "add",
+      "path": "/system/components",
+      "payload": "<component id=\"C1\" type=\"capacitor\"><value>100nF</value><pin name=\"1\" net=\"2\" /><pin name=\"2\" net=\"10\" /></component>\n  "
+    }
+  ],
+  "before": {
+    "errors": 3,
+    "warnings": 0,
+    "diagnostics": [
+      {
+        "id": "diag_00001",
+        "severity": "error",
+        "domain": "schema",
+        "code": "MISSING_SECTION",
+        "message": "Missing <metadata> section.",
+        "related_elements": [],
+        "observed": {},
+        "expected": {},
+        "suggested_actions": []
+      },
+      {
+        "id": "diag_00002",
+        "severity": "error",
+        "domain": "schema",
+        "code": "MISSING_SECTION",
+        "message": "Missing <tests> section.",
+        "related_elements": [],
+        "observed": {},
+        "expected": {},
+        "suggested_actions": []
+      },
+      {
+        "id": "diag_00003",
+        "severity": "error",
+        "domain": "schema",
+        "code": "MISSING_SECTION",
+        "message": "Missing <simulation_profiles> section.",
+        "related_elements": [],
+        "observed": {},
+        "expected": {},
+        "suggested_actions": []
+      }
+    ]
+  },
+  "after": {
+    "errors": 3,
+    "warnings": 0,
+    "diagnostics": [
+      {
+        "id": "diag_00001",
+        "severity": "error",
+        "domain": "schema",
+        "code": "MISSING_SECTION",
+        "message": "Missing <metadata> section.",
+        "related_elements": [],
+        "observed": {},
+        "expected": {},
+        "suggested_actions": []
+      },
+      {
+        "id": "diag_00002",
+        "severity": "error",
+        "domain": "schema",
+        "code": "MISSING_SECTION",
+        "message": "Missing <tests> section.",
+        "related_elements": [],
+        "observed": {},
+        "expected": {},
+        "suggested_actions": []
+      },
+      {
+        "id": "diag_00003",
+        "severity": "error",
+        "domain": "schema",
+        "code": "MISSING_SECTION",
+        "message": "Missing <simulation_profiles> section.",
+        "related_elements": [],
+        "observed": {},
+        "expected": {},
+        "suggested_actions": []
+      }
+    ]
+  },
+  "resolved": [],
+  "introduced": []
+}

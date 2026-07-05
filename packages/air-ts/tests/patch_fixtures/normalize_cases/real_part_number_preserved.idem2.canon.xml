@@ -1,0 +1,8 @@
+<?xml version="1.0" ?>
+<system ir_version="0.1" name="s">
+  <components>
+    <component id="U1" part="LM1117" type="ldo">
+      <pin name="in" net="a"/>
+    </component>
+  </components>
+</system>

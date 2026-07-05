@@ -1,0 +1,20 @@
+<?xml version="1.0" ?>
+<system ir_version="0.1" name="s">
+  <analog>
+    <subsystem id="a1"/>
+    <subsystem id="a2"/>
+  </analog>
+  <tests>
+    <test id="t1">
+      <run duration="1ms"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="p">
+      <backend type="ngspice"/>
+      <run test="t1"/>
+      <include subsystem="a1"/>
+      <include subsystem="a2"/>
+    </profile>
+  </simulation_profiles>
+</system>

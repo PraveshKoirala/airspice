@@ -1,0 +1,1 @@
+<system name="s" ir_version="0.1"><components><component id="R1" type="resistor"><value>1k</value><pin name="1" node="a"/><pin name="2" ref="b"/></component></components></system>
