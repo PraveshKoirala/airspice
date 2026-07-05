@@ -1,0 +1,17 @@
+{
+  "circuit": "photoresistor_divider",
+  "profile": "analog_only",
+  "test": "ldr_10lux",
+  "outcome": "pass",
+  "require_backend": "ngspice",
+  "checks": [
+    {
+      "net": "ldr_sense",
+      "nominal_v": 2.5,
+      "min_v": 2.375,
+      "max_v": 2.625,
+      "basis": "LDR at 10 lux typical: R ~ 10 kOhm (GL5528 datasheet 10 lux range 8-20 kOhm, typical 10 kOhm). Tap = 5V * R_FIXED/(R_LDR + R_FIXED) = 5 * 10k/20k = 2.500V at the typical value. Window +/-5% [2.375, 2.625] reflects that a CdS cell is specified as a RANGE at 10 lux (the value is not exact like an NTC's R25); it still absorbs only a small part of the 8-20k spread, so the assertion tracks the typical build point. The sibling circuit photoresistor_divider_dark proves the tap collapses in darkness."
+    }
+  ],
+  "issue": null
+}

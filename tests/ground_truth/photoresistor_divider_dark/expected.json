@@ -1,0 +1,17 @@
+{
+  "circuit": "photoresistor_divider_dark",
+  "profile": "analog_only",
+  "test": "ldr_dark",
+  "outcome": "pass",
+  "require_backend": "ngspice",
+  "checks": [
+    {
+      "net": "ldr_sense",
+      "nominal_v": 0.0495,
+      "min_v": 0.045,
+      "max_v": 0.055,
+      "basis": "LDR in the dark: R >= 1 MOhm (GL5528 datasheet dark-resistance minimum). Tap = 5V * R_FIXED/(R_LDR + R_FIXED) = 5 * 10k/(1M + 10k) = 0.0495V. Compared to 2.500V at 10 lux, the tap collapsed as the top-leg resistance rose ~100x: LDR light-dependent behavior. Window +/-10% [0.045, 0.055] absorbs the '>= 1M' floor (a darker cell reads even lower) and solver reltol."
+    }
+  ],
+  "issue": null
+}

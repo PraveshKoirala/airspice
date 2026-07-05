@@ -1,0 +1,72 @@
+<system name="gt_i2c_sensor_stub" ir_version="0.1">
+  <metadata>
+    <title>Ground truth: behavioral I2C sensor stub (electrical-only)</title>
+    <description>An ATmega328 I2C controller on a 5V rail with an abstracted I2C sensor: two 4.7k SDA/SCL pull-ups to the rail and a generic_load (1mA) modelling the sensor's active supply draw. This exercises ONLY the electrical envelope of an I2C device -- rail, ground, open-drain pull-ups, supply current. The idle (undriven) SDA/SCL bus sits at the rail through the pull-ups (5.000V). The sensor's data value is out of analog scope (M8 firmware) and is deliberately NOT modelled.</description>
+    <author>issue-105</author>
+  </metadata>
+  <nets>
+    <net id="gnd" role="ground"/>
+    <net id="vcc" role="power" nominal_voltage="5V"/>
+    <net id="i2c_sda" role="digital_signal"/>
+    <net id="i2c_scl" role="digital_signal"/>
+  </nets>
+  <components>
+    <component id="R_PU_SDA" type="resistor">
+      <value>4.7k</value>
+      <pin name="1" net="vcc"/>
+      <pin name="2" net="i2c_sda"/>
+    </component>
+    <component id="R_PU_SCL" type="resistor">
+      <value>4.7k</value>
+      <pin name="1" net="vcc"/>
+      <pin name="2" net="i2c_scl"/>
+    </component>
+    <component id="U_SENSOR" type="generic_load" part="I2C_SENSOR_STUB">
+      <pin name="p" net="vcc"/>
+      <pin name="n" net="gnd"/>
+      <property name="current" value="1mA"/>
+    </component>
+    <component id="U_MCU" type="mcu" part="ATmega328P">
+      <pin name="VCC" net="vcc"/>
+      <pin name="GND" net="gnd"/>
+      <pin name="A4" net="i2c_sda" function="I2C_SDA"/>
+      <pin name="A5" net="i2c_scl" function="I2C_SCL"/>
+    </component>
+  </components>
+  <interfaces>
+    <interface id="i2c0" type="i2c">
+      <controller component="U_MCU" peripheral="I2C0"/>
+      <sda net="i2c_sda"/>
+      <scl net="i2c_scl"/>
+      <pullup net="i2c_sda" value="4.7k" to="vcc"/>
+      <pullup net="i2c_scl" value="4.7k" to="vcc"/>
+    </interface>
+  </interfaces>
+  <analog>
+    <subsystem id="i2c_electrical">
+      <uses component="R_PU_SDA"/>
+      <uses component="R_PU_SCL"/>
+      <uses component="U_SENSOR"/>
+      <probe id="probe_sda" net="i2c_sda" quantity="voltage"/>
+      <probe id="probe_scl" net="i2c_scl" quantity="voltage"/>
+    </subsystem>
+  </analog>
+  <tests>
+    <test id="i2c_idle_high">
+      <description>Idle (undriven) bus: pull-ups hold SDA and SCL at the 5V rail.</description>
+      <setup>
+        <set_voltage net="vcc" value="5V"/>
+      </setup>
+      <run duration="1ms"/>
+      <assert_voltage net="i2c_sda" min="4.95V" max="5.05V"/>
+      <assert_voltage net="i2c_scl" min="4.95V" max="5.05V"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="analog_only" default="true">
+      <backend type="ngspice"/>
+      <include subsystem="i2c_electrical"/>
+      <run test="i2c_idle_high"/>
+    </profile>
+  </simulation_profiles>
+</system>

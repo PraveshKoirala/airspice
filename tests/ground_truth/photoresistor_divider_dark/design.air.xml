@@ -1,0 +1,48 @@
+<system name="gt_photoresistor_divider_dark" ir_version="0.1">
+  <metadata>
+    <title>Ground truth: LDR (photoresistor) divider in the dark (R-vs-light shift)</title>
+    <description>The same GL5528 / fixed 10k divider off a 5V rail as photoresistor_divider, but the LDR value is now its dark resistance (1M, datasheet minimum). The tap collapses from 2.500V at 10 lux to ~0.0495V in the dark, demonstrating the light-dependent behavior. Behavioral parameterized-resistor stand-in.</description>
+    <author>issue-105</author>
+  </metadata>
+  <nets>
+    <net id="gnd" role="ground"/>
+    <net id="vcc" role="power" nominal_voltage="5V"/>
+    <net id="ldr_sense" role="analog_signal"/>
+  </nets>
+  <components>
+    <component id="R_LDR" type="resistor" part="LDR_GL5528">
+      <value>1M</value>
+      <pin name="1" net="vcc"/>
+      <pin name="2" net="ldr_sense"/>
+    </component>
+    <component id="R_FIXED" type="resistor">
+      <value>10k</value>
+      <pin name="1" net="ldr_sense"/>
+      <pin name="2" net="gnd"/>
+    </component>
+  </components>
+  <analog>
+    <subsystem id="divider">
+      <uses component="R_LDR"/>
+      <uses component="R_FIXED"/>
+      <probe id="probe_ldr" net="ldr_sense" quantity="voltage"/>
+    </subsystem>
+  </analog>
+  <tests>
+    <test id="ldr_dark">
+      <description>LDR in the dark: R >= 1M, tap ~ 0.0495V.</description>
+      <setup>
+        <set_voltage net="vcc" value="5V"/>
+      </setup>
+      <run duration="1ms"/>
+      <assert_voltage net="ldr_sense" min="0.045V" max="0.055V"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="analog_only" default="true">
+      <backend type="ngspice"/>
+      <include subsystem="divider"/>
+      <run test="ldr_dark"/>
+    </profile>
+  </simulation_profiles>
+</system>

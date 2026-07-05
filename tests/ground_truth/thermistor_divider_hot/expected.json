@@ -1,0 +1,17 @@
+{
+  "circuit": "thermistor_divider_hot",
+  "profile": "analog_only",
+  "test": "therm_50c",
+  "outcome": "pass",
+  "require_backend": "ngspice",
+  "checks": [
+    {
+      "net": "therm_sense",
+      "nominal_v": 3.686,
+      "min_v": 3.61,
+      "max_v": 3.76,
+      "basis": "NTC at 50 C: R(50C) = R25*exp(B*(1/323.15 - 1/298.15)) = 10k*exp(3977*(...)) ~ 3.563 kOhm (Beta model). Tap = 5V * 10k/(3.563k + 10k) = 3.686V. Vishay R-T table gives ~3.60 kOhm -> ~3.676V, so window +/-2% [3.61, 3.76] absorbs the documented Beta-vs-datasheet divergence away from 25 C. The tap rose from 2.500V (25 C) to ~3.69V (50 C): NTC negative-temperature-coefficient behavior."
+    }
+  ],
+  "issue": null
+}

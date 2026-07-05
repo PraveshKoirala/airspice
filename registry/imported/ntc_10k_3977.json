@@ -1,0 +1,27 @@
+{
+  "part": "NTC_10K_3977",
+  "type": "resistor",
+  "model_class": "thermistor_ntc",
+  "abstraction": "behavioral_parameterized_resistor",
+  "spice_supported": true,
+  "required_pins": ["1", "2"],
+  "value_required": true,
+  "nominal": {
+    "r25_ohm": 10000,
+    "r25_tolerance_pct": 5,
+    "beta_25_85_k": 3977,
+    "beta_tolerance_pct": 0.75,
+    "temp_range_c": [-40, 125]
+  },
+  "resistance_model": {
+    "law": "R(T) = R25 * exp(B * (1/T - 1/T25)), T,T25 in kelvin, T25 = 298.15 K",
+    "worked_points_ohm": {
+      "0C": 33900,
+      "25C": 10000,
+      "50C": 3563
+    },
+    "note": "The Beta (B) equation is an approximation valid within its 25-85 C fitting window; the datasheet R/R25 table is the reference for exact values, and the Beta result diverges by a few percent far from 25 C. In a build spec, the thermistor is emitted as an ordinary resistor whose <value> is the resistance at the temperature under test (compute R(T) from the law above, or read the datasheet R-T table). The 25 C point (R = R25 = 10 kOhm) is exact by definition."
+  },
+  "source": "Vishay NTCLE100E3103 datasheet (doc 29049), R25 = 10 kOhm +/-5%, B25/85 = 3977 K +/-0.75%. https://www.vishay.com/docs/29049/ntcle100.pdf",
+  "provenance_note": "Behavioral, NOT a datasheet-exact thermal SPICE model. It is a parameterized resistor: the emitter produces a plain R card from <value>, and the divider math is what a build spec asserts. No self-heating, no thermal time constant, no temperature port -- temperature is chosen by the spec author as the <value> at that temperature."
+}
