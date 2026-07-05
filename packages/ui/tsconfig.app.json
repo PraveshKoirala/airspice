@@ -25,6 +25,7 @@
        `ui` CI job. */
     "paths": {
       "air-ts": ["../air-ts/src/index.ts"],
+      "agent": ["../agent/src/index.ts"],
       "fast-xml-parser": ["./node_modules/fast-xml-parser"]
     },
 

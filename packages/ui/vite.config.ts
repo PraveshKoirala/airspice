@@ -13,6 +13,11 @@ export default defineConfig({
       // its worker import) directly -- no separate build/publish step, which
       // keeps the `ui` CI job (npm ci in packages/ui only) working.
       'air-ts': fileURLToPath(new URL('../air-ts/src/index.ts', import.meta.url)),
+      // The BYOK agent layer (packages/agent, issue #17) is consumed the same
+      // way: source-aliased, strict ESM, browser-safe, zero server. Vite compiles
+      // + bundles it directly so the `ui` CI job (npm ci in packages/ui only)
+      // needs no separate build/publish of the agent package.
+      'agent': fileURLToPath(new URL('../agent/src/index.ts', import.meta.url)),
       // air-ts source imports `fast-xml-parser`. Pin it to the UI's own copy so
       // Vite (and the worker bundle) resolves it from packages/ui/node_modules
       // -- packages/air-ts/node_modules is NOT installed in the `ui` CI job.

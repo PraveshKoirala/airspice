@@ -1013,6 +1013,151 @@ body {
   color: var(--accent-strong);
 }
 
+/* --- BYOK settings panel (issue #17) --- */
+.settings-panel {
+  max-width: 720px;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-field > span {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.settings-field select,
+.settings-field input {
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.settings-field input:disabled,
+.settings-field select:disabled {
+  opacity: 0.5;
+}
+
+.settings-key {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.settings-key .settings-field {
+  flex: 1 1 260px;
+}
+
+.settings-key-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.settings-key-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-hover);
+  color: var(--text-bright);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.settings-key-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.settings-key-actions button.danger {
+  color: var(--error);
+  border-color: var(--error);
+  background: transparent;
+}
+
+.settings-stored {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.settings-stored code {
+  color: var(--text-bright);
+}
+
+.settings-validate {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.settings-validate.ok {
+  color: var(--success);
+  border: 1px solid var(--success);
+}
+
+.settings-validate.error {
+  color: var(--error);
+  border: 1px solid var(--error);
+}
+
+.settings-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--warning);
+  background: color-mix(in srgb, var(--warning) 10%, transparent);
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+
+.settings-notice svg {
+  color: var(--warning);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.settings-notice p {
+  margin: 0;
+}
+
+.settings-counter {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.settings-counter strong {
+  color: var(--text-bright);
+}
+
 .message-content {
   color: var(--text-primary);
   font-size: 13px;

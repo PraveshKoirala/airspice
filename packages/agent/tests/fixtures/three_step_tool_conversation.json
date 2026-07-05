@@ -1,0 +1,23 @@
+{
+  "_comment": "Deterministic 3-step tool conversation for CI (issue #17 acceptance criterion). Ports the Python mock recipe idea: the model inspects the registry, validates a design, then reports success. Turn i replays on the (i+1)-th user message. Same fixture -> same events every run.",
+  "turns": [
+    [
+      { "type": "text-delta", "text": "Let me check the available parts first." },
+      { "type": "tool-call", "id": "call_1", "name": "list_registry_parts", "args": {} },
+      { "type": "usage", "inputTokens": 120, "outputTokens": 18 },
+      { "type": "done", "stopReason": "tool_use" }
+    ],
+    [
+      { "type": "text-delta", "text": "Now validating the proposed design." },
+      { "type": "tool-call", "id": "call_2", "name": "validate_design", "args": { "design_path": "generated/ui_work/design.air.xml" } },
+      { "type": "usage", "inputTokens": 210, "outputTokens": 24 },
+      { "type": "done", "stopReason": "tool_use" }
+    ],
+    [
+      { "type": "text-delta", "text": "The design validates cleanly. " },
+      { "type": "text-delta", "text": "Your regulator rail is ready." },
+      { "type": "usage", "inputTokens": 260, "outputTokens": 30 },
+      { "type": "done", "stopReason": "stop" }
+    ]
+  ]
+}

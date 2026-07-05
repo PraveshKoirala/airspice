@@ -1,0 +1,20 @@
+{
+  "_comment": "Recovery-ladder scenarios (issue #17 post-audit amendment): invalid JSON args, unknown tool name, and a schema mismatch. Each raw call is routed through the real parseToolArgs ladder so the mock exercises the SAME validation the live providers use. Truncated-stream mid-call is covered separately by the provider SSE tests.",
+  "turns": [
+    [
+      { "type": "text-delta", "text": "Calling a tool with broken JSON." },
+      { "type": "tool-call-raw", "id": "bad_1", "name": "validate_design", "rawArgs": "{ \"design_path\": " },
+      { "type": "done", "stopReason": "tool_use" }
+    ],
+    [
+      { "type": "text-delta", "text": "Calling a tool that does not exist." },
+      { "type": "tool-call-raw", "id": "bad_2", "name": "delete_everything", "rawArgs": "{}" },
+      { "type": "done", "stopReason": "tool_use" }
+    ],
+    [
+      { "type": "text-delta", "text": "Calling a real tool but missing a required field." },
+      { "type": "tool-call-raw", "id": "bad_3", "name": "validate_design", "rawArgs": "{ \"wrong_field\": 1 }" },
+      { "type": "done", "stopReason": "tool_use" }
+    ]
+  ]
+}
