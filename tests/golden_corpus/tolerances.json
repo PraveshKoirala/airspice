@@ -20,7 +20,7 @@
       "justification": "DIVERGENCE A (formalized honestly). On a numerically FLAT signal every sample time is a valid argmin/argmax, so the reported extremum-TIME is engine-arbitrary while the extremum VALUE is exact. Concrete corpus case: esp32_battery_sensor/battery_adc_nominal probes `battery_sense`, which is flat at 1.04211V across the ENTIRE `.tran 1u 500ms` window (0..0.5s); native ngspice 42 reports time_of_max=0s (first sample) and eecircuit 45.2 reports 2.28e-06s (a different equally-valid sample) — the VALUE 1.04211V is byte-identical. The abs tolerance is therefore applied ONLY to the `time_of_min`/`time_of_max` fields and is sized to span the whole transient window (max 500ms in the corpus), with 2x headroom -> 1.0s. It does NOT relax the extremum VALUE (compared at rtol) nor the report STRUCTURE (byte-exact), so it cannot mask a real stats bug: a signal that is NOT flat has a well-defined extremum time that both engines must agree on within this window, and the value/structure checks stay strict."
     },
     "time_of_max": {
-      "abs_tol_s": 1.0,
+      "abs_tol_s": 1e-9,
       "justification": "See time_of_min: same divergence A, same flat-signal engine-arbitrary argmax, same 1.0s window-spanning abs tolerance. Value and structure remain strict."
     }
   },
