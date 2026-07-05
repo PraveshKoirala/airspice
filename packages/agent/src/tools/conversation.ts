@@ -140,8 +140,24 @@ export async function runConversation(
       reason = "aborted";
       break;
     }
-    // Append the assistant's turn (text + any tool calls it made).
-    if (turn.text) messages.push({ role: "assistant", content: turn.text });
+    // Append the assistant's turn, PRESERVING its tool-use blocks (issue #101).
+    // A turn with tool calls must be replayed to the provider with EVERY tool
+    // call's id, so the `tool_result` blocks appended below reference valid ids.
+    // Flattening this to plain text (the old behavior) orphaned those ids and
+    // 400'd on Anthropic/OpenAI/Gemini the moment a tool_result was echoed back
+    // — which happens on any multi-tool-call turn (the i2c SDA+SCL case) or any
+    // multi-turn tool loop. Include EVERY call the model made this turn (well-
+    // formed AND malformed): each gets a `tool` reply below (or the turn aborts
+    // and no further provider round-trip occurs), so the ids stay balanced.
+    if (turn.toolCalls.length > 0) {
+      messages.push({
+        role: "assistant",
+        content: turn.text,
+        toolCalls: turn.toolCalls.map((c) => ({ id: c.id, name: c.name, args: c.args })),
+      });
+    } else if (turn.text) {
+      messages.push({ role: "assistant", content: turn.text });
+    }
 
     // --- No tool calls: the model gave a final answer. Done. -------------- //
     if (turn.toolCalls.length === 0) {
