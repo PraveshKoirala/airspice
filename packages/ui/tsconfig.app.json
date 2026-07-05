@@ -15,6 +15,19 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
+    /* The UI consumes the TypeScript engine (packages/air-ts) through its
+       source entry. This path mapping mirrors the Vite alias in vite.config.ts
+       so `import { ... } from 'air-ts'` type-checks (issue #10 / epic #6).
+       air-ts source imports `fast-xml-parser`; since we type-check its .ts
+       sources here (not a prebuilt .d.ts), map that dep to the UI's own copy so
+       it resolves from packages/ui/node_modules regardless of the importing
+       file's directory -- packages/air-ts/node_modules is NOT installed in the
+       `ui` CI job. */
+    "paths": {
+      "air-ts": ["../air-ts/src/index.ts"],
+      "fast-xml-parser": ["./node_modules/fast-xml-parser"]
+    },
+
     /* Linting */
     "noUnusedLocals": true,
     "noUnusedParameters": true,
