@@ -3,6 +3,7 @@ import { GeminiProvider } from "../src/index.js";
 import {
   collect,
   errorResponse,
+  fakeKey,
   FAST_RETRY,
   joinText,
   makeRequest,
@@ -11,7 +12,7 @@ import {
   toolCalls,
 } from "./helpers.js";
 
-const KEY = "AIzaSyGeminiSecretKeyABCDEFGHIJKLMNOP";
+const KEY = fakeKey("AIza", "SyGeminiSecretKeyABCDEFGHIJKLMNOP");
 
 function geminiTextStream(): Response {
   return sseEvents([

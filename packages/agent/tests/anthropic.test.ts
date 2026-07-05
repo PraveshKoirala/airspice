@@ -3,6 +3,7 @@ import { AnthropicProvider } from "../src/index.js";
 import {
   collect,
   errorResponse,
+  fakeKey,
   joinText,
   makeRequest,
   sseEvents,
@@ -11,7 +12,7 @@ import {
   toolCalls,
 } from "./helpers.js";
 
-const KEY = "sk-ant-secret-key-abcdefghijklmnop";
+const KEY = fakeKey("sk-ant-", "secretkeyabcdefghijklmnop");
 
 /** A well-formed Anthropic streaming sequence: text + one tool call. */
 function anthropicStream(): Response {

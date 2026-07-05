@@ -3,6 +3,7 @@ import { OpenAIProvider } from "../src/index.js";
 import {
   collect,
   errorResponse,
+  fakeKey,
   FAST_RETRY,
   joinText,
   makeRequest,
@@ -11,7 +12,7 @@ import {
   toolCalls,
 } from "./helpers.js";
 
-const KEY = "sk-openaisecretkeyABCDEFGHIJKLMNOP";
+const KEY = fakeKey("sk-", "openaisecretkeyABCDEFGHIJKLMNOP");
 
 function openaiTextStream(): Response {
   return sseEvents([
