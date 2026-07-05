@@ -1,0 +1,60 @@
+name: agent
+
+# CI for the browser BYOK agent layer (packages/agent, issue #17). Modeled on
+# air-ts.yml: a SEPARATE workflow that builds the package under strict TypeScript
+# and runs the full Vitest suite. Every test uses a mocked `fetch` and an
+# in-memory Storage stub -- NO network, NO browser, NO provider keys -- so the
+# job is deterministic and CI-safe. Real-provider end-to-end validation is
+# manual (see the PR checklist); it is intentionally NOT run here.
+#
+# Maintainer note: once green, `agent` can be added to the required status checks
+# for `main` alongside guardrails / core-py / ui / air-ts.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Newer pushes to the same ref cancel in-flight runs.
+concurrency:
+  group: agent-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  agent:
+    name: agent (build + vitest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/agent
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: packages/agent/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Strict TypeScript: `tsc -b` (src) + `tsc -p tsconfig.test.json` (tests)
+      # both fail on any type error.
+      - name: Typecheck (src + tests, strict)
+        run: npm run typecheck
+
+      # `npm run build` == `tsc -b`; emits dist/ and fails on any TS error.
+      - name: Build
+        run: npm run build
+
+      # Full Vitest suite: mock provider 3-step determinism + recovery ladder,
+      # per-provider happy path / streaming reassembly / tool-call parsing / 429
+      # + 5xx retry / abort, the shared backoff + SSE reader, the localStorage
+      # key vault + verbatim notice, and the no-key-leak redaction test.
+      - name: Test (vitest)
+        run: npm test

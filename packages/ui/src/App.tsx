@@ -9,6 +9,7 @@ import XmlEditor from './components/Editor';
 import Graph from './components/Graph';
 import ResultPanel from './components/ResultPanel';
 import ChatRepl from './components/ChatRepl';
+import SettingsPanel from './components/SettingsPanel';
 import Landing from './pages/Landing';
 import type { ApiError, ChatHistoryEntry, Diagnostic, ValidationResult } from './types/api';
 import { getEngine, ENGINE_MODE } from './engine';
@@ -466,6 +467,9 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
         'Validated output is written to generated/ui_fixed.air.xml.',
         'Open the validation and simulation tabs after applying a patch.',
       ]} />;
+    }
+    if (activeTab === 'settings') {
+      return <SettingsPanel />;
     }
     return null;
   };

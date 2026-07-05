@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileCode, Activity, Play, CheckCircle, Bug, CircuitBoard, Sun, Moon, Cpu, FolderTree } from 'lucide-react';
+import { FileCode, Activity, Play, CheckCircle, Bug, CircuitBoard, Sun, Moon, Cpu, FolderTree, Settings } from 'lucide-react';
 
 interface SidebarProps {
   activeTab: string;
@@ -17,6 +17,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, theme, toggl
     { id: 'artifacts', icon: FolderTree, label: 'Artifacts' },
     { id: 'validation', icon: CheckCircle, label: 'Validation' },
     { id: 'repair', icon: Bug, label: 'Repair' },
+    { id: 'settings', icon: Settings, label: 'Settings' },
   ];
 
   return (
