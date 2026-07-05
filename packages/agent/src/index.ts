@@ -56,3 +56,51 @@ export {
   schemaRef,
 } from "./repair.js";
 export type { ParsedToolArgs } from "./repair.js";
+
+// Browser agent tool runtime (issue #18): the deterministic validation gate
+// (the single write path), the tool registry + runtime, version-stamped proposal
+// staging, loop budgets, bounded tool results, ported prompts, and the
+// conversation runner. See ./tools/index.ts for the full surface.
+export {
+  gateDesign,
+  AGENT_TOOLS,
+  AGENT_TOOL_NAMES,
+  READ_WAVEFORM_MAX_POINTS,
+  ToolRuntime,
+  isStale,
+  resolveApply,
+  BudgetCounter,
+  DEFAULT_BUDGET,
+  capToolResult,
+  capString,
+  stableStringify,
+  summarizeStderr,
+  DEFAULT_RESULT_CHAR_CAP,
+  airContract,
+  chatSystemInstruction,
+  GOLDEN_DESIGN,
+  runConversation,
+} from "./tools/index.js";
+export type {
+  ValidatedDesign,
+  GateResult,
+  EngineHooks,
+  GateDiagnostic,
+  PatchPreviewResult,
+  WaveformSummary,
+  SimulationReportLike,
+  RegistryListing,
+  ToolName,
+  DesignSnapshot,
+  ToolExecution,
+  ToolRuntimeOptions,
+  StagedProposal,
+  ProposalSource,
+  ApplyOutcome,
+  BudgetLimits,
+  BudgetUsage,
+  BudgetExhaustion,
+  RunnerEvent,
+  RunEndReason,
+  RunConversationOptions,
+} from "./tools/index.js";
