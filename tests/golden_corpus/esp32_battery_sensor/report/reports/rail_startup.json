@@ -6,6 +6,21 @@
     "waveforms/rail_startup_battery_sense.csv"
   ],
   "backend": "ngspice",
+  "convergence": {
+    "aids_required": false,
+    "attempts": [
+      {
+        "converged": true,
+        "name": "as-written",
+        "options": [],
+        "rung": 1
+      }
+    ],
+    "converged": true,
+    "note": null,
+    "rung": 1,
+    "terminal": false
+  },
   "diagnostics": [],
   "measurement_stats": {
     "3v3": {
