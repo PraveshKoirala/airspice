@@ -176,6 +176,54 @@ class SelfHealingRepairTests(unittest.TestCase):
         self.assertIn("error", result)
 
 
+class SourceEmittedCodeTests(unittest.TestCase):
+    """Exercise the two raw-dict diagnostic codes agent.py emits directly, so
+    they are covered by the registry checker's dead-code check (check 2) and the
+    source-emit check (check 3) -- see registry/diagnostics.json (issue #67).
+
+    Both codes are emitted as raw diagnostic dicts (NOT through
+    DiagnosticBuilder): {"severity": "error", "code": "...", "message": str(exc)}.
+    """
+
+    def test_validate_design_xml_emits_xml_parse_error(self) -> None:
+        # Malformed input makes normalize/parse raise -> the raw-dict
+        # XML_PARSE_ERROR is returned (agent.py:validate_design_xml).
+        ok, diagnostics = agent.validate_design_xml("this is not valid air xml <<<")
+        self.assertFalse(ok)
+        codes = {d["code"] for d in diagnostics}
+        self.assertIn("XML_PARSE_ERROR", codes)
+        emitted = next(d for d in diagnostics if d["code"] == "XML_PARSE_ERROR")
+        self.assertEqual(emitted["severity"], "error")
+
+    def test_run_ai_repair_emits_patch_apply_error(self) -> None:
+        # A client whose proposed patch is not well-formed XML makes _apply_patch
+        # raise -> the raw-dict PATCH_APPLY_ERROR is recorded (agent.py:run_ai_repair).
+        class BadPatchClient:
+            def propose_patch(self, context, prior_error=None):
+                return "this is not xml, ET.fromstring will raise <<<"
+
+            def generate_design(self, *args, **kwargs):
+                return ""
+
+        original = agent._make_client
+        agent._make_client = lambda provider, model, design, report: (
+            BadPatchClient() if provider == "gemini" else original(provider, model, design, report)
+        )
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                result = agent.run_ai_repair(
+                    FAILING,
+                    Path(tmp) / "p.xml",
+                    apply_out=Path(tmp) / "fixed.air.xml",
+                    provider="gemini",
+                )
+        finally:
+            agent._make_client = original
+        self.assertFalse(result["success"])
+        codes = {d["code"] for d in result["diagnostics"]}
+        self.assertIn("PATCH_APPLY_ERROR", codes)
+
+
 class ToolSafetyTests(unittest.TestCase):
     def test_write_firmware_rejects_traversal(self) -> None:
         self.assertTrue(agent.write_firmware_file("/etc/passwd", "x").startswith("Error"))

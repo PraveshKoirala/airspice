@@ -1,10 +1,15 @@
 name: diagnostics-registry
 
-# Enforces the diagnostics registry (issue #44) in BOTH directions:
+# Enforces the diagnostics registry (issue #44, extended by #67) in THREE
+# directions:
 #   1. every diagnostic code in the golden corpus / test expectations has a
 #      registry entry (registry/diagnostics.json);
 #   2. every ACTIVE registry entry is exercised by at least one test/fixture
 #      (dead codes fail; the `pending` section is exempt until its codes land).
+#   3. every code emitted directly in the oracle source
+#      (packages/core/src/air/**.py) has a registry entry -- an AST scan of the
+#      emit sites, so a new unregistered emit fails CI before it reaches a
+#      fixture (issue #67).
 #
 # The checker is dependency-free stdlib, so this job is fast and needs no
 # ngspice/node. It runs the checker's own --self-test first (a checker that
@@ -55,11 +60,12 @@ jobs:
           python-version: "3.12"
 
       # Self-test first: prove the checker has teeth (unregistered code fails
-      # check 1, orphan is flagged by check 2, pending section is exempt).
+      # check 1, orphan is flagged by check 2, pending section is exempt, and an
+      # unregistered source-emitted code fails check 3).
       - name: Registry checker self-test
         run: python scripts/check_diagnostics.py --self-test
 
-      # The real bidirectional check against the committed registry, corpus, and
-      # tests.
-      - name: Check diagnostics registry (both directions)
+      # The real check against the committed registry, corpus, tests, and the
+      # oracle source emit sites (all three directions).
+      - name: Check diagnostics registry (all directions)
         run: python scripts/check_diagnostics.py
