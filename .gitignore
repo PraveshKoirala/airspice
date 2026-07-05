@@ -22,3 +22,13 @@ venv/
 # otherwise swallow its files, so re-include the whole corpus tree. Everything
 # under it is intentional and byte-checked in CI; never hand-edit it.
 !tests/golden_corpus/**
+
+# The build-benchmark harness (issue #107) lives in directories literally named
+# `build`, which the `build/` ignore above (meant for compiled firmware/artifacts)
+# would otherwise swallow. Re-include these committed SOURCE trees — the harness
+# code, its mock CI test, and the build_specs corpus README's golden dir. Only the
+# directory itself must be re-included for git to descend into it.
+!packages/agent/bench/build/
+!packages/agent/bench/build/**
+!packages/agent/tests/build/
+!packages/agent/tests/build/**

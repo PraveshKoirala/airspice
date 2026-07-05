@@ -18,5 +18,9 @@
       "fast-xml-parser": ["./node_modules/fast-xml-parser"]
     }
   },
-  "include": ["run.ts", "runner.ts", "engine.ts", "cases.ts"]
+  "include": [
+    "run.ts", "runner.ts", "engine.ts", "cases.ts",
+    "build/run.ts", "build/runner.ts", "build/engine.ts", "build/loop.ts",
+    "build/context.ts", "build/scorer.ts", "build/specs.ts", "build/mock_fixtures.ts"
+  ]
 }

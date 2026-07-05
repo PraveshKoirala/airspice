@@ -1,0 +1,75 @@
+{
+  "provider": "anthropic",
+  "model": null,
+  "mode": "live",
+  "date": "2026-07-05",
+  "totalSpecs": 5,
+  "builtCount": 0,
+  "cases": [
+    {
+      "id": "adc_esp32c3_lipo_divider",
+      "category": "adc_frontend",
+      "fidelity": "faithful",
+      "built": false,
+      "stopReason": "no_progress",
+      "failedCriterion": "sim_assertion",
+      "turns": 3,
+      "tokens": 267720,
+      "simBackend": "ngspice",
+      "simValue": null,
+      "message": "Stopped: the design did not change (no progress) after 3 iteration(s)."
+    },
+    {
+      "id": "led_esp32c3_single",
+      "category": "led_driver",
+      "fidelity": "faithful",
+      "built": false,
+      "stopReason": "no_progress",
+      "failedCriterion": "firmware_intent",
+      "turns": 4,
+      "tokens": 256606,
+      "simBackend": null,
+      "simValue": null,
+      "message": "Stopped: the design did not change (no progress) after 4 iteration(s)."
+    },
+    {
+      "id": "opamp_esp32c3_noninv_amp",
+      "category": "opamp",
+      "fidelity": "abstracted",
+      "built": false,
+      "stopReason": "no_build",
+      "failedCriterion": null,
+      "turns": 1,
+      "tokens": 23310,
+      "simBackend": null,
+      "simValue": null,
+      "message": "Stopped: the model staged no design that passed the gate after 1 iteration(s)."
+    },
+    {
+      "id": "pwr_stm32_revpol_ldo",
+      "category": "power",
+      "fidelity": "faithful",
+      "built": false,
+      "stopReason": "no_progress",
+      "failedCriterion": "sim_assertion",
+      "turns": 2,
+      "tokens": 54752,
+      "simBackend": "ngspice",
+      "simValue": null,
+      "message": "Stopped: the design did not change (no progress) after 2 iteration(s)."
+    },
+    {
+      "id": "sw_atmega_bss138_lowside",
+      "category": "switching",
+      "fidelity": "faithful",
+      "built": false,
+      "stopReason": "scorer_error",
+      "failedCriterion": null,
+      "turns": 1,
+      "tokens": 72290,
+      "simBackend": null,
+      "simValue": null,
+      "message": "Stopped: the objective scorer toolchain failed after 1 iteration(s) (not an agent failure)."
+    }
+  ]
+}
