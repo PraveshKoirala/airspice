@@ -108,6 +108,14 @@ jobs:
       - name: Install dependencies (workspaces, root)
         run: npm ci
 
+      # Build the sibling workspace packages so TypeScript resolution inside the
+      # ui harness finds their real .d.ts under node_modules/<name>/dist.
+      - name: Build workspace deps (air-ts, agent, sim-wasm)
+        run: |
+          npm --workspace air-ts run build
+          npm --workspace agent run build
+          npm --workspace sim-wasm run build
+
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:

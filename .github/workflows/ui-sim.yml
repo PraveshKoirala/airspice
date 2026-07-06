@@ -63,6 +63,16 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: npm ci
 
+      # Build the sibling workspace packages so TypeScript resolution inside the
+      # ui harness finds their real .d.ts under node_modules/<name>/dist. Vite
+      # bundles from source via aliases, but tsc still needs the .d.ts.
+      - name: Build workspace deps (air-ts, agent, sim-wasm)
+        working-directory: ${{ github.workspace }}
+        run: |
+          npm --workspace air-ts run build
+          npm --workspace agent run build
+          npm --workspace sim-wasm run build
+
       # Real Chromium, real Web Worker, real WASM ngspice: run every corpus
       # design through the full browser pipeline and diff its report JSON against
       # the oracle (structure byte-exact, numbers within rtol 1e-3).

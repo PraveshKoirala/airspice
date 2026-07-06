@@ -107,6 +107,18 @@ jobs:
       - name: Lint
         run: npm --workspace ui run lint
 
+      # Build the sibling workspace packages first so ui's `tsc -b` finds their
+      # real .d.ts under node_modules/<name>/dist (workspace symlink -> the built
+      # dist). Vite bundles from SOURCE via the aliases in vite.config.ts, but
+      # TypeScript resolves the bare `air-ts` / `agent` / `sim-wasm` specifiers
+      # through package.json `types` -> `./dist/index.d.ts`, so they need to
+      # exist.
+      - name: Build workspace deps (air-ts, agent, sim-wasm)
+        run: |
+          npm --workspace air-ts run build
+          npm --workspace agent run build
+          npm --workspace sim-wasm run build
+
       # `npm run build` == `tsc -b && vite build`; fails on any TS or build error.
       - name: Build
         run: npm --workspace ui run build
