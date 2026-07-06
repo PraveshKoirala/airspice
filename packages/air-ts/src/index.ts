@@ -180,6 +180,7 @@ export type {
   SimulationReport,
   SimulationResult,
   ReportInputs,
+  LadderInput,
 } from "./sim/report.js";
 
 // Differential-fuzzer outcome reporting (for #43).

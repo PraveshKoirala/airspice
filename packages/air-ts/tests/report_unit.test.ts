@@ -213,6 +213,81 @@ describe("convergence section: honest as-written (browser has no #45 ladder)", (
   });
 });
 
+describe("convergence section: ladder outcome (issue #94, browser ladder)", () => {
+  it("rung-1 ladder win -> byte-identical to the pre-#94 rung-1 section", () => {
+    const c = convergenceSection(true, true, {
+      attempts: [{ rung: 1, name: "as-written", options: [], converged: true }],
+      winningRung: 1,
+    });
+    expect(c).toEqual({
+      attempts: [{ rung: 1, name: "as-written", options: [], converged: true }],
+      converged: true,
+      rung: 1,
+      aids_required: false,
+      terminal: false,
+      note: null,
+    });
+  });
+
+  it("rung 2 win -> aids_required with the standard 'numerical aids required' note", () => {
+    const c = convergenceSection(true, true, {
+      attempts: [
+        { rung: 1, name: "as-written", options: [], converged: false },
+        { rung: 2, name: "gmin stepping", options: ["gminsteps=1", "itl1=500"], converged: true },
+      ],
+      winningRung: 2,
+    });
+    expect(c.converged).toBe(true);
+    expect(c.rung).toBe(2);
+    expect(c.aids_required).toBe(true);
+    expect(c.terminal).toBe(false);
+    expect(c.note).toBe(
+      "numerical aids required (rung 2: gmin stepping); accuracy may be reduced - see docs/convergence_ladder.md",
+    );
+    expect(c.attempts).toHaveLength(2);
+    expect(c.attempts[1]!.options).toEqual(["gminsteps=1", "itl1=500"]);
+  });
+
+  it("rung 4 win -> the note additionally discloses the relaxed reltol", () => {
+    const c = convergenceSection(true, true, {
+      attempts: [
+        { rung: 1, name: "as-written", options: [], converged: false },
+        { rung: 2, name: "gmin stepping", options: ["gminsteps=1", "itl1=500"], converged: false },
+        { rung: 3, name: "source stepping", options: ["srcsteps=10", "gminsteps=1", "itl1=500"], converged: false },
+        { rung: 4, name: "Gear + relaxed reltol",
+          options: ["method=gear", "reltol=0.005", "srcsteps=10", "gminsteps=1", "itl1=500", "itl4=100"],
+          converged: true },
+      ],
+      winningRung: 4,
+    });
+    expect(c.rung).toBe(4);
+    expect(c.aids_required).toBe(true);
+    expect(c.note).toContain("rung 4: Gear + relaxed reltol");
+    expect(c.note).toContain("error tolerance was relaxed one notch");
+  });
+
+  it("terminal ladder (all 4 rungs failed) -> honest topology-directed terminal", () => {
+    const c = convergenceSection(true, false, {
+      attempts: [
+        { rung: 1, name: "as-written", options: [], converged: false },
+        { rung: 2, name: "gmin stepping", options: ["gminsteps=1", "itl1=500"], converged: false },
+        { rung: 3, name: "source stepping", options: ["srcsteps=10", "gminsteps=1", "itl1=500"], converged: false },
+        { rung: 4, name: "Gear + relaxed reltol",
+          options: ["method=gear", "reltol=0.005", "srcsteps=10", "gminsteps=1", "itl1=500", "itl4=100"],
+          converged: false },
+      ],
+      winningRung: null,
+    });
+    expect(c.converged).toBe(false);
+    expect(c.terminal).toBe(true);
+    expect(c.rung).toBeNull();
+    expect(c.aids_required).toBe(false);
+    expect(c.note).toContain("topology");
+    // All 4 rungs are recorded, honestly.
+    expect(c.attempts).toHaveLength(4);
+  });
+});
+
 describe("waveformCsv: FORMAT parity with the oracle's canonical CSV", () => {
   it("header, comma columns, CPython float repr, LF endings, trailing newline", () => {
     const csv = waveformCsv("mid", [
