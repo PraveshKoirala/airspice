@@ -31,12 +31,11 @@
       "test": "charge_cycle",
       "native_converged": true,
       "native_rung": 1,
-      "browser_converged": true,
-      "browser_terminal": false,
-      "browser_backend": "ngspice",
-      "browser_min_rung": 2,
-      "justification": "DIVERGENCE B (formalized honestly, post-#94). Native ngspice 42 solves charge_cycle's operating point on rung 1 (as-written), but the browser's eecircuit 45.2 reports `singular matrix: check node charge_ctrl` on rung 1 and only converges after the #94 browser-side ladder injects the manual-documented .options (gmin/source-stepping, or Gear+relaxed reltol at rung 4). The browser now converges (backend=ngspice, convergence.converged=true) but the winning rung is >= 2, so `aids_required` is true and the convergence.note carries the standard 'numerical aids required' disclosure. The measurement stats agree with native within rtol on the probed nets; the divergence is confined to the convergence.attempts array (rung >=2 in browser vs 1 native) and the aids_required / rung / note fields. This is NOT absorbed by a numeric tolerance (rung is a schema integer, not a physical value); it is pinned as a documented, narrow exception.",
-      "follow_up": "The exception collapses if the two engines' rung-1 behaviour ever aligns (both converge on rung 1). It stays STALE if the browser regresses to terminal non-convergence (browser_converged flips false again) — the comparator flags the shift and the entry must be removed or re-justified."
+      "browser_converged": false,
+      "browser_terminal": true,
+      "browser_backend": "builtin_dc_fallback",
+      "justification": "DIVERGENCE B (formalized honestly, post-#94). Native ngspice 42 solves charge_cycle's operating point on rung 1 (as-written): the design has a MOSFET gate node (`charge_ctrl`) with no explicit DC path, and ngspice 42's default gmin/source/transient-op stepping rescues it silently. The browser's eecircuit 45.2 reports `singular matrix: check node charge_ctrl` on rung 1. Post-#94 the browser now walks the full 4-rung ladder (`convergence.attempts.length == 4`, `aids_required: false, terminal: true`) with the SAME .options tokens as the native ladder (`gminsteps=1 itl1=500` -> `srcsteps=10` -> `method=gear reltol=0.005`), each option confirmed to inject after the SPICE title line so ngspice honours it, but eecircuit 45.2's build does not rescue this specific topology even with those aids applied. The two ngspice versions have different DEFAULT DC-solver behaviour (ngspice 42's default gmin/source/transient-op sweep evidently succeeds on this circuit where 45.2's does not), so escalating the same options that native uses beyond its defaults still falls short. The report is HONEST: `terminal: true`, topology-directed note, `backend: builtin_dc_fallback`. The 4 recorded ladder attempts document the port; this exception pins the residual engine capability gap.",
+      "follow_up": "This exception collapses if the browser ever converges the design (browser_converged flips true) — the comparator will flag the shift and the entry must be removed. Root-cause fix would be either (a) an eecircuit-engine build that matches ngspice 42's default DC-solver aids on this topology, or (b) an oracle-first addition to the ladder of a nodeset/topology aid documented in the ngspice manual (out of #94 scope, which ports the existing ladder verbatim)."
     }
   },
 

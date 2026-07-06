@@ -45,9 +45,12 @@
  * disclosure on a rung-4 win. For every corpus design that converges on rung 1
  * both sides, the browser's convergence section is byte-identical to the
  * oracle's. A design where the browser converges on a HIGHER rung than native
- * (or vice-versa) legitimately diverges in this section; the parity job's
- * ``expected_divergences`` pins that delta narrowly. We do NOT fabricate a
- * ladder outcome — the ladder is walked for real and its true winner is
+ * legitimately diverges in this section; the parity job's
+ * ``expected_divergences`` pins that delta narrowly. When ALL rungs still fail
+ * (a real engine-capability gap between ngspice 42 and eecircuit 45.2), the
+ * browser reports HONEST `terminal: true` with the full 4-attempt array — the
+ * port is proven, the gap is disclosed. We do NOT fabricate a ladder outcome
+ * — the ladder is walked for real and its true winner (or true terminal) is
  * reported.
  */
 

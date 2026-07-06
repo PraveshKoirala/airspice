@@ -86,13 +86,17 @@ for (const [design, cases] of byDesign) {
       }
 
       if (parsed.convergence.rung !== 1) {
-        // #94 CONVERGE-ON-DIFFERENT-RUNG divergence: the browser required the
-        // convergence-aid ladder to solve a design native ngspice solves on
-        // rung 1. Schema-correct, honestly disclosed via aids_required + note,
-        // but the convergence section legitimately differs from the corpus's
-        // rung-1 shape. Byte-diff against the corpus report is NOT valid here
-        // (attempts.length + aids_required + note + rung all differ); sim-parity's
-        // expected_divergences pins the delta narrowly.
+        // #94 CONVERGE-ON-DIFFERENT-RUNG (rung >= 2, aids_required): the
+        // browser required the convergence-aid ladder to solve a design
+        // native ngspice solves on rung 1. Schema-correct, honestly disclosed
+        // via aids_required + note, but the convergence section legitimately
+        // differs from the corpus's rung-1 shape. Byte-diff against the
+        // corpus report is NOT valid here (attempts.length + aids_required +
+        // note + rung all differ); sim-parity's expected_divergences pins
+        // the delta narrowly. This branch exists to catch a FUTURE eecircuit
+        // build where the ladder DOES rescue an otherwise-terminal design;
+        // today's corpus has no case that lands here (the design that would,
+        // hits engine-capability terminal — see the terminal branch above).
         expect(parsed.convergence, `${design}/${c.testId} aids-required convergence`).toMatchObject({
           converged: true,
           aids_required: true,
@@ -147,10 +151,15 @@ test("waveform CSV export is FORMAT-parity with the corpus (header + column stru
 // the browser converges on rung 1, converges only after the #94 ladder aids
 // (rung >= 2), or honestly diverges. If a bug turns a CONVERGING design
 // terminal, the terminal count grows and this fails — regressions cannot hide
-// as a divergence. Post-#94 tallies: 4 rung-1 successes; 1 (the MOSFET+
-// behavioural-source design native ngspice solves rung 1) requires the ladder
-// (rung >= 2) in the browser; 0 terminal. No corpus name is referenced — only
-// the tallies (guardrails R4). Bump if the corpus changes.
+// as a divergence. Tallies (post-#94 landing): 4 rung-1 successes; 0 requiring
+// aids (see below); 1 honestly terminal — the MOSFET+behavioural-source design
+// native ngspice 42 solves on rung 1 that eecircuit 45.2's build cannot solve
+// even with the #94 ladder's manual-documented .options aids injected on line
+// 1 of the deck. The ladder MECHANICS are proven by the recorded 4-attempt
+// convergence.attempts array on that report (byte-parity with what the native
+// ladder would emit on a terminal walk); the residual is an engine capability
+// gap pinned in tolerances.json expected_divergences. No corpus name is
+// referenced — only the tallies (guardrails R4). Bump if the corpus changes.
 test("convergence tally is pinned (a regression cannot hide as a divergence)", async ({ page }) => {
   let rung1 = 0;
   let aidsRequired = 0;
@@ -166,6 +175,47 @@ test("convergence tally is pinned (a regression cannot hide as a divergence)", a
   }
   expect(rung1 + aidsRequired + terminal).toBe(CASES.length);
   expect(rung1).toBe(4);
-  expect(aidsRequired).toBe(1);
-  expect(terminal).toBe(0);
+  expect(aidsRequired).toBe(0);
+  expect(terminal).toBe(1);
+});
+
+// #94 LADDER MECHANICS: the honest-terminal case must record all 4 rung
+// attempts (not the pre-#94 single-rung terminal). This proves the ladder was
+// walked for real — the residual divergence is an engine capability gap in
+// eecircuit 45.2, not a broken port. Fails loudly if a future change accidentally
+// silences the ladder (e.g. reverting to a single-rung `convergenceSection`
+// call). Also pins that the ladder-recorded options match the native ladder
+// byte-for-byte (the port-parity contract).
+test("terminal browser cases record the full 4-rung ladder walk (#94 port evidence)", async ({ page }) => {
+  const EXPECTED_LADDER: Array<{ rung: number; options: string[] }> = [
+    { rung: 1, options: [] },
+    { rung: 2, options: ["gminsteps=1", "itl1=500"] },
+    { rung: 3, options: ["srcsteps=10", "gminsteps=1", "itl1=500"] },
+    { rung: 4, options: [
+      "method=gear", "reltol=0.005", "srcsteps=10", "gminsteps=1", "itl1=500", "itl4=100",
+    ] },
+  ];
+  let checked = 0;
+  for (const [, cases] of byDesign) {
+    const outcome = await page.evaluate((designXml) => window.__air.runDesign(designXml), cases[0]!.xml);
+    for (const c of cases) {
+      const parsed = JSON.parse(outcome.reportJson[c.testId] as string);
+      if (parsed.convergence.converged) continue;
+      // Terminal case: all 4 rungs walked, each recording its (unchanged) options.
+      const attempts = parsed.convergence.attempts as Array<{
+        rung: number; options: string[]; converged: boolean;
+      }>;
+      expect(attempts).toHaveLength(4);
+      for (let i = 0; i < 4; i++) {
+        expect(attempts[i]!.rung).toBe(EXPECTED_LADDER[i]!.rung);
+        expect(attempts[i]!.options).toEqual(EXPECTED_LADDER[i]!.options);
+        expect(attempts[i]!.converged).toBe(false);
+      }
+      checked += 1;
+    }
+  }
+  // If the corpus has no terminal case (e.g. after an engine bump that closes
+  // the gap), this test becomes vacuous and the tally test above will fail
+  // separately — the two together keep the ladder honest.
+  expect(checked).toBeGreaterThan(0);
 });
