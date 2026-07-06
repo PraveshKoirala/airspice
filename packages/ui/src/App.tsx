@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import type { Node, Edge } from 'reactflow';
@@ -8,9 +8,29 @@ import Toolbar from './components/Toolbar';
 import XmlEditor from './components/Editor';
 import Graph from './components/Graph';
 import Inspector from './schematic/Inspector';
+import Palette from './schematic/Palette';
 import type { GuiHint, SchematicIR } from './schematic/types';
 import { parse as parseAir } from 'air-ts';
-import { runGate, saveHintsPatch } from './schematic/patches';
+import { saveHintsPatch } from './schematic/patches';
+import { commitPatch } from './schematic/gate';
+import type { WireSource, WireTarget } from './schematic/Renderer';
+import {
+  disconnectPinPatch,
+  deleteComponentPatch,
+  deleteNetPatch,
+  nextAutoNetId,
+  reassignPinPatch,
+  connectPinsWithNewNetPatch,
+} from './schematic/wiring';
+import {
+  coalesceUserXml,
+  flushCoalescedEdit,
+  performRedo,
+  performUndo,
+  pushHistoryEntry,
+  resetHistory,
+  useHistoryStore,
+} from './schematic/history';
 import ResultPanel from './components/ResultPanel';
 import ChatRepl from './components/ChatRepl';
 import RepairPanel from './components/RepairPanel';
@@ -197,6 +217,7 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
     // Seeding is a one-time init; setUserXml is stable (store setter).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -210,6 +231,86 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
   const [agentProvider, setAgentProvider] = useState<NetworkProviderId | 'mock'>('mock');
   const [agentModel, setAgentModel] = useState<string | undefined>(undefined);
   const malformedCount = useAgentSettings((s) => s.malformedCount);
+
+  // Undo/redo keyboard binding (issue #24 D5). Ctrl+Z / Cmd+Z undoes,
+  // Ctrl+Shift+Z / Ctrl+Y / Cmd+Shift+Z redoes. Registered at capture
+  // phase so it fires ahead of Monaco's own binding.
+  //
+  // Any pending typing-coalesce entry is FLUSHED before the undo runs so
+  // a mid-type Ctrl+Z steps back over the whole in-flight edit, not the
+  // future never-flushed pre-image.
+  const undoDepth = useHistoryStore((s) => s.undoStack.length);
+  const redoDepth = useHistoryStore((s) => s.redoStack.length);
+  useEffect(() => {
+    const stampLog = (message: string, type: LogEntry['type']) =>
+      setLogs((prev) => [
+        { message, type, timestamp: new Date().toLocaleTimeString() },
+        ...prev,
+      ]);
+    const onKey = (event: KeyboardEvent) => {
+      const cmd = event.ctrlKey || event.metaKey;
+      if (!cmd) return;
+      const key = event.key.toLowerCase();
+      if (key === 'z' && !event.shiftKey) {
+        event.preventDefault();
+        event.stopPropagation();
+        flushCoalescedEdit();
+        const entry = performUndo();
+        if (entry) stampLog(`Undo: ${entry.label}`, 'info');
+        else stampLog('Nothing to undo', 'warning');
+        return;
+      }
+      if ((key === 'z' && event.shiftKey) || key === 'y') {
+        event.preventDefault();
+        event.stopPropagation();
+        flushCoalescedEdit();
+        const entry = performRedo();
+        if (entry) stampLog(`Redo: ${entry.label}`, 'info');
+        else stampLog('Nothing to redo', 'warning');
+        return;
+      }
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, []);
+
+  // Agent write path (#18) -> history: applyValidated writes go through
+  // useDesignStore.setState directly (not our commitPatch), so we
+  // subscribe to store changes and record entries when the write source
+  // is external (agent).
+  useEffect(() => {
+    let previous = useDesignStore.getState().xml;
+    const unsubscribe = useDesignStore.subscribe((state) => {
+      const next = state.xml;
+      if (next === previous) return;
+      const hs = useHistoryStore.getState();
+      // Skip if undo/redo replay is in progress.
+      if (hs.suppressCapture) {
+        previous = next;
+        return;
+      }
+      // Skip if a coalesced typing edit or a commitPatch is currently
+      // owning this write. Both paths push their own entry.
+      if (hs.internalWrite) {
+        previous = next;
+        return;
+      }
+      // Otherwise: an external write (agent applyValidated, initial seed,
+      // programmatic reset). Capture it so undo/redo covers it too
+      // (issue #24 D5 cross-source acceptance). The initial seed
+      // (previous === '') is skipped -- there's nothing meaningful to
+      // undo to.
+      if (previous !== '') {
+        pushHistoryEntry(previous, next, 'agent', 'external write');
+      }
+      previous = next;
+    });
+    return () => unsubscribe();
+  }, []);
+
+  void undoDepth;
+  void redoDepth;
+  void resetHistory;
 
   const artifacts = useMemo(() => {
     const paths = new Set<string>();
@@ -472,13 +573,9 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
     }
   }, [xml]);
 
-  // Issue #23 drag/nudge write path. The Renderer hands us a list of
-  // (id, snapped x, snapped y) moves; we parse the CURRENT design XML
-  // once, build ONE <patch> containing one <gui> op per move (via
-  // saveHintsPatch), run it through runGate, and either land the
-  // canonical XML via setUserXml (single undo step for the whole group)
-  // or return the diagnostic so the Renderer rolls back its DOM
-  // transforms. This mirrors the Inspector's commit pipeline exactly.
+  // Issue #23 drag/nudge write path. Threaded through the ONE COMMIT PATH
+  // (schematic/gate.ts) so the mutation shows up in the undo/redo stack
+  // (issue #24 D5) alongside every other edit source.
   const commitMove = (moves: Array<{ id: string; x: number; y: number }>): { ok: true } | { ok: false; message: string } => {
     if (moves.length === 0) return { ok: true };
     const currentXml = useDesignStore.getState().xml;
@@ -504,16 +601,168 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
     }
     const patchXml = saveHintsPatch(entries);
     if (!patchXml) return { ok: true };
-    const outcome = runGate(currentXml, patchXml);
-    if (!outcome.ok) return { ok: false, message: outcome.message };
-    setUserXml(outcome.xml);
-    return { ok: true };
+    const outcome = commitPatch(patchXml, 'drag', `moved ${moves.map((m) => m.id).join(', ')}`);
+    return outcome.ok ? { ok: true } : { ok: false, message: outcome.message };
+  };
+
+  // Issue #24 D1 wire-draw write path. The Renderer resolves the drop
+  // target; we build the appropriate <patch> and hand it to commitPatch.
+  //
+  // Rules:
+  //   - target=pin same as source: illegal (rejected with toast).
+  //   - target=pin on same component: allowed IF pins differ (creates a
+  //     short across the component; the gate will reject at validation
+  //     time if it violates the topology, so we don't second-guess here).
+  //   - target=pin on different component: reassign source to target's
+  //     net when target's net has >=2 members OR is a rail (join it);
+  //     otherwise create a fresh auto-name net for both.
+  //   - target=net: reassign source pin to that net.
+  const commitWire = (source: WireSource, target: WireTarget): { ok: true } | { ok: false; message: string } => {
+    if (target.kind === 'empty') return { ok: true };
+    const currentXml = useDesignStore.getState().xml;
+    let parsed;
+    try {
+      parsed = parseAir(currentXml);
+    } catch (err) {
+      return { ok: false, message: 'parse failed: ' + (err as Error).message };
+    }
+    const srcComp = parsed.components.get(source.comp);
+    if (!srcComp) return { ok: false, message: `unknown component: ${source.comp}` };
+    const srcPin = srcComp.pins.get(source.pin);
+    if (!srcPin) return { ok: false, message: `unknown pin: ${source.pin} on ${source.comp}` };
+
+    if (target.kind === 'net') {
+      if (srcPin.net === target.net) return { ok: false, message: 'already on that net' };
+      const patchXml = reassignPinPatch(srcComp, source.pin, target.net);
+      const outcome = commitPatch(patchXml, 'wire', `${source.comp}.${source.pin} -> ${target.net}`);
+      return outcome.ok ? { ok: true } : { ok: false, message: outcome.message };
+    }
+
+    // target.kind === 'pin'
+    if (target.comp === source.comp && target.pin === source.pin) {
+      return { ok: false, message: 'cannot wire a pin to itself' };
+    }
+    const tgtComp = parsed.components.get(target.comp);
+    if (!tgtComp) return { ok: false, message: `unknown component: ${target.comp}` };
+    const tgtPin = tgtComp.pins.get(target.pin);
+    if (!tgtPin) return { ok: false, message: `unknown pin: ${target.pin} on ${target.comp}` };
+
+    if (srcPin.net === tgtPin.net) {
+      return { ok: false, message: 'pins are already on the same net' };
+    }
+
+    // Count members of both nets to decide join-vs-create.
+    let srcCount = 0;
+    let tgtCount = 0;
+    for (const c of parsed.components.values()) {
+      for (const p of c.pins.values()) {
+        if (p.net === srcPin.net) srcCount++;
+        if (p.net === tgtPin.net) tgtCount++;
+      }
+    }
+    const tgtNet = parsed.nets.get(tgtPin.net);
+    const srcNet = parsed.nets.get(srcPin.net);
+    const tgtIsRail = tgtNet && (tgtNet.role === 'power' || tgtNet.role === 'ground');
+    const srcIsRail = srcNet && (srcNet.role === 'power' || srcNet.role === 'ground');
+
+    // If target is a rail: reassign source into the rail.
+    // If source is a rail (rare -- user started drag from a rail pin):
+    //   reassign target into source's net.
+    // Otherwise: reassign into the "richer" net so we absorb the smaller.
+    if (tgtIsRail || tgtCount > srcCount) {
+      const patchXml = reassignPinPatch(srcComp, source.pin, tgtPin.net);
+      const outcome = commitPatch(patchXml, 'wire', `${source.comp}.${source.pin} -> ${tgtPin.net}`);
+      return outcome.ok ? { ok: true } : { ok: false, message: outcome.message };
+    }
+    if (srcIsRail || srcCount > tgtCount) {
+      const patchXml = reassignPinPatch(tgtComp, target.pin, srcPin.net);
+      const outcome = commitPatch(patchXml, 'wire', `${target.comp}.${target.pin} -> ${srcPin.net}`);
+      return outcome.ok ? { ok: true } : { ok: false, message: outcome.message };
+    }
+
+    // Both source and target nets are singletons: create a fresh auto-name
+    // net and put both pins on it. `nextAutoNetId` skips collisions.
+    const newNet = nextAutoNetId(parsed);
+    const patchXml = connectPinsWithNewNetPatch(
+      { comp: srcComp, pin: source.pin },
+      { comp: tgtComp, pin: target.pin },
+      newNet,
+      'signal',
+    );
+    const outcome = commitPatch(patchXml, 'wire', `new ${newNet}: ${source.comp}.${source.pin} <-> ${target.comp}.${target.pin}`);
+    return outcome.ok ? { ok: true } : { ok: false, message: outcome.message };
+  };
+
+  // Issue #24 D2 & D4 delete write path.
+  const commitDelete = (t: { kind: 'component'; id: string } | { kind: 'net'; id: string }): { ok: true } | { ok: false; message: string } => {
+    const currentXml = useDesignStore.getState().xml;
+    let parsed;
+    try {
+      parsed = parseAir(currentXml);
+    } catch (err) {
+      return { ok: false, message: 'parse failed: ' + (err as Error).message };
+    }
+    if (t.kind === 'component') {
+      let built;
+      try {
+        built = deleteComponentPatch(parsed, t.id);
+      } catch (err) {
+        return { ok: false, message: (err as Error).message };
+      }
+      if (built.danglingProbeTests.length > 0) {
+        const ok = window.confirm(
+          `Deleting ${t.id} will leave ${built.danglingProbeTests.length} assertion probe(s) with no connected net:\n  ${built.danglingProbeTests.join('\n  ')}\nProceed?`,
+        );
+        if (!ok) return { ok: false, message: 'delete cancelled' };
+      }
+      const outcome = commitPatch(built.patchXml, 'delete', `deleted ${t.id}`);
+      return outcome.ok ? { ok: true } : { ok: false, message: outcome.message };
+    }
+    // Net delete: only remove signal nets outright (power/ground are
+    // structural and referenced by <tests>/<power_domains>).
+    const net = parsed.nets.get(t.id);
+    if (!net) return { ok: false, message: `unknown net: ${t.id}` };
+    if (net.role === 'power' || net.role === 'ground') {
+      return { ok: false, message: `cannot delete ${net.role} net ${t.id}` };
+    }
+    const reserved = new Set<string>();
+    const namer = (used: Set<string>) => {
+      const id = nextAutoNetId(parsed, new Set([...reserved, ...used]));
+      reserved.add(id);
+      return id;
+    };
+    let patchXml;
+    try {
+      patchXml = deleteNetPatch(parsed, t.id, namer);
+    } catch (err) {
+      return { ok: false, message: (err as Error).message };
+    }
+    const outcome = commitPatch(patchXml, 'delete', `deleted net ${t.id}`);
+    return outcome.ok ? { ok: true } : { ok: false, message: outcome.message };
+  };
+
+  // Wire the schematic disconnect-single-pin flow if we want it in the
+  // future -- currently the whole-net delete covers the acceptance
+  // criterion; per-segment disconnect is exposed via wiring.ts should a
+  // caller need it. Silence linter.
+  void disconnectPinPatch;
+
+  // Track the last-known cursor hint on the canvas for palette placement.
+  const cursorHintRef = useRef<GuiHint | null>(null);
+  const getPlacementHint = (): GuiHint | null => cursorHintRef.current;
+  const onCursor = (hint: GuiHint) => {
+    cursorHintRef.current = hint;
   };
 
   const renderPanel = () => {
     if (activeTab === 'schematic') {
       return (
-        <div className="schematic-split">
+        <div className="schematic-split with-palette" data-testid="schematic-split">
+          <Palette
+            getPlacementHint={getPlacementHint}
+            onPlaced={(id, entry) => addLog(`Placed ${entry.displayName} as ${id}`, 'success')}
+            onError={(msg) => addLog(msg, 'error')}
+          />
           <Graph
             nodes={nodes}
             edges={edges}
@@ -521,13 +770,20 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
             interactive
             onLayout={setSchematicIR}
             onCommitMove={commitMove}
+            onCommitWire={commitWire}
+            onCommitDelete={commitDelete}
+            onCursor={onCursor}
           />
           <Inspector ir={schematicIR} />
         </div>
       );
     }
     if (activeTab === 'editor') {
-      return <XmlEditor xml={xml} onChange={(value) => setUserXml(value || '')} theme={theme} />;
+      // Route Monaco keystrokes through coalesceUserXml so a long run of
+      // typing enters the undo stack as ONE history entry (per issue #24
+      // acceptance: "text edits enter as ONE coalesced step per
+      // idle-pause"). Undo/redo replay via performUndo/performRedo.
+      return <XmlEditor xml={xml} onChange={(value) => coalesceUserXml(value || '')} theme={theme} />;
     }
     if (activeTab === 'simulation') {
       return <SimulationPanel simulation={simulation} waveforms={waveforms} />;

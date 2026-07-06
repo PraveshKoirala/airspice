@@ -21,7 +21,7 @@
 
 import React from "react";
 import type { Edge, Node } from "reactflow";
-import Renderer from "../schematic/Renderer";
+import Renderer, { type WireSource, type WireTarget } from "../schematic/Renderer";
 import type { GuiHint, SchematicIR } from "../schematic/types";
 
 interface GraphProps {
@@ -41,6 +41,21 @@ interface GraphProps {
    * makes the Renderer roll back the pending DOM transforms.
    */
   onCommitMove?: (moves: Array<{ id: string; x: number; y: number }>) => { ok: true } | { ok: false; message: string };
+  /**
+   * Wire-draw commit callback (issue #24 D1). The Renderer resolves the
+   * drop target and hands the app the resolved (source, target) pair.
+   */
+  onCommitWire?: (source: WireSource, target: WireTarget) => { ok: true } | { ok: false; message: string };
+  /**
+   * Component / net delete commit callback (issue #24 D2, D4). Triggered
+   * by Delete / Backspace when a component or net is selected.
+   */
+  onCommitDelete?: (target: { kind: "component"; id: string } | { kind: "net"; id: string }) => { ok: true } | { ok: false; message: string };
+  /**
+   * Fires on every pointer move over the canvas with the snapped cursor
+   * hint. Used by the palette to place components at the cursor.
+   */
+  onCursor?: (hint: GuiHint) => void;
 }
 
 const Graph: React.FC<GraphProps> = (props) => <Renderer {...props} />;
