@@ -18,8 +18,8 @@ import SettingsPanel from './components/SettingsPanel';
 import Landing from './pages/Landing';
 import type { ApiError, Diagnostic, ValidationResult } from './types/api';
 import { getEngine, ENGINE_MODE, getRun } from './engine';
-import { waveformCsv } from 'air-ts';
-import type { SimulationReport as OracleReport } from 'air-ts';
+import type { SimulationReport as OracleReport, SystemIR } from 'air-ts';
+import { WaveformViewer, type WaveformTrace } from './waveform';
 import { useDesignStore } from './agent/designStore';
 import { useAgentSettings } from './agent/agentSettings';
 import type { NetworkProviderId } from 'agent';
@@ -530,7 +530,7 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
       return <XmlEditor xml={xml} onChange={(value) => setUserXml(value || '')} theme={theme} />;
     }
     if (activeTab === 'simulation') {
-      return <SimulationPanel simulation={simulation} waveforms={waveforms} />;
+      return <SimulationPanel simulation={simulation} waveforms={waveforms} designXml={xml} theme={theme} />;
     }
     if (activeTab === 'validation') {
       return <DiagnosticsPanel validation={validation} />;
@@ -601,9 +601,59 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
   );
 }
 
-function SimulationPanel({ simulation, waveforms }: { simulation: SimulationReport | null; waveforms: WaveformData[] }) {
-  const [selectedWaveform, setSelectedWaveform] = useState('');
-  const activeWaveform = waveforms.find((waveform) => waveform.name === selectedWaveform) || waveforms[0];
+function SimulationPanel({ simulation, waveforms, designXml, theme }: { simulation: SimulationReport | null; waveforms: WaveformData[]; designXml: string; theme: 'dark' | 'light' }) {
+  // Parse the design once for assertion-band extraction. A malformed mid-edit
+  // XML yields no bands; the viewer still renders the traces.
+  const design = useMemo<SystemIR | null>(() => {
+    if (!designXml.trim()) return null;
+    try { return parseAir(designXml); } catch { return null; }
+  }, [designXml]);
+
+  // Flatten every simulation report's diagnostics so the viewer can flag
+  // failing assertions with their diagnostic ids (audit amendment).
+  const allDiagnostics = useMemo(() => {
+    const out: Array<{ code: string; id?: string; related_elements?: string[] }> = [];
+    for (const r of simulation?.reports ?? []) {
+      for (const d of r.diagnostics ?? []) {
+        out.push({ code: d.code, id: (d as { id?: string }).id, related_elements: (d as { related_elements?: string[] }).related_elements });
+      }
+    }
+    return out;
+  }, [simulation]);
+
+  // Convert the panel's WaveformData[] into WaveformTrace[] for the viewer.
+  // Server-mode waveforms (JSON points, no typed arrays) are materialized
+  // into Float64Arrays here so the viewer's LOD cache still applies.
+  const traces = useMemo<WaveformTrace[]>(() => {
+    return waveforms
+      .map((w): WaveformTrace | null => {
+        let time: Float64Array;
+        let values: Float64Array;
+        if (w.timeArr && w.valueArr) {
+          time = w.timeArr;
+          values = w.valueArr;
+        } else {
+          const pts = w.points ?? [];
+          if (pts.length === 0) return null;
+          time = new Float64Array(pts.length);
+          values = new Float64Array(pts.length);
+          for (let i = 0; i < pts.length; i++) {
+            time[i] = pts[i]!.time_s;
+            values[i] = pts[i]!.value;
+          }
+        }
+        return {
+          key: `${w.test}_${w.signal}`,
+          label: `${w.signal} (${w.quantity === 'current' ? 'A' : 'V'}) — ${w.test}`,
+          net: w.signal,
+          test: w.test,
+          unit: w.quantity === 'current' ? 'A' : 'V',
+          time,
+          values,
+        };
+      })
+      .filter((t): t is WaveformTrace => t !== null);
+  }, [waveforms]);
 
   if (!simulation) {
     return <EmptyState icon={<Activity size={20} />} title="No simulation run yet" text="Run simulation to inspect assertions, measurements, and generated artifacts." />;
@@ -649,113 +699,19 @@ function SimulationPanel({ simulation, waveforms }: { simulation: SimulationRepo
       <div className="waveform-section">
         <div className="metric-section-title">
           <strong>Waveforms</strong>
-          {waveforms.length > 0 && (
-            <select value={activeWaveform?.name || ''} onChange={(event) => setSelectedWaveform(event.target.value)}>
-              {waveforms.map((waveform) => (
-                <option key={waveform.name} value={waveform.name}>{waveform.signal} - {waveform.test}</option>
-              ))}
-            </select>
-          )}
         </div>
-        {activeWaveform ? <WaveformChart waveform={activeWaveform} /> : <p className="muted-copy">No waveform CSVs were generated for this run.</p>}
+        {traces.length > 0
+          ? <WaveformViewer traces={traces} design={design} diagnostics={allDiagnostics} theme={theme} />
+          : <p className="muted-copy">No waveform CSVs were generated for this run.</p>}
       </div>
     </div>
   );
 }
 
-function WaveformChart({ waveform }: { waveform: WaveformData }) {
-  // Prefer the retained TYPED ARRAYS (local #14 runs) — read directly, no JSON
-  // conversion. Fall back to the JSON `points` (server-mode waveforms).
-  const timeArr = waveform.timeArr;
-  const valueArr = waveform.valueArr;
-  const useTyped = timeArr !== undefined && valueArr !== undefined && valueArr.length > 0;
-  const jsonPoints = waveform.points || [];
-  const sampleCount = useTyped ? valueArr!.length : jsonPoints.length;
-
-  if (sampleCount === 0) {
-    return <div className="waveform-empty">No samples in {waveform.name}</div>;
-  }
-
-  const width = 720;
-  const height = 280;
-  const pad = { left: 58, right: 18, top: 18, bottom: 36 };
-  const timeAt = (i: number) => (useTyped ? (timeArr![i] as number) : jsonPoints[i]!.time_s);
-  const valueAt = (i: number) => (useTyped ? (valueArr![i] as number) : jsonPoints[i]!.value);
-
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  for (let i = 0; i < sampleCount; i++) {
-    const t = timeAt(i), v = valueAt(i);
-    if (t < minX) minX = t;
-    if (t > maxX) maxX = t;
-    if (v < minY) minY = v;
-    if (v > maxY) maxY = v;
-  }
-  const spanX = maxX - minX || 1;
-  const spanY = maxY - minY || 1;
-  const plotWidth = width - pad.left - pad.right;
-  const plotHeight = height - pad.top - pad.bottom;
-  const segments: string[] = [];
-  for (let i = 0; i < sampleCount; i++) {
-    const x = pad.left + ((timeAt(i) - minX) / spanX) * plotWidth;
-    const y = pad.top + (1 - ((valueAt(i) - minY) / spanY)) * plotHeight;
-    segments.push(`${x.toFixed(2)},${y.toFixed(2)}`);
-  }
-  const path = segments.join(' ');
-  const unit = waveform.quantity === 'current' ? 'A' : 'V';
-  const finalValue = valueAt(sampleCount - 1);
-
-  // CSV export byte-identical in FORMAT to the oracle's canonical waveform CSVs
-  // (issue #14): air-ts `waveformCsv` serializes the retained typed arrays.
-  const canExport = useTyped;
-  const onExport = () => {
-    if (!canExport) return;
-    const samples: [number, number][] = [];
-    for (let i = 0; i < valueArr!.length; i++) samples.push([timeArr![i] as number, valueArr![i] as number]);
-    const csv = waveformCsv(waveform.signal, samples);
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${waveform.test}_${waveform.signal}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  return (
-    <div className="waveform-chart">
-      <div className="waveform-meta">
-        <span>{waveform.name}</span>
-        <strong>{formatValue(finalValue, unit)} final</strong>
-        {canExport && (
-          <button onClick={onExport} data-testid="waveform-export-csv" style={{ marginLeft: 8 }}>
-            Export CSV
-          </button>
-        )}
-      </div>
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${waveform.signal} waveform`}>
-        <line x1={pad.left} y1={pad.top} x2={pad.left} y2={height - pad.bottom} />
-        <line x1={pad.left} y1={height - pad.bottom} x2={width - pad.right} y2={height - pad.bottom} />
-        <text x={12} y={pad.top + 8}>{formatValue(maxY, unit)}</text>
-        <text x={12} y={height - pad.bottom}>{formatValue(minY, unit)}</text>
-        <text x={pad.left} y={height - 10}>{formatTime(minX)}</text>
-        <text x={width - pad.right - 70} y={height - 10}>{formatTime(maxX)}</text>
-        <polyline points={path} />
-      </svg>
-    </div>
-  );
-}
-
-function formatValue(value: number, unit: string) {
-  if (Math.abs(value) < 1 && value !== 0) {
-    return `${(value * 1000).toFixed(2)}m${unit}`;
-  }
-  return `${value.toFixed(3)}${unit}`;
-}
-
-function formatTime(value: number) {
-  if (value < 1) return `${(value * 1000).toFixed(2)}ms`;
-  return `${value.toFixed(3)}s`;
-}
+// The pre-#25 SVG WaveformChart + `formatValue` / `formatTime` helpers lived
+// here. They were replaced by the canvas-based, min/max-decimated
+// `WaveformViewer` (packages/ui/src/waveform/) which reuses air-ts's
+// engineering-notation formatting for value + time labels.
 
 function DiagnosticsPanel({ validation }: { validation: ValidationResult | null }) {
   const diagnostics = validation?.diagnostics || [];
