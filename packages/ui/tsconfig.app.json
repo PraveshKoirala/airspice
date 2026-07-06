@@ -19,9 +19,18 @@
        packages (air-ts, agent, sim-wasm) now goes through the ordinary npm
        workspace symlink at node_modules/<name>, and their transitive deps
        (fast-xml-parser via air-ts, eecircuit-engine via sim-wasm) are hoisted
-       by npm. No `paths` overrides are needed -- the drift landmine from #85
-       (a consumer's fast-xml-parser copy not matching air-ts's declared
-       range) is gone because there's exactly one copy per name. */
+       by npm. Those `paths` overrides are gone -- the drift landmine from #85
+       (a consumer's fast-xml-parser copy not matching air-ts's declared range)
+       is gone because there's exactly one copy per name.
+
+       `@engine-adapter` stays here (from #86): it is the build-time seam that
+       Vite swaps for `./src/engine/adapter.{local,server}.ts` based on
+       VITE_ENGINE. At typecheck time we resolve it to the LOCAL adapter (which
+       has the widest type surface) so `src/engine/index.ts` typechecks in both
+       modes. */
+    "paths": {
+      "@engine-adapter": ["./src/engine/adapter.local.ts"]
+    },
 
     /* Linting */
     "noUnusedLocals": true,
