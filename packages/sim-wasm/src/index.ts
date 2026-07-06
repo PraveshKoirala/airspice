@@ -16,6 +16,8 @@ export type {
   WaveTable,
   SignalUnit,
   SimDiagnostic,
+  SimLadderAttempt,
+  SimLadderOutcome,
   EngineCapabilities,
   WorkerInbound,
   WorkerOutbound,
@@ -25,3 +27,9 @@ export type {
 export { classifyStderr, hasError, UNCLASSIFIED_CODE } from "./diagnostics";
 export { toWaveTables, finalValue } from "./result";
 export { prepareNetlist } from "./netlist";
+export {
+  CONVERGENCE_LADDER,
+  buildRungNetlist,
+  runConvergenceLadder,
+} from "./ladder";
+export type { LadderRung, LadderAttempt, LadderOutcome, RungOutcome } from "./ladder";

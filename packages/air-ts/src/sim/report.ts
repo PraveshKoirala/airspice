@@ -37,14 +37,18 @@
  *     `ASSERT_NO_MEASUREMENT` / `ASSERT_FAILED` codes, same observed/expected
  *     payloads. Repair-context keys on these codes.
  *
- * THE CONVERGENCE HONESTY (issue #45 / #14 scope): the #45 convergence-aid ladder
- * (gmin/source-stepping retry) lives in `simulator.py`, NATIVE-side. The browser
- * eecircuit engine runs the netlist AS-WRITTEN only — no ladder. For every corpus
- * design that converges on rung 1 (`aids_required:false, rung:1`), the browser's
- * honest `convergence` section is byte-identical to the oracle's. A design that
- * would need rung>=2 the browser cannot rescue; it reports the honest not-
- * converged rung-1 attempt (browser-side ladder via eecircuit `.options`
- * injection is future work). We do NOT fabricate a ladder the browser never ran.
+ * THE CONVERGENCE HONESTY (issue #45 / #14 / #94 scope): the #45 convergence-aid
+ * ladder (gmin/source-stepping retry) originally lived NATIVE-only in
+ * `simulator.py`; the browser now runs the SAME ladder via eecircuit `.options`
+ * injection (#94), so the browser's `convergence` section reflects a real
+ * per-rung walk — including `aids_required` and the "tolerance was relaxed"
+ * disclosure on a rung-4 win. For every corpus design that converges on rung 1
+ * both sides, the browser's convergence section is byte-identical to the
+ * oracle's. A design where the browser converges on a HIGHER rung than native
+ * (or vice-versa) legitimately diverges in this section; the parity job's
+ * ``expected_divergences`` pins that delta narrowly. We do NOT fabricate a
+ * ladder outcome — the ladder is walked for real and its true winner is
+ * reported.
  */
 
 import type { Component, SystemIR, Test } from "../model.js";
@@ -147,6 +151,23 @@ export interface SimulationResult {
 }
 
 /**
+ * The browser ladder's per-rung outcome, sourced from sim-wasm's terminal
+ * event (issue #94). Present when the ladder was walked; absent only on the
+ * engine-unavailable path. Byte-shape identical to the native ladder's
+ * ``attempts[]`` entry (rung/name/options/converged).
+ */
+export interface LadderInput {
+  attempts: readonly {
+    rung: number;
+    name: string;
+    options: readonly string[];
+    converged: boolean;
+  }[];
+  /** The rung index (1-based) that converged, or null on terminal exhaustion. */
+  winningRung: number | null;
+}
+
+/**
  * Inputs to build ONE test's report. `waveTables` are the engine's per-probe
  * tables for THIS test (plus the sweep vector); the "time" table names the time
  * axis, and each `v(<net>)` / `i(<dev>)` table names a probed signal.
@@ -171,6 +192,13 @@ export interface ReportInputs {
    * Defaults to true when omitted (the common "engine ran" path).
    */
   engineAttempted?: boolean;
+  /**
+   * Optional browser-ladder outcome (issue #94). When present, the ``convergence``
+   * section is built from these attempts — mirroring the native oracle's
+   * ``convergence.attempts[]`` byte-for-byte. When absent, the section falls
+   * back to the pre-#94 single-rung honest shape (`convergenceSection` below).
+   */
+  ladder?: LadderInput;
 }
 
 // --------------------------------------------------------------------------- //
@@ -597,30 +625,49 @@ function spiceNet(net: string): string {
 }
 
 // --------------------------------------------------------------------------- //
-// Convergence section — verbatim port of `_convergence_section` for the
-// browser's honest AS-WRITTEN (rung-1-only) run.
+// Convergence section — verbatim port of `_convergence_section`.
+// Handles both the pre-#94 rung-1-only shape AND the #94 browser ladder shape.
 // --------------------------------------------------------------------------- //
 
 /**
- * The browser's `convergence` section. The eecircuit engine runs the netlist
- * AS-WRITTEN only (no #45 ladder), so the honest section has a SINGLE rung-1
- * attempt.
- *
- *  - engineAttempted && converged  -> the rung-1 as-written success the corpus
- *    reports for every design that converges natively on rung 1
- *    (`aids_required:false, rung:1, terminal:false, note:null`). Byte-identical
- *    to the oracle's rung-1 reports.
- *  - engineAttempted && !converged -> the engine RAN as-written and did NOT
- *    converge (e.g. eecircuit's singular-matrix on a design native ngspice
- *    solves) and the browser has no ladder to climb. HONEST `terminal:true` with
- *    the topology-directed note (matching `_convergence_section`'s terminal
- *    branch). This is where a design diverges from the oracle — DISCLOSED, not
- *    papered over as a missing engine. Browser-side ladder is future work.
- *  - !engineAttempted -> engine unavailable: a single not-converged rung-1
- *    attempt flagged `ngspice_missing`, no note (the DC-fallback path owns that
- *    case), exactly as the oracle's ladder returns for a missing binary.
+ * Rung 4 (Gear + relaxed reltol) is the ONLY rung that trades accuracy for
+ * convergence, so its note carries the "tolerance was relaxed one notch"
+ * disclosure — silent accuracy loss is what the ladder exists to prevent.
+ * Mirrors simulator.py `LadderRung.relaxes` on the rung-4 tuple.
  */
-export function convergenceSection(engineAttempted: boolean, converged: boolean): ConvergenceSection {
+const RELAXES_RUNG = 4;
+
+/**
+ * The browser's `convergence` section.
+ *
+ * With a ladder outcome (#94):
+ *   - `winningRung != null` -> the rung that converged wins. `aids_required`
+ *     is true when the winning rung is >= 2. `note` carries the
+ *     "numerical aids required" disclosure (mirroring simulator.py
+ *     `_convergence_section`), and includes the "tolerance was relaxed"
+ *     addendum when rung 4 wins.
+ *   - `winningRung == null` -> every rung failed. HONEST `terminal:true` with
+ *     the topology-directed note, matching the native oracle's terminal
+ *     branch byte-for-byte.
+ *
+ * Without a ladder outcome (engine unavailable): a single not-converged
+ * rung-1 attempt flagged `ngspice_missing`, no note (the DC-fallback path
+ * owns that case), exactly as the oracle's ladder returns for a missing
+ * binary. This is the ``engineAttempted: false`` path.
+ *
+ * BYTE-PARITY with the native ladder (simulator.py `_convergence_section`):
+ * for every corpus design that converges on rung 1 natively, the browser's
+ * rung-1 win produces a byte-identical convergence section. For designs
+ * where the browser now converges on a HIGHER rung than native (or vice
+ * versa), the sections legitimately differ in `rung` / `attempts.length` /
+ * `aids_required` / `note` — that is honest, disclosed, and the parity job's
+ * ``expected_divergences`` pins the delta narrowly.
+ */
+export function convergenceSection(
+  engineAttempted: boolean,
+  converged: boolean,
+  ladder?: LadderInput,
+): ConvergenceSection {
   if (!engineAttempted) {
     return {
       attempts: [
@@ -633,6 +680,54 @@ export function convergenceSection(engineAttempted: boolean, converged: boolean)
       note: null,
     };
   }
+
+  if (ladder) {
+    const attempts: ConvergenceAttempt[] = ladder.attempts.map((a) => ({
+      rung: a.rung,
+      name: a.name,
+      options: [...a.options],
+      converged: a.converged,
+    }));
+    const winningRung = ladder.winningRung;
+    if (winningRung === null) {
+      // Ladder exhausted: every rung failed. Topology-directed note.
+      return {
+        attempts,
+        converged: false,
+        rung: null,
+        aids_required: false,
+        terminal: true,
+        note:
+          "did not converge after every numerical aid; this usually means a " +
+          "topology problem (floating node / missing DC path to ground), not a " +
+          "value problem - inspect the topology before adjusting values",
+      };
+    }
+    const winning = attempts.find((a) => a.rung === winningRung);
+    const aidsRequired = winningRung >= 2;
+    let note: string | null = null;
+    if (aidsRequired && winning) {
+      note =
+        `numerical aids required (rung ${winning.rung}: ${winning.name}); ` +
+        "accuracy may be reduced - see docs/convergence_ladder.md";
+      if (winningRung === RELAXES_RUNG) {
+        note += " (error tolerance was relaxed one notch to reach convergence)";
+      }
+    }
+    return {
+      attempts,
+      converged: true,
+      rung: winningRung,
+      aids_required: aidsRequired,
+      terminal: false,
+      note,
+    };
+  }
+
+  // No ladder outcome: single as-written attempt. Preserves the pre-#94 shape
+  // for callers that do not yet plumb ladder data (e.g. unit tests, buildReport
+  // fallback), and for the honest terminal branch when the engine ran but
+  // rung-1 alone did not converge.
   const attempts: ConvergenceAttempt[] = [
     { rung: 1, name: "as-written", options: [], converged },
   ];
@@ -646,7 +741,6 @@ export function convergenceSection(engineAttempted: boolean, converged: boolean)
       note: null,
     };
   }
-  // Engine ran as-written but did not converge; no ladder to climb (rung 1 only).
   return {
     attempts,
     converged: false,
@@ -711,7 +805,7 @@ export function buildReport(inputs: ReportInputs): SimulationReport {
     measured.set(name, signal.final);
   }
 
-  const convergence = convergenceSection(engineAttempted, usedEngine);
+  const convergence = convergenceSection(engineAttempted, usedEngine, inputs.ladder);
 
   const assertionDiagnostics = evaluateAssertions(test, measured, stats);
   const diagnostics = assertionDiagnostics;

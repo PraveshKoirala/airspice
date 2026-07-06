@@ -229,9 +229,10 @@ async function main() {
     const page = await browser.newPage();
     // Only UNCAUGHT page exceptions are fatal here. Do NOT treat console.error as
     // fatal: the engine legitimately echoes ngspice stderr (e.g. eecircuit's
-    // singular-matrix warnings on the divergence-B design) to the console; that
-    // is the engine working, not a harness bug. The report content is the
-    // contract, checked downstream by compare_reports.py.
+    // singular-matrix warnings on rung 1 for the divergence-B design, before
+    // the #94 ladder climbs to a converging rung) to the console; that is the
+    // engine working, not a harness bug. The report content is the contract,
+    // checked downstream by compare_reports.py.
     const fatalErrors = [];
     page.on("pageerror", (err) => fatalErrors.push(`UNCAUGHT: ${err.message}`));
     // Fail loudly if the harness ever reaches out to a network origin other than

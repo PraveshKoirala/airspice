@@ -26,12 +26,13 @@ import type {
   EngineCapabilities,
   ProbeSpec,
   SimEvent,
+  SimLadderOutcome,
   WorkerInbound,
   WorkerOutbound,
 } from "./protocol";
 import { classifyStderr } from "./diagnostics";
 import { toWaveTables } from "./result";
-import { prepareNetlist } from "./netlist";
+import { CONVERGENCE_LADDER, buildRungNetlist, type LadderRung } from "./ladder";
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
 
@@ -109,6 +110,76 @@ function streamOutput(id: string, info: string, errors: string[]): void {
   }
 }
 
+/**
+ * One rung's execution against the eecircuit engine. Returns the raw result,
+ * an error diagnostic (if the rung failed / did not converge), and the tables
+ * it produced (empty on failure). Kept as a small pure-ish helper so the
+ * ladder driver in `handleRun` reads as: "for each rung, runRung, decide
+ * converged, break or climb".
+ *
+ * A rung is treated as CONVERGED when eecircuit returned without throwing
+ * AND `classifyStderr` on the union of transcripts did NOT surface an
+ * error-severity diagnostic AND the tables actually contain data. This
+ * mirrors the native oracle's rule: "ngspice exits 0 AND its transient
+ * produced readable waveform data" (simulator.py `run_convergence_ladder`).
+ */
+async function runRung(
+  engine: EEChip,
+  rungNetlist: string,
+  probes: ProbeSpec[] | undefined,
+  liveLines: string[],
+): Promise<{
+  ok: boolean;
+  tables: ReturnType<typeof toWaveTables>["tables"];
+  transfer: ArrayBufferLike[];
+  errorDiag: import("./protocol").SimDiagnostic | null;
+  linesBefore: number;
+}> {
+  // Snapshot how many live lines existed BEFORE this rung so `classifyStderr`
+  // sees only this rung's slice — a stale "singular matrix" from an earlier
+  // failed rung must NOT sink a later rung that produced clean output.
+  const linesBefore = liveLines.length;
+
+  let raw: unknown;
+  try {
+    engine.setNetList(rungNetlist);
+    raw = await engine.runSim();
+  } catch (err) {
+    const info = safe(() => engine.getInfo(), "") as string;
+    const errors = safe(() => engine.getError(), [] as string[]) as string[];
+    const combined = [
+      ...liveLines.slice(linesBefore),
+      info,
+      ...errors,
+      err instanceof Error ? err.message : String(err),
+    ].join("\n");
+    const diags = classifyStderr(combined);
+    const errorDiag =
+      diags.find((d) => d.severity === "error") ?? {
+        code: "SIM-RUN-THREW",
+        message: "The simulation run threw before producing a result.",
+        hint: "See the raw output for the ngspice error.",
+        severity: "error" as const,
+        raw: err instanceof Error ? err.message : String(err),
+      };
+    return { ok: false, tables: [], transfer: [], errorDiag, linesBefore };
+  }
+
+  const info = safe(() => engine.getInfo(), "") as string;
+  const errors = safe(() => engine.getError(), [] as string[]) as string[];
+
+  // Classify only THIS rung's slice of the live stream so a prior rung's
+  // singular-matrix line does not condemn a passing rung.
+  const rungSlice = [...liveLines.slice(linesBefore), info, ...errors].join("\n");
+  const diags = classifyStderr(rungSlice);
+  const errorDiag = diags.find((d) => d.severity === "error") ?? null;
+
+  const { tables, transfer } = toWaveTables(raw as never, probes);
+  const hasData = tables.some((t) => t.values.length > 0);
+  const ok = !errorDiag && hasData;
+  return { ok, tables, transfer, errorDiag, linesBefore };
+}
+
 async function handleRun(id: string, netlist: string, probes?: ProbeSpec[]): Promise<void> {
   emit({ id, type: "progress", pct: 0, simTime: 0 });
   let engine: EEChip;
@@ -136,7 +207,10 @@ async function handleRun(id: string, netlist: string, probes?: ProbeSpec[]): Pro
   // some diagnostics (e.g. "Warning: singular matrix") through the live stream
   // and not always into getInfo(), so classifying only the post-run transcript
   // can miss them. We stream each line as it arrives (stderr never swallowed)
-  // AND classify the union at the end.
+  // AND classify per rung at the end. Ladder note: the SLICE of liveLines
+  // produced by rung N is what classifies rung N — a rung-2 singular-matrix
+  // does NOT poison the rung-3 verdict, which must be free to succeed on its
+  // own transcript (that is the whole point of the ladder).
   const liveLines: string[] = [];
   engine.setOutputEvent?.((out: string) => {
     for (const raw of String(out).split(/\r?\n/)) {
@@ -147,52 +221,71 @@ async function handleRun(id: string, netlist: string, probes?: ProbeSpec[]): Pro
     }
   });
 
-  let raw: unknown;
-  try {
-    // Adapt the emitted netlist for the WASM engine (strip host-only .control
-    // blocks + ascii-rawfile option; devices/analysis untouched). See netlist.ts.
-    engine.setNetList(prepareNetlist(netlist));
-    raw = await engine.runSim();
-  } catch (err) {
-    // A throw from runSim is an engine-level failure; classify what we captured.
-    const info = safe(() => engine.getInfo(), "") as string;
-    const errors = safe(() => engine.getError(), [] as string[]) as string[];
-    streamOutput(id, info, errors);
-    const combined = [...liveLines, info, ...errors, err instanceof Error ? err.message : String(err)].join("\n");
-    const diags = classifyStderr(combined);
-    emit({
-      id,
-      type: "error",
-      diagnostic: diags[0] ?? {
-        code: "SIM-RUN-THREW",
-        message: "The simulation run threw before producing a result.",
-        hint: "See the raw output for the ngspice error.",
-        severity: "error",
-        raw: err instanceof Error ? err.message : String(err),
-      },
+  // Walk the ladder (issue #94 / port of simulator.py:run_convergence_ladder).
+  // Rung 1 is the as-written deck (byte-for-byte the pre-ladder single-run
+  // behaviour); rungs 2..4 inject the manual-documented `.options` in the same
+  // order and same tokens as the native ladder. First rung that converges wins.
+  const ladderAttempts: SimLadderOutcome["attempts"] = [];
+  let winningRung: LadderRung | null = null;
+  let winningTables: ReturnType<typeof toWaveTables>["tables"] = [];
+  let winningTransfer: ArrayBufferLike[] = [];
+  let lastErrorDiag: import("./protocol").SimDiagnostic | null = null;
+
+  for (const rung of CONVERGENCE_LADDER) {
+    const rungNetlist = buildRungNetlist(netlist, rung);
+    const outcome = await runRung(engine, rungNetlist, probes, liveLines);
+    ladderAttempts.push({
+      rung: rung.rung,
+      name: rung.name,
+      options: [...rung.options],
+      converged: outcome.ok,
     });
-    return;
+    if (outcome.ok) {
+      winningRung = rung;
+      winningTables = outcome.tables;
+      winningTransfer = outcome.transfer;
+      lastErrorDiag = null;
+      break;
+    }
+    lastErrorDiag = outcome.errorDiag;
+    // Bounce progress a tick per non-converging rung so the UI shows movement.
+    emit({ id, type: "progress", pct: 10 + rung.rung * 15, simTime: 0 });
   }
 
   emit({ id, type: "progress", pct: 90, simTime: 0 });
 
-  // Stream the post-run transcript + any error lines (stderr never swallowed).
+  // Stream the post-run transcript once (any error lines already went through
+  // liveLines). This preserves the pre-ladder invariant that the client
+  // receives the full ngspice info transcript exactly once per run.
   const info = safe(() => engine.getInfo(), "") as string;
   const errors = safe(() => engine.getError(), [] as string[]) as string[];
   streamOutput(id, info, errors);
 
-  // Did ngspice flag a real failure? Classify the UNION of everything printed.
-  const diags = classifyStderr([...liveLines, info, ...errors].join("\n"));
-  const errorDiag = diags.find((d) => d.severity === "error");
-  if (errorDiag) {
-    emit({ id, type: "error", diagnostic: errorDiag });
+  const ladder: SimLadderOutcome = {
+    attempts: ladderAttempts,
+    winningRung: winningRung ? winningRung.rung : null,
+  };
+
+  if (!winningRung) {
+    // Ladder exhausted: every rung failed. Surface the last rung's error
+    // diagnostic + the honest ladder record so the report pipeline marks the
+    // convergence section `terminal: true`.
+    const diagnostic = lastErrorDiag ?? {
+      code: "SIM-UNKNOWN",
+      message: "ngspice reported an error that is not yet mapped to a hint.",
+      hint: "See the raw output. If this is common, add a rule in diagnostics.ts.",
+      severity: "error" as const,
+      raw: "",
+    };
+    emit({ id, type: "error", diagnostic, ladder });
     return;
   }
 
-  // Convert to transferable wave tables and hand back the result.
-  const { tables, transfer } = toWaveTables(raw as never, probes);
   emit({ id, type: "progress", pct: 100, simTime: 0 });
-  emit({ id, type: "result", tables }, transfer as unknown as Transferable[]);
+  emit(
+    { id, type: "result", tables: winningTables, ladder },
+    winningTransfer as unknown as Transferable[],
+  );
 }
 
 function safe<T>(fn: () => T, fallback?: T): T | undefined {

@@ -19,14 +19,18 @@
  * samples arrive as transferred `Float64Array`s and are retained in the waveform
  * store as typed arrays — never converted to `number[]` / JSON in the hot path.
  *
- * CONVERGENCE HONESTY (issue #45 scope): the browser engine runs the netlist
- * AS-WRITTEN (no #45 ladder). `engineRan`/converged is derived from whether the
- * transient produced readable probe data; buildReport turns that into the honest
- * rung-1 convergence section (see report.ts).
+ * CONVERGENCE HONESTY (issue #45 / #94): the browser now walks the SAME
+ * convergence-aid ladder the native oracle does — rung 1 is the netlist
+ * as-written, rungs 2..4 inject the manual-documented ``.options`` via
+ * eecircuit (#94). The WASM worker returns the ladder outcome on its terminal
+ * result/error event; buildReport turns that into the honest ``convergence``
+ * section, including `aids_required` on a rung>=2 win. The `engineAttempted`
+ * flag still splits the not-attempted (missing engine) case from the ran-but-
+ * failed cases, exactly as before.
  */
 
 import { parse, compileSpice, defaultNgspiceProfile, buildReport, probeNets } from "air-ts";
-import type { SystemIR, Test, SimulationReport, WaveTableLike } from "air-ts";
+import type { SystemIR, Test, SimulationReport, WaveTableLike, LadderInput } from "air-ts";
 import { SimClient, prepareNetlist } from "sim-wasm";
 import type { SimEvent, WaveTable } from "sim-wasm";
 import { retainRun, type RetainedWaveform, type RunWaveforms } from "./waveformStore";
@@ -153,15 +157,23 @@ async function runOneTest(
   let engineAttempted = false;
   let errorLine: string | null = null;
   const stderr: string[] = [];
+  // Browser ladder outcome (issue #94) — carried on the terminal result/error
+  // event by the WASM worker. When present, buildReport turns it into the
+  // ``convergence`` section byte-for-byte (mirroring simulator.py's
+  // `_convergence_section`), including `aids_required` on a rung >= 2 win and
+  // the topology-directed note on terminal exhaustion.
+  let ladderInput: LadderInput | undefined;
 
   try {
     for await (const ev of client().run({ id: simId, netlist: prepared, probes }) as AsyncIterable<SimEvent>) {
       if (ev.type === "result") {
         engineAttempted = true;
         tables = ev.tables;
+        if (ev.ladder) ladderInput = ev.ladder;
       } else if (ev.type === "error") {
         engineAttempted = true;
         errorLine = `${ev.diagnostic.code}: ${ev.diagnostic.message}`;
+        if (ev.ladder) ladderInput = ev.ladder;
       } else if (ev.type === "stderr") {
         stderr.push(ev.line);
       }
@@ -188,6 +200,7 @@ async function runOneTest(
     profileId,
     waveTables: tables as unknown as WaveTableLike[],
     engineAttempted,
+    ladder: ladderInput,
   });
   return { report, tables };
 }

@@ -114,13 +114,39 @@ export interface EngineCapabilities {
   ngspiceVersion: string;
 }
 
+/**
+ * One rung attempt as surfaced to the client. Mirrors the browser ladder's
+ * `LadderAttempt` shape (and the oracle's per-rung record in
+ * simulator.py). The report pipeline (#14) turns this into the
+ * ``convergence.attempts[]`` entries byte-for-byte.
+ */
+export interface SimLadderAttempt {
+  rung: number;
+  name: string;
+  options: string[];
+  converged: boolean;
+}
+
+/**
+ * The convergence-ladder outcome for the run, carried alongside the terminal
+ * `result`/`error` event so the report pipeline can build an honest
+ * ``convergence`` section that reflects which rung succeeded (#94). Present on
+ * every terminal event when the ladder was walked (i.e. the engine was
+ * attempted). Byte-identical shape to the browser ladder's `LadderOutcome`.
+ */
+export interface SimLadderOutcome {
+  attempts: SimLadderAttempt[];
+  /** The rung index (1-based) that produced the result, or null on terminal. */
+  winningRung: number | null;
+}
+
 /** Events streamed from the worker to the client for a single run. */
 export type SimEvent =
   | { id: string; type: "progress"; pct: number; simTime: number }
   | { id: string; type: "stdout"; line: string }
   | { id: string; type: "stderr"; line: string }
-  | { id: string; type: "result"; tables: WaveTable[] }
-  | { id: string; type: "error"; diagnostic: SimDiagnostic };
+  | { id: string; type: "result"; tables: WaveTable[]; ladder?: SimLadderOutcome }
+  | { id: string; type: "error"; diagnostic: SimDiagnostic; ladder?: SimLadderOutcome };
 
 /**
  * Worker-inbound messages. `run` and `cancel` are the core surface; `preload`

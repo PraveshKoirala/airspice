@@ -282,14 +282,25 @@ def _field_on_line(line: str) -> str | None:
 def check_expected_divergence(
     design: str, test: str, expected_report: dict, actual_report: dict, entry: dict,
 ) -> list[SignalDiff]:
-    """Verify a pinned converge-vs-not divergence STILL holds exactly.
+    """Verify a pinned convergence divergence STILL holds exactly.
 
     Fails (returns diffs) if native no longer matches the pinned native shape,
-    or the browser no longer matches the pinned browser terminal shape -- e.g.
-    the browser started converging (its #45 ladder landed) or diverged
-    differently. Either way the exception is now stale and the job must fail so
-    the entry is removed or re-justified. This is what makes the exception
-    NARROW and self-invalidating rather than a blanket skip.
+    or the browser no longer matches the pinned browser shape -- e.g. the
+    browser regressed to terminal non-convergence, started converging on the
+    SAME rung native uses (the divergence collapsed), or diverged differently.
+    Either way the exception is now stale and the job must fail so the entry
+    is removed or re-justified. This is what makes the exception NARROW and
+    self-invalidating rather than a blanket skip.
+
+    Two divergence flavours are supported today:
+
+      * Converge-vs-not (pre-#94): pins `browser_converged=False`,
+        `browser_terminal=True`, `browser_backend=builtin_dc_fallback`.
+      * Converge-on-different-rung (#94): both converged, but the browser
+        needed rung >= 2 (aids required). Pinned with `browser_min_rung`
+        (integer, the LOWEST rung the browser is allowed to converge on for
+        the entry to still hold — matches simulator.py's rung enumeration
+        1..4). `native_rung` pins the native winning rung symmetrically.
     """
     diffs: list[SignalDiff] = []
     exp_conv = expected_report.get("convergence", {})
@@ -300,15 +311,32 @@ def check_expected_divergence(
         ("browser converged", act_conv.get("converged"), entry.get("browser_converged")),
         ("browser terminal", act_conv.get("terminal"), entry.get("browser_terminal")),
         ("browser backend", actual_report.get("backend"), entry.get("browser_backend")),
+        ("native rung", exp_conv.get("rung"), entry.get("native_rung")),
     ]
     for label, observed, pinned in checks:
         if pinned is not None and observed != pinned:
             diffs.append(SignalDiff(
                 design, test, "divergence", label,
                 f"pinned {pinned!r}", f"observed {observed!r}",
-                "expected-divergence entry is STALE: the pinned converge-vs-not "
+                "expected-divergence entry is STALE: the pinned convergence "
                 "shape changed. Remove or re-justify the tolerances.json "
                 "expected_divergences entry (see its follow_up).",
+            ))
+
+    # browser_min_rung: the browser must converge on a rung >= this floor for
+    # the entry to still hold. If the browser converges on a LOWER rung (i.e.
+    # the divergence has collapsed because the browser now solves it as-written
+    # / at parity with native), the exception is stale and must go.
+    min_rung = entry.get("browser_min_rung")
+    if min_rung is not None:
+        observed_rung = act_conv.get("rung")
+        if observed_rung is None or int(observed_rung) < int(min_rung):
+            diffs.append(SignalDiff(
+                design, test, "divergence", "browser winning rung",
+                f"pinned >= {min_rung!r}", f"observed {observed_rung!r}",
+                "expected-divergence entry is STALE: the browser now converges "
+                "on a lower rung than pinned (the ladder divergence collapsed). "
+                "Remove the tolerances.json expected_divergences entry.",
             ))
     return diffs
 
@@ -730,10 +758,11 @@ def self_test() -> int:
     })
 
     def rpt(value: str, tmax: str = "0s", backend: str = "ngspice",
-            converged: bool = True, terminal: bool = False) -> str:
+            converged: bool = True, terminal: bool = False, rung: int | None = None) -> str:
+        rung_val = rung if rung is not None else (1 if converged else None)
         obj = {
             "backend": backend,
-            "convergence": {"converged": converged, "terminal": terminal, "rung": 1 if converged else None},
+            "convergence": {"converged": converged, "terminal": terminal, "rung": rung_val},
             "measurement_stats": {"n1": {"final": value, "max": value, "min": value,
                                          "time_of_max": tmax, "time_of_min": "0s"}},
             "measurements": {"n1": value},
@@ -779,6 +808,45 @@ def self_test() -> int:
     d = check_expected_divergence("designX", "t", native, browser_conv, entry)
     if not d:
         failures.append("stale divergence-B (browser now converges) was NOT caught")
+
+    # Case 8 (#94): converge-on-different-rung divergence — native rung 1,
+    # browser rung >= 2. Pinned with browser_min_rung.
+    tol_rung = Tolerances({
+        "defaults": {"rtol": 1e-3, "atol": 1e-6},
+        "field_tolerances": {
+            "time_of_min": {"abs_tol_s": 1.0},
+            "time_of_max": {"abs_tol_s": 1.0},
+        },
+        "expected_divergences": {
+            "designY": {
+                "test": "t",
+                "native_converged": True,
+                "native_rung": 1,
+                "browser_converged": True,
+                "browser_terminal": False,
+                "browser_backend": "ngspice",
+                "browser_min_rung": 2,
+            }
+        },
+    })
+    entry_rung = tol_rung.divergence_for("designY", "t")
+    native_r1 = json.loads(rpt("3V", rung=1))
+    browser_r3 = json.loads(rpt("3V", rung=3))  # browser converged on rung 3
+    d = check_expected_divergence("designY", "t", native_r1, browser_r3, entry_rung)
+    if d:
+        failures.append(
+            f"holding #94 converge-on-rung>=2 divergence flagged as changed: "
+            f"{[x.detail for x in d]}"
+        )
+
+    # Case 9 (#94): the divergence COLLAPSED (browser now converges rung 1).
+    # MUST be caught -> entry is stale.
+    browser_r1 = json.loads(rpt("3V", rung=1))
+    d = check_expected_divergence("designY", "t", native_r1, browser_r1, entry_rung)
+    if not d:
+        failures.append(
+            "stale #94 rung divergence (browser now converges on rung 1) was NOT caught"
+        )
 
     if failures:
         print("SELF-TEST FAILED:")

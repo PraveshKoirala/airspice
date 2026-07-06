@@ -26,15 +26,17 @@
   },
 
   "expected_divergences": {
-    "_about": "NARROW, self-invalidating per-design exceptions for genuine converge-vs-NOT divergences (NOT value tolerances). Each entry names ONE design + ONE test and pins the EXACT convergence shapes both engines produce today. compare_reports.py requires BOTH engines to still produce those exact shapes: if the browser starts converging (the #45 browser-side ladder landed), or diverges differently, the exception no longer matches and the job FAILS, forcing this entry to be removed or re-justified. It is not a blanket skip — every OTHER field of the excepted report is still compared normally.",
+    "_about": "NARROW, self-invalidating per-design exceptions for genuine converge-vs-NOT (or converge-on-different-rung) divergences (NOT value tolerances). Each entry names ONE design + ONE test and pins the EXACT convergence shapes both engines produce today. compare_reports.py requires BOTH engines to still produce those exact shapes: if the browser starts converging on rung 1 (matching native), or diverges differently, the exception no longer matches and the job FAILS, forcing this entry to be removed or re-justified. It is not a blanket skip — every OTHER field of the excepted report is still compared normally.",
     "complex_bms": {
       "test": "charge_cycle",
       "native_converged": true,
-      "browser_converged": false,
-      "browser_terminal": true,
-      "browser_backend": "builtin_dc_fallback",
-      "justification": "DIVERGENCE B (formalized honestly). This is a real engine capability gap, not a value skew: native ngspice 42 solves charge_cycle's operating point (convergence.converged=true, backend=ngspice), but the browser's eecircuit 45.2 reports `singular matrix: check node charge_ctrl` and its dynamic-gmin / true-gmin / source-stepping all fail, so the browser cannot solve it AS-WRITTEN. The browser has no #45 convergence-aid ladder (gmin/source-stepping via injected .options) — that ladder lives native-side in simulator.py; the browser honestly reports terminal non-convergence and falls back to the analytic DC solver (backend=builtin_dc_fallback) rather than fabricating a waveform. Both #14 and its independent verifier confirmed the eecircuit singular-matrix stderr directly. This is NOT absorbed by a numeric tolerance (there is no waveform to compare); it is pinned as a documented, narrow exception.",
-      "follow_up": "Browser-side convergence ladder (eecircuit .options gmin/source-stepping injection) is tracked as follow-up to #45. When it lands, charge_cycle will converge in the browser too, native_converged/browser_converged will both be true, this exception will stop matching, and the job will fail until this entry is removed."
+      "native_rung": 1,
+      "browser_converged": true,
+      "browser_terminal": false,
+      "browser_backend": "ngspice",
+      "browser_min_rung": 2,
+      "justification": "DIVERGENCE B (formalized honestly, post-#94). Native ngspice 42 solves charge_cycle's operating point on rung 1 (as-written), but the browser's eecircuit 45.2 reports `singular matrix: check node charge_ctrl` on rung 1 and only converges after the #94 browser-side ladder injects the manual-documented .options (gmin/source-stepping, or Gear+relaxed reltol at rung 4). The browser now converges (backend=ngspice, convergence.converged=true) but the winning rung is >= 2, so `aids_required` is true and the convergence.note carries the standard 'numerical aids required' disclosure. The measurement stats agree with native within rtol on the probed nets; the divergence is confined to the convergence.attempts array (rung >=2 in browser vs 1 native) and the aids_required / rung / note fields. This is NOT absorbed by a numeric tolerance (rung is a schema integer, not a physical value); it is pinned as a documented, narrow exception.",
+      "follow_up": "The exception collapses if the two engines' rung-1 behaviour ever aligns (both converge on rung 1). It stays STALE if the browser regresses to terminal non-convergence (browser_converged flips false again) — the comparator flags the shift and the entry must be removed or re-justified."
     }
   },
 
