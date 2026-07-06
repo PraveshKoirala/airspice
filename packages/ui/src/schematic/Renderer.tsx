@@ -239,7 +239,37 @@ export interface RendererProps {
    * transforms so the schematic snaps back to its pre-drag position.
    */
   onCommitMove?: (moves: Array<{ id: string; x: number; y: number }>) => { ok: true } | { ok: false; message: string };
+  /**
+   * Issue #24 wire-draw path. Called on pointer-up after a pin-drag with
+   * the source pin (component + name) and the resolved drop target:
+   *   - kind: "pin"       -> user dropped on another pin
+   *   - kind: "net"       -> user dropped on an existing net wire segment
+   *   - kind: "empty"     -> user dropped on the canvas background
+   * The app resolves this to a `<patch>` and runs it through the gate. On
+   * rejection the returned message is surfaced as a toast; the schematic
+   * is not mutated (the wire preview vanishes on pointer-up regardless).
+   */
+  onCommitWire?: (source: WireSource, target: WireTarget) => { ok: true } | { ok: false; message: string };
+  /**
+   * Issue #24 delete path. Called when the user presses Delete/Backspace
+   * with a component or net selected. Returns { ok, message } for the
+   * toast. The Renderer clears the selection on success.
+   */
+  onCommitDelete?: (target: { kind: "component"; id: string } | { kind: "net"; id: string }) => { ok: true } | { ok: false; message: string };
+  /**
+   * Fired on every pointer-move over the canvas with the CURRENT snapped
+   * cursor position in SVG user coords. Used by the palette to place new
+   * components at (or near) the cursor. Throttled to rAF alongside the
+   * drag pipeline so it never fires more than once per frame.
+   */
+  onCursor?: (hint: GuiHint) => void;
 }
+
+export type WireSource = { comp: string; pin: string };
+export type WireTarget =
+  | { kind: "pin"; comp: string; pin: string }
+  | { kind: "net"; net: string }
+  | { kind: "empty" };
 
 const Renderer: React.FC<RendererProps> = ({
   nodes,
@@ -248,6 +278,9 @@ const Renderer: React.FC<RendererProps> = ({
   interactive = false,
   onLayout,
   onCommitMove,
+  onCommitWire,
+  onCommitDelete,
+  onCursor,
 }) => {
   const [schematic, setSchematic] = useState<SchematicIR | null>(null);
   const selectedComponents = useSchematicUI((s) => s.selectedComponents);
@@ -289,12 +322,31 @@ const Renderer: React.FC<RendererProps> = ({
   // ref.current assignment during render is disallowed).
   const schematicRef = useRef<SchematicIR | null>(schematic);
   const onCommitMoveRef = useRef<RendererProps["onCommitMove"]>(onCommitMove);
+  const onCommitWireRef = useRef<RendererProps["onCommitWire"]>(onCommitWire);
+  const onCommitDeleteRef = useRef<RendererProps["onCommitDelete"]>(onCommitDelete);
+  const onCursorRef = useRef<RendererProps["onCursor"]>(onCursor);
   useEffect(() => {
     schematicRef.current = schematic;
   }, [schematic]);
   useEffect(() => {
     onCommitMoveRef.current = onCommitMove;
   }, [onCommitMove]);
+  useEffect(() => {
+    onCommitWireRef.current = onCommitWire;
+  }, [onCommitWire]);
+  useEffect(() => {
+    onCommitDeleteRef.current = onCommitDelete;
+  }, [onCommitDelete]);
+  useEffect(() => {
+    onCursorRef.current = onCursor;
+  }, [onCursor]);
+
+  // Ref to the wire-preview <path> that is rewritten in place during a
+  // wire-draw drag (issue #24). Same performance invariant as component
+  // drag: NO React re-renders per pointermove. On drop the path either
+  // vanishes (cancel) or is replaced by whatever the fresh layout produces
+  // from the committed patch.
+  const wirePreviewRef = useRef<SVGPathElement | null>(null);
 
   const commitMove = useCallback((ids: string[], dx: number, dy: number) => {
     const ir = schematicRef.current;
@@ -336,6 +388,37 @@ const Renderer: React.FC<RendererProps> = ({
       }
       if (event.key === "Escape") {
         clear();
+        return;
+      }
+      if (event.key === "Delete" || event.key === "Backspace") {
+        // Delete the current selection through the standard commit path.
+        // Multi-component selection is supported by iterating -- each
+        // component becomes ONE patch (bounded by the practical concern
+        // that a batch-delete with pruning is hard to gate-preview
+        // atomically). If the user prefers atomic delete, the Inspector's
+        // future "delete N" action can build the batch itself.
+        const state = useSchematicUI.getState();
+        const commit = onCommitDeleteRef.current;
+        if (!commit) return;
+        if (state.selectedNet) {
+          event.preventDefault();
+          const result = commit({ kind: "net", id: state.selectedNet });
+          if (!result.ok) console.warn("Net delete rejected:", result.message);
+          else clear();
+          return;
+        }
+        if (state.selectedComponents.size > 0) {
+          event.preventDefault();
+          const ids = [...state.selectedComponents];
+          let anyOk = false;
+          for (const id of ids) {
+            const result = commit({ kind: "component", id });
+            if (result.ok) anyOk = true;
+            else console.warn("Delete rejected:", result.message);
+          }
+          if (anyOk) clear();
+          return;
+        }
         return;
       }
       const arrow =
@@ -415,7 +498,26 @@ const Renderer: React.FC<RendererProps> = ({
     curX: number;
     curY: number;
   }
-  const dragRef = useRef<DragState | MarqueeState | null>(null);
+  /**
+   * Wire-draw state (issue #24). Started by a pointer-down on a pin
+   * hitbox. The preview line goes from the source pin's coordinates to
+   * the CURRENT pointer position and is rewritten via wirePreviewRef on
+   * every rAF. On pointer-up the drop target is resolved and the wire
+   * commit callback runs.
+   */
+  interface WireState {
+    kind: "wire";
+    sourceComp: string;
+    sourcePin: string;
+    startX: number;
+    startY: number;
+    curX: number;
+    curY: number;
+    /** Last client-frame pointer coords, for elementFromPoint hit-testing. */
+    clientX: number;
+    clientY: number;
+  }
+  const dragRef = useRef<DragState | MarqueeState | WireState | null>(null);
 
   const svgClientToUser = (event: PointerEvent | React.PointerEvent): { x: number; y: number } => {
     const svg = svgRef.current;
@@ -453,6 +555,32 @@ const Renderer: React.FC<RendererProps> = ({
         rectEl.setAttribute("y", String(y));
         rectEl.setAttribute("width", String(w));
         rectEl.setAttribute("height", String(h));
+      }
+      return;
+    }
+
+    if (state.kind === "wire") {
+      // Straight-line preview from the source pin to the current pointer.
+      // Kept simple (no orthogonal L-bend) so the user always sees exactly
+      // where the drop lands. Selected color drives visual affordance:
+      // hovering over a legal target gets a "wire-preview-legal" class the
+      // hit detector below toggles.
+      const path = wirePreviewRef.current;
+      if (path) {
+        path.setAttribute(
+          "d",
+          `M${state.startX} ${state.startY} L${state.curX} ${state.curY}`,
+        );
+        // Legal-target detection: any pin or net wire under the pointer.
+        const under = elementUnder(state.clientX, state.clientY);
+        const legal =
+          under.kind === "pin"
+            ? // A pin on a DIFFERENT component is always legal; same
+              // component + same pin is a no-op (illegal).
+              !(under.comp === state.sourceComp && under.pin === state.sourcePin)
+            : under.kind === "net";
+        path.classList.toggle("legal", legal);
+        path.classList.toggle("illegal", !legal);
       }
       return;
     }
@@ -608,6 +736,48 @@ const Renderer: React.FC<RendererProps> = ({
     [beginDrag, interactive, replaceComponentSelection],
   );
 
+  // ---- pointer-down on a PIN: begin a wire-draw drag (issue #24 D1).
+  //      Stops propagation so the component-drag handler doesn't ALSO fire
+  //      on the enclosing <g data-component-id>.
+  const onPinPointerDown = useCallback(
+    (compId: string, pinName: string, event: React.PointerEvent<SVGCircleElement>) => {
+      if (!interactive) return;
+      if (event.button !== 0) return;
+      event.stopPropagation();
+      event.preventDefault();
+      const svg = svgRef.current;
+      if (!svg) return;
+      try {
+        svg.setPointerCapture(event.pointerId);
+      } catch {
+        // ignore
+      }
+      const start = svgClientToUser(event);
+      dragRef.current = {
+        kind: "wire",
+        sourceComp: compId,
+        sourcePin: pinName,
+        startX: start.x,
+        startY: start.y,
+        curX: start.x,
+        curY: start.y,
+        clientX: event.clientX,
+        clientY: event.clientY,
+      };
+      // Show the preview line immediately (as a zero-length dot).
+      const path = wirePreviewRef.current;
+      if (path) {
+        path.setAttribute(
+          "d",
+          `M${start.x} ${start.y} L${start.x} ${start.y}`,
+        );
+        path.style.display = "block";
+        path.classList.remove("legal", "illegal");
+      }
+    },
+    [interactive],
+  );
+
   // ---- pointer-down on the SVG background: begin a marquee OR clear
   const onSvgPointerDown = useCallback(
     (event: React.PointerEvent<SVGSVGElement>) => {
@@ -652,12 +822,24 @@ const Renderer: React.FC<RendererProps> = ({
 
   const onSvgPointerMove = useCallback(
     (event: React.PointerEvent<SVGSVGElement>) => {
+      const p = svgClientToUser(event);
+      // Notify the cursor listener EVERY move (throttled to rAF by the
+      // caller if needed; palette placement reads on click so this is
+      // cheap). Snapped so the placement lands on the drawing grid.
+      const cursor = onCursorRef.current;
+      if (cursor) {
+        cursor({ componentId: "", x: snapDrag(p.x), y: snapDrag(p.y), rot: 0 });
+      }
       const state = dragRef.current;
       if (!state) return;
-      const p = svgClientToUser(event);
       if (state.kind === "component") {
         state.pendingDx = p.x - state.startX;
         state.pendingDy = p.y - state.startY;
+      } else if (state.kind === "wire") {
+        state.curX = p.x;
+        state.curY = p.y;
+        state.clientX = event.clientX;
+        state.clientY = event.clientY;
       } else {
         state.curX = p.x;
         state.curY = p.y;
@@ -701,6 +883,42 @@ const Renderer: React.FC<RendererProps> = ({
         } catch {
           // ignore
         }
+      }
+      if (state.kind === "wire") {
+        // Hide the preview and resolve the drop target BEFORE clearing
+        // state -- elementUnder needs the last known client coords, and
+        // the commit is synchronous.
+        const path = wirePreviewRef.current;
+        if (path) {
+          path.setAttribute("d", "");
+          path.style.display = "none";
+          path.classList.remove("legal", "illegal");
+        }
+        const under = elementUnder(state.clientX, state.clientY);
+        const commit = onCommitWireRef.current;
+        const source: WireSource = { comp: state.sourceComp, pin: state.sourcePin };
+        dragRef.current = null;
+        if (commit) {
+          let target: WireTarget;
+          if (under.kind === "pin") {
+            if (under.comp === source.comp && under.pin === source.pin) {
+              target = { kind: "empty" };
+            } else {
+              target = { kind: "pin", comp: under.comp, pin: under.pin };
+            }
+          } else if (under.kind === "net") {
+            target = { kind: "net", net: under.net };
+          } else {
+            target = { kind: "empty" };
+          }
+          if (target.kind !== "empty") {
+            const result = commit(source, target);
+            if (!result.ok) {
+              console.warn("Wire commit rejected:", result.message);
+            }
+          }
+        }
+        return;
       }
       if (state.kind === "marquee") {
         // Compute the marquee rectangle in user coords, intersect with the
@@ -797,6 +1015,14 @@ const Renderer: React.FC<RendererProps> = ({
       dragRef.current = null;
       endDrag();
       rollbackDom(ids, state.netsTouched);
+    } else if (state.kind === "wire") {
+      const path = wirePreviewRef.current;
+      if (path) {
+        path.setAttribute("d", "");
+        path.style.display = "none";
+        path.classList.remove("legal", "illegal");
+      }
+      dragRef.current = null;
     } else {
       const rectEl = marqueeRectRef.current;
       if (rectEl) rectEl.style.display = "none";
@@ -879,6 +1105,11 @@ const Renderer: React.FC<RendererProps> = ({
                 highlightedNets?: Set<string>;
                 onSelect?: (shift: boolean) => void;
                 onPointerDown?: (event: React.PointerEvent<SVGGElement>) => void;
+                onPinPointerDown?: (
+                  compId: string,
+                  pinName: string,
+                  event: React.PointerEvent<SVGCircleElement>,
+                ) => void;
               } = { component };
               if (interactive) {
                 props.selected = isSelected;
@@ -888,6 +1119,7 @@ const Renderer: React.FC<RendererProps> = ({
                   else selectComponent(component.id);
                 };
                 props.onPointerDown = (event) => onComponentPointerDown(component.id, event);
+                props.onPinPointerDown = onPinPointerDown;
               }
               return <ComponentSvg key={component.id} {...props} />;
             })}
@@ -904,6 +1136,17 @@ const Renderer: React.FC<RendererProps> = ({
               pointerEvents="none"
             />
           )}
+          {interactive && (
+            <path
+              ref={wirePreviewRef}
+              className="wire-preview"
+              d=""
+              fill="none"
+              style={{ display: "none" }}
+              pointerEvents="none"
+              data-testid="wire-preview"
+            />
+          )}
         </svg>
       ) : (
         <div className="schematic-loading">Laying out schematic…</div>
@@ -911,6 +1154,48 @@ const Renderer: React.FC<RendererProps> = ({
     </div>
   );
 };
+
+/**
+ * Resolve the topmost pin / net element under a screen point (in CLIENT
+ * coords). Walks up the DOM stack via elementFromPoint + closest so a
+ * pin's wider transparent hit circle (see symbols.tsx) resolves to the
+ * pin marker's data-pin-* attributes, and a wire's transparent hitbox
+ * resolves to a data-net attribute on the underlay/stroke path.
+ *
+ * Returns { kind: "empty" } for background drops.
+ */
+function elementUnder(
+  clientX: number,
+  clientY: number,
+):
+  | { kind: "pin"; comp: string; pin: string; net: string }
+  | { kind: "net"; net: string }
+  | { kind: "empty" } {
+  if (typeof document === "undefined") return { kind: "empty" };
+  const el = document.elementFromPoint(clientX, clientY);
+  if (!el) return { kind: "empty" };
+  // Pin hitbox / marker: closest ancestor carrying data-pin-comp.
+  const pinGroup = (el as Element).closest("[data-pin-comp]");
+  if (pinGroup) {
+    return {
+      kind: "pin",
+      comp: pinGroup.getAttribute("data-pin-comp") || "",
+      pin: pinGroup.getAttribute("data-pin-name") || "",
+      net: pinGroup.getAttribute("data-pin-net") || "",
+    };
+  }
+  // Wire: any path carrying data-net. The wide transparent hitbox
+  // (wire-hitbox class) resolves first; underlay / stroke also carry the
+  // attribute. Exclude the wire-preview <path> itself so a wire never
+  // targets itself.
+  const wirePath = (el as Element).closest(
+    "path[data-net]:not(.wire-preview)",
+  );
+  if (wirePath) {
+    return { kind: "net", net: wirePath.getAttribute("data-net") || "" };
+  }
+  return { kind: "empty" };
+}
 
 /**
  * CSS.escape polyfill for querySelector attribute values (component ids

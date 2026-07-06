@@ -1803,3 +1803,107 @@ body {
   user-select: none;
   -webkit-user-select: none;
 }
+
+/* --------------------------------------------------------------------
+ * Issue #24: component palette + wire-draw preview + pin hitbox.
+ * ----------------------------------------------------------------- */
+
+.schematic-split.with-palette {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr) 300px;
+  height: 100%;
+  min-height: 0;
+}
+
+.schematic-palette {
+  border-right: 1px solid var(--border);
+  background: var(--bg-panel);
+  padding: 14px 12px 14px;
+  overflow: auto;
+  color: var(--text-primary);
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.schematic-palette .palette-header .eyebrow {
+  color: var(--text-muted);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.schematic-palette .palette-search {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  background: var(--bg-input, transparent);
+  color: var(--text-primary);
+  font: inherit;
+}
+.schematic-palette .palette-search:focus {
+  outline: 2px solid var(--focus, #4c86ff);
+  outline-offset: -1px;
+}
+.schematic-palette .palette-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: auto;
+}
+.schematic-palette .palette-item {
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  background: transparent;
+  color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: pointer;
+  font: inherit;
+}
+.schematic-palette .palette-item:hover {
+  background: var(--bg-hover, rgba(255,255,255,0.06));
+  border-color: var(--focus, #4c86ff);
+}
+.schematic-palette .palette-item strong {
+  font-size: 13px;
+}
+.schematic-palette .palette-item .muted-copy {
+  font-size: 11px;
+}
+.schematic-palette .palette-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: 0;
+}
+.schematic-palette .palette-empty {
+  padding: 8px;
+  font-size: 12px;
+}
+
+/* Wire draw preview. Legal/illegal classes are toggled from the
+   Renderer's rAF drag loop; unstyled default is a dashed grey line. */
+.native-schematic .wire-preview {
+  stroke: #94a3b8;
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+  pointer-events: none;
+}
+.native-schematic .wire-preview.legal {
+  stroke: #16a34a;
+  stroke-dasharray: 0;
+}
+.native-schematic .wire-preview.illegal {
+  stroke: #ef4444;
+}
+
+/* Pin hitbox: transparent but cursor-hint. */
+.native-schematic .pin-hitbox {
+  cursor: crosshair;
+}

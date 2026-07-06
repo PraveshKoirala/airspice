@@ -129,6 +129,7 @@ export function ComponentSvg({
   highlightedNets,
   onSelect,
   onPointerDown,
+  onPinPointerDown,
 }: {
   component: SchematicComponent;
   selected?: boolean;
@@ -144,6 +145,18 @@ export function ComponentSvg({
    * Renderer's SVG-level pointer-capture takes effect on this element.
    */
   onPointerDown?: (event: React.PointerEvent<SVGGElement>) => void;
+  /**
+   * Pointer-down handler on an INDIVIDUAL PIN marker (issue #24 wiring).
+   * When present, a pointer-down on the pin's hitbox begins a wire-draw
+   * gesture rather than a component drag. The Renderer wires this to its
+   * wiring state machine. Called with the pin's owning component id + pin
+   * name so the caller doesn't need to reverse-look it up.
+   */
+  onPinPointerDown?: (
+    compId: string,
+    pinName: string,
+    event: React.PointerEvent<SVGCircleElement>,
+  ) => void;
 }) {
   const c = component;
   let symbol: React.ReactNode;
@@ -209,7 +222,35 @@ export function ComponentSvg({
         const point: PinPoint = pinPoint(c, pin);
         const highlighted = highlightedNets?.has(pin.net) ?? false;
         return (
-          <g key={`${c.id}:${pin.name}`} className={`pin-marker${highlighted ? " on-highlighted-net" : ""}`}>
+          <g
+            key={`${c.id}:${pin.name}`}
+            className={`pin-marker${highlighted ? " on-highlighted-net" : ""}`}
+            data-pin-comp={c.id}
+            data-pin-name={pin.name}
+            data-pin-net={pin.net}
+            data-pin-x={point.x}
+            data-pin-y={point.y}
+          >
+            {/*
+             * Wider transparent circle receives pointer events so tapping
+             * near the pin (not exactly on the 3px dot) still initiates a
+             * wire-draw. The visible dot on top stays 3px. Both live under
+             * the same group so highlight/selection classes apply uniformly.
+             * Wiring hit target only exists when onPinPointerDown is wired
+             * (interactive mode); parity commit renders no hitbox.
+             */}
+            {onPinPointerDown ? (
+              <circle
+                className="pin-hitbox"
+                cx={point.x}
+                cy={point.y}
+                r="10"
+                fill="transparent"
+                pointerEvents="all"
+                data-testid={`pin-hit-${c.id}-${pin.name}`}
+                onPointerDown={(event) => onPinPointerDown(c.id, pin.name, event)}
+              />
+            ) : null}
             <circle cx={point.x} cy={point.y} r="3" />
             {showPinText && (
               <text x={point.x + 5} y={point.y - 5}>
