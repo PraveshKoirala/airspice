@@ -12,6 +12,10 @@ name: sim-wasm
 #                       and error mapping. jsdom cannot run a WASM worker, so this
 #                       tier MUST be a real browser (issue deliverable 8/9).
 #
+# Workspaces refactor (issue #85): `npm ci` runs at the repo root; npm workspaces
+# hoists eecircuit-engine and links every sibling package. No per-package
+# lockfiles.
+#
 # No ngspice apt install: the ngspice used here is the one compiled INTO
 # eecircuit-engine's WASM (45.2), not the host's. No COOP/COEP headers: the
 # single-threaded build needs none (epic #12 binding decision 2).
@@ -35,9 +39,6 @@ jobs:
   sim-wasm-unit:
     name: sim-wasm (typecheck + vitest)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: packages/sim-wasm
     steps:
       - uses: actions/checkout@v4
 
@@ -46,19 +47,19 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: packages/sim-wasm/package-lock.json
+          cache-dependency-path: package-lock.json
 
-      - name: Install dependencies
+      - name: Install dependencies (workspaces, root)
         run: npm ci
 
       - name: Typecheck (src + tests, strict)
-        run: npm run typecheck
+        run: npm --workspace sim-wasm run typecheck
 
       - name: Build (tsc -b)
-        run: npm run build
+        run: npm --workspace sim-wasm run build
 
       - name: Unit tests (vitest, stub worker)
-        run: npm test
+        run: npm --workspace sim-wasm test
 
   sim-wasm-browser:
     name: sim-wasm (playwright, real WASM worker)
@@ -99,9 +100,10 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: packages/sim-wasm/package-lock.json
+          cache-dependency-path: package-lock.json
 
-      - name: Install dependencies
+      - name: Install dependencies (workspaces, root)
+        working-directory: ${{ github.workspace }}
         run: npm ci
 
       # Real Chromium + Firefox, real Web Worker, real WASM ngspice: corpus

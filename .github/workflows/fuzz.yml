@@ -46,7 +46,7 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: packages/air-ts/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
@@ -54,12 +54,13 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      # air-ts (in-process engine): install + build so dist/index.js exists.
+      # Workspaces refactor (issue #85): root install + build air-ts so
+      # dist/index.js exists for the in-process fuzz engine.
+      - name: Install dependencies (workspaces, root)
+        run: npm ci
+
       - name: Build air-ts
-        working-directory: packages/air-ts
-        run: |
-          npm ci
-          npm run build
+        run: npm --workspace air-ts run build
 
       # Core package (the oracle behind `air fuzz-eval`).
       - name: Install core package

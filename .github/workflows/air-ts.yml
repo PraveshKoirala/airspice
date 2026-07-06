@@ -7,6 +7,11 @@ name: air-ts
 # Vitest suite, whose parity tests diff air-ts output against the golden corpus
 # byte-for-byte. No ngspice / Python is needed -- issue #7 does no simulation.
 #
+# Workspaces refactor (issue #85): the repo is now an npm workspace root, so
+# `npm ci` runs at the root and hoists a single copy of every dep (in
+# particular fast-xml-parser, which is what #85 was filed to fix). The
+# working-directory stays packages/air-ts for the per-package scripts.
+#
 # Maintainer note: once green, `air-ts` can be added to the required status
 # checks for `main` alongside guardrails / core-py / ui.
 
@@ -27,9 +32,6 @@ jobs:
   air-ts:
     name: air-ts (build + vitest)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: packages/air-ts
     steps:
       - uses: actions/checkout@v4
 
@@ -38,23 +40,28 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: packages/air-ts/package-lock.json
+          cache-dependency-path: package-lock.json
 
-      - name: Install dependencies
+      # Root install: npm workspaces places every hoisted dep under
+      # node_modules/, and symlinks packages/{air-ts,agent,sim-wasm,ui} under
+      # node_modules/<name>. This is the fix for #85: a single fast-xml-parser
+      # copy resolved by npm the standard way (no per-consumer hard-coded
+      # alias). All subsequent per-package scripts see this layout.
+      - name: Install dependencies (workspaces, root)
         run: npm ci
 
       # Strict TypeScript build (tsc -b) fails on any type error; also
       # type-checks the test sources against the same strict config.
       - name: Typecheck (src + tests, strict)
-        run: npm run typecheck
+        run: npm --workspace air-ts run typecheck
 
       # `npm run build` == `tsc -b`; emits dist/ and fails on any TS error.
       - name: Build
-        run: npm run build
+        run: npm --workspace air-ts run build
 
       # Full Vitest suite: corpus parity (15 designs x model.json +
       # canonical.air.xml, byte-diff), units table, formatNumber/%.6g,
       # canonicalizer edges, parser leniencies, security limits, the parity
       # harness mutation self-test, and the fuzzer outcome reporter.
       - name: Test (vitest)
-        run: npm test
+        run: npm --workspace air-ts test
