@@ -100,10 +100,36 @@ export function modelToObject(ir: SystemIR): JsonValue {
     firmware_bindings: mapValues(ir.firmware_bindings),
     firmware_tasks: mapValues(ir.firmware_tasks),
     bridges,
-    tests: mapValues(ir.tests),
+    tests: testsMapValues(ir),
     simulation_profiles: mapValues(ir.simulation_profiles),
     exports,
   };
+}
+
+/**
+ * Serialize the tests Map, omitting the ``analysis`` key on any Test whose
+ * ``analysis`` is null (issue #62). The Python oracle does the same in
+ * ``model_dump.model_to_dict`` -- a Test that never grew an <analysis> child
+ * (i.e. every design in the pre-#62 corpus) dumps without the field at all so
+ * the frozen model.json bytes are unchanged. A Test that DOES carry an AC
+ * analysis serializes the nested object verbatim.
+ */
+function testsMapValues(ir: SystemIR): JsonValue {
+  const out: Record<string, JsonValue> = {};
+  for (const [testId, test] of ir.tests) {
+    const testObj: Record<string, JsonValue> = {
+      id: test.id,
+      description: test.description,
+      setup: test.setup as unknown as JsonValue,
+      duration: test.duration,
+      assertions: test.assertions as unknown as JsonValue,
+    };
+    if (test.analysis !== null) {
+      testObj["analysis"] = { ...test.analysis };
+    }
+    out[testId] = testObj;
+  }
+  return out;
 }
 
 /**

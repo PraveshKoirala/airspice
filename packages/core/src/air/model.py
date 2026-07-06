@@ -104,12 +104,38 @@ class Bridge:
 
 
 @dataclass(frozen=True)
+class Analysis:
+    """AC small-signal sweep description for a test (issue #62).
+
+    ``type`` today is always ``"ac"``; the field exists so future analyses
+    (``dc``, ``noise``, ...) can slot in without another Test attribute. When
+    ``type == "ac"`` the four numeric fields (``sweep``, ``points``, ``start``,
+    ``end``) are the ngspice ``.ac`` card's arguments verbatim -- ``sweep`` is one
+    of ``dec`` / ``oct`` / ``lin`` (§15.3.1 ngspice-46 manual), ``points`` is
+    points-per-decade / octave (or total, for ``lin``), and ``start`` / ``end``
+    are frequency strings the units module parses to Hz. The emitter renders them
+    into ``.ac {sweep} {points} {start_hz} {end_hz}`` (see spice.py).
+
+    When absent from a Test, the compiler falls back to the existing ``.tran``
+    emission: adding this dataclass is BACKWARD COMPATIBLE (every corpus/ground-
+    truth design without an ``<analysis>`` child is unchanged).
+    """
+
+    type: str = "ac"
+    sweep: str = "dec"
+    points: str = "20"
+    start: str = "10Hz"
+    end: str = "1MegHz"
+
+
+@dataclass(frozen=True)
 class Test:
     id: str
     description: str = ""
     setup: dict[str, str] = field(default_factory=dict)
     duration: str = ""
     assertions: list[dict[str, str]] = field(default_factory=list)
+    analysis: Analysis | None = None
 
 
 @dataclass(frozen=True)

@@ -126,12 +126,35 @@ export interface Bridge {
   data: Record<string, BridgeDatum>;
 }
 
+/**
+ * AC small-signal sweep description for a test (issue #62).
+ *
+ * Mirror of the Python ``Analysis`` dataclass. ``type`` today is always ``"ac"``;
+ * the field exists so future analyses (``dc``, ``noise``, ...) slot in without
+ * another Test attribute. When ``type == "ac"`` the four string fields
+ * (``sweep``, ``points``, ``start``, ``end``) are the ngspice ``.ac`` card's
+ * arguments verbatim (§15.3.1 ngspice-46 manual): ``sweep`` is ``dec`` / ``oct``
+ * / ``lin``; ``points`` is points-per-decade/octave (or total, for ``lin``);
+ * ``start`` / ``end`` are frequency strings the units module parses to Hz.
+ * Absent (``null``) on a Test -> the emitter takes the historical ``.tran`` path
+ * (backward compatible; the existing corpus is unchanged).
+ */
+export interface Analysis {
+  type: string;
+  sweep: string;
+  points: string;
+  start: string;
+  end: string;
+}
+
 export interface Test {
   id: string;
   description: string;
   setup: Map<string, string>;
   duration: string;
   assertions: Array<Record<string, string>>;
+  /** Optional analysis descriptor (AC today). null == the .tran path. */
+  analysis: Analysis | null;
 }
 
 export interface SimulationProfile {

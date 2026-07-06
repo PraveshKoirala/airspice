@@ -287,12 +287,27 @@ export function parseTree(rawRoot: XmlElement): SystemIR {
       }
     }
     const run = find(test, "run");
+    // AC analysis descriptor (issue #62). Absent -> null -> the .tran path in
+    // the emitter (backward compatible). Byte-parity mirror of the Python
+    // parser's Analysis extraction.
+    const analysisEl = find(test, "analysis");
+    const analysis =
+      analysisEl !== null
+        ? {
+            type: attr(analysisEl, "type", "ac"),
+            sweep: attr(analysisEl, "sweep", "dec"),
+            points: attr(analysisEl, "points", "20"),
+            start: attr(analysisEl, "start", "10Hz"),
+            end: attr(analysisEl, "end", "1MegHz"),
+          }
+        : null;
     tests.set(testId, {
       id: testId,
       description: childText(test, "description"),
       setup,
       duration: run !== null ? attr(run, "duration", "") : "",
       assertions,
+      analysis,
     });
   }
 
