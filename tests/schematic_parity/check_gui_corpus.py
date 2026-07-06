@@ -7,7 +7,7 @@ after adding <gui>-hint support, because no pre-#22 design carries the hint --
 the addition is designed as an omit-when-none / document-order-preserving
 extension. This script re-parses every corpus input.air.xml and confirms it.
 
-Run:  python scripts/schematic-parity/check_gui_corpus.py
+Run:  python tests/schematic_parity/check_gui_corpus.py
 """
 
 from __future__ import annotations

@@ -10,8 +10,8 @@
  * will show it.
  *
  * Usage:
- *   node scripts/schematic-parity/snapshot.mjs --write <out-dir>
- *   node scripts/schematic-parity/snapshot.mjs --check <baseline-dir>
+ *   npx tsx tests/schematic_parity/snapshot.mjs --write <out-dir>
+ *   npx tsx tests/schematic_parity/snapshot.mjs --check <baseline-dir>
  */
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
