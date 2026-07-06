@@ -1520,3 +1520,179 @@ body {
 .repair-outcome-body strong { display: block; font-size: 14px; color: var(--text-bright); margin-bottom: 2px; }
 .repair-outcome-body p { margin: 0 0 4px; font-size: 12px; color: var(--text-secondary); }
 .repair-outcome-meta { font-size: 11px; color: var(--text-muted); }
+
+/* --------------------------------------------------------------------------
+ * Schematic split (canvas + Inspector) and Inspector panel (issue #22).
+ * ------------------------------------------------------------------------ */
+.schematic-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  height: 100%;
+  min-height: 0;
+}
+
+.schematic-inspector {
+  border-left: 1px solid var(--border);
+  background: var(--bg-panel);
+  padding: 14px 14px 20px;
+  overflow: auto;
+  color: var(--text-primary);
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.schematic-inspector .inspector-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.schematic-inspector .inspector-header .eyebrow {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.schematic-inspector .icon-btn {
+  height: 24px;
+  width: 24px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.schematic-inspector .icon-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+.schematic-inspector .inspector-body { display: flex; flex-direction: column; gap: 8px; }
+
+.schematic-inspector .inspector-row {
+  display: grid;
+  grid-template-columns: 60px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.schematic-inspector .inspector-row label {
+  color: var(--text-muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+.schematic-inspector .inspector-row input {
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 12px;
+}
+.schematic-inspector .inspector-row input:focus {
+  outline: none;
+  border-color: var(--accent, #6366f1);
+}
+.schematic-inspector .inspector-row.readonly code {
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.schematic-inspector .inspector-section-title {
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+}
+
+.schematic-inspector .inspector-pins {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.schematic-inspector .inspector-pins th {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-align: left;
+  font-weight: 700;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+}
+.schematic-inspector .inspector-pins td {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+}
+.schematic-inspector .inspector-pins code {
+  color: var(--text-primary);
+  font-size: 11px;
+}
+
+.schematic-inspector .inspector-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.schematic-inspector .inspector-actions button {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.schematic-inspector .inspector-actions button:hover { background: var(--bg-hover); }
+
+.schematic-inspector .diagnostic.success {
+  border-color: var(--success, #2ecc71);
+  color: var(--success, #2ecc71);
+  padding: 6px 8px;
+  font-size: 11px;
+}
+.schematic-inspector .diagnostic.error {
+  border-color: var(--error, #fb7185);
+  color: var(--error, #fb7185);
+  padding: 6px 8px;
+  font-size: 11px;
+}
+.schematic-inspector.empty { color: var(--text-muted); }
+.schematic-inspector.empty p { font-size: 12px; margin: 4px 0; }
+.schematic-inspector kbd {
+  padding: 1px 5px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-size: 10px;
+  font-family: monospace;
+}
+
+/* Selection highlight on the schematic canvas. */
+.schematic-component.selected .symbol-line,
+.schematic-component.selected .symbol-shell,
+.schematic-component.selected .ic-body,
+.schematic-component.selected .ic-pin {
+  stroke: var(--accent, #6366f1);
+  stroke-width: 2.4;
+}
+.schematic-component.selected .ic-body { fill: rgba(99, 102, 241, 0.08); }
+.schematic-net-wire.selected .wire-stroke {
+  stroke-width: 3.2;
+  filter: drop-shadow(0 0 3px rgba(99, 102, 241, 0.55));
+}
+.pin-marker.on-highlighted-net circle {
+  fill: var(--accent, #6366f1);
+  opacity: 1;
+}

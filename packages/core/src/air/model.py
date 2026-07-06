@@ -34,6 +34,29 @@ class PinConnection:
 
 
 @dataclass(frozen=True)
+class GuiHint:
+    """Optional schematic-position hint for a component (issue #22).
+
+    The design XML may attach a ``<gui x="120" y="240" rot="0"/>`` child to
+    any ``<component>``. When present, the UI renders the component at those
+    exact coordinates on the schematic canvas instead of running auto-layout
+    for it; ``rot`` is a rotation in degrees (0/90/180/270). Absent -> the
+    component participates in the ELK/motif fallback path.
+
+    The values are unitless doubles/integers in the schematic's own
+    coordinate system; they are grid-snapped by the renderer. This dataclass
+    is BACKWARD COMPATIBLE: no pre-#22 corpus design carries a ``<gui>``
+    child, so ``Component.gui`` is ``None`` on every existing design and the
+    frozen model.json bytes are unchanged (see ``model_dump.model_to_dict``
+    for the omit-when-None serialization).
+    """
+
+    x: float
+    y: float
+    rot: int = 0
+
+
+@dataclass(frozen=True)
 class Component:
     id: str
     type: str
@@ -43,6 +66,9 @@ class Component:
     value: str | None = None
     pins: dict[str, PinConnection] = field(default_factory=dict)
     properties: dict[str, str] = field(default_factory=dict)
+    # Optional schematic-position hint (issue #22). None for every pre-#22
+    # design; omitted from model.json when None (see model_dump).
+    gui: GuiHint | None = None
 
 
 @dataclass(frozen=True)

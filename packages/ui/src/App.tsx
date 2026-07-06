@@ -7,6 +7,9 @@ import Sidebar from './components/Sidebar';
 import Toolbar from './components/Toolbar';
 import XmlEditor from './components/Editor';
 import Graph from './components/Graph';
+import Inspector from './schematic/Inspector';
+import type { GuiHint, SchematicIR } from './schematic/types';
+import { parse as parseAir } from 'air-ts';
 import ResultPanel from './components/ResultPanel';
 import ChatRepl from './components/ChatRepl';
 import RepairPanel from './components/RepairPanel';
@@ -443,9 +446,45 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
   // against the client-side gate + tools, and applies designs ONLY through the
   // design store's single write path (applyValidated / a gated ValidatedDesign).
 
+  // Latest schematic IR (positions + wire routes) captured from the Renderer
+  // after each successful layout. The Inspector's "Save layout" action reads
+  // it to build <gui> patches; storing it in App state keeps the Inspector
+  // decoupled from the SVG renderer.
+  const [schematicIR, setSchematicIR] = useState<SchematicIR | null>(null);
+
+  // Parse the design XML on the main thread to extract <gui> hints (a small
+  // cost -- a few ms on the largest corpus -- shared with the Inspector's
+  // parse in a real app; kept explicit here for clarity). A parse failure
+  // during mid-edit typing yields empty hints, which is the same as
+  // hint-less behavior (fallback to auto-layout).
+  const hints = useMemo<GuiHint[]>(() => {
+    if (!xml.trim()) return [];
+    try {
+      const ir = parseAir(xml);
+      const out: GuiHint[] = [];
+      for (const c of ir.components.values()) {
+        if (c.gui) out.push({ componentId: c.id, x: c.gui.x, y: c.gui.y, rot: c.gui.rot });
+      }
+      return out;
+    } catch {
+      return [];
+    }
+  }, [xml]);
+
   const renderPanel = () => {
     if (activeTab === 'schematic') {
-      return <Graph nodes={nodes} edges={edges} />;
+      return (
+        <div className="schematic-split">
+          <Graph
+            nodes={nodes}
+            edges={edges}
+            hints={hints}
+            interactive
+            onLayout={setSchematicIR}
+          />
+          <Inspector ir={schematicIR} />
+        </div>
+      );
     }
     if (activeTab === 'editor') {
       return <XmlEditor xml={xml} onChange={(value) => setUserXml(value || '')} theme={theme} />;

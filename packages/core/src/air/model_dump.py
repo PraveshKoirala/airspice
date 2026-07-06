@@ -66,6 +66,13 @@ def model_to_dict(ir: SystemIR) -> dict[str, Any]:
         # Pins is a dict keyed by pin name; enforce sorted key order explicitly.
         comp_dict["pins"] = _sorted_map(comp.pins)
         comp_dict["properties"] = _sorted_map(comp.properties)
+        # OMIT-WHEN-NONE for the optional <gui> hint (issue #22): every
+        # pre-#22 corpus design has gui=None, and dropping the key entirely
+        # (rather than emitting "gui": null) preserves byte-parity with the
+        # frozen model.json fixtures -- exactly the same pattern applied to
+        # Test.analysis in #62.
+        if comp_dict.get("gui") is None:
+            comp_dict.pop("gui", None)
         components[cid] = comp_dict
 
     analog: list[Any] = []

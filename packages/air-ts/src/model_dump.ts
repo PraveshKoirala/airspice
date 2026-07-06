@@ -55,7 +55,7 @@ export function modelToObject(ir: SystemIR): JsonValue {
     for (const propName of [...comp.properties.keys()].sort(byCodePoint)) {
       properties[propName] = comp.properties.get(propName) as string;
     }
-    components[cid] = {
+    const componentObj: Record<string, JsonValue> = {
       id: comp.id,
       type: comp.type,
       part: comp.part,
@@ -65,6 +65,14 @@ export function modelToObject(ir: SystemIR): JsonValue {
       pins,
       properties,
     };
+    // OMIT-WHEN-NULL for the optional <gui> hint (issue #22): every pre-#22
+    // corpus design has gui=null, and dropping the key entirely (rather
+    // than emitting "gui": null) preserves byte-parity with the frozen
+    // model.json fixtures. Same pattern as Test.analysis (#62).
+    if (comp.gui !== null) {
+      componentObj["gui"] = { x: comp.gui.x, y: comp.gui.y, rot: comp.gui.rot };
+    }
+    components[cid] = componentObj;
   }
 
   const analog: JsonValue[] = [];

@@ -13,6 +13,7 @@ from .model import (
     FirmwareBinding,
     FirmwareProject,
     FirmwareTask,
+    GuiHint,
     Interface,
     Metadata,
     Net,
@@ -97,6 +98,24 @@ def parse_tree(tree: ET.ElementTree) -> SystemIR:
             for prop in element.findall("property")
         }
         value_el = element.find("value")
+        # Optional schematic-position hint (issue #22). We take the FIRST
+        # <gui> child if the design carries multiple (well-formed designs
+        # have at most one; matching ElementTree's `.find` behavior). x and y
+        # are required attributes (numeric); rot defaults to 0. A malformed
+        # <gui> (missing coord, non-numeric value) is silently ignored so a
+        # partially-typed edit doesn't fail the whole design parse -- the
+        # validator will surface the schema failure separately.
+        gui: GuiHint | None = None
+        gui_el = element.find("gui")
+        if gui_el is not None:
+            try:
+                gui = GuiHint(
+                    x=float(gui_el.attrib["x"]),
+                    y=float(gui_el.attrib["y"]),
+                    rot=int(gui_el.attrib.get("rot", "0") or "0"),
+                )
+            except (KeyError, ValueError):
+                gui = None
         components[component_id] = Component(
             id=component_id,
             type=element.attrib.get("type", ""),
@@ -106,6 +125,7 @@ def parse_tree(tree: ET.ElementTree) -> SystemIR:
             value=value_el.text.strip() if value_el is not None and value_el.text else None,
             pins=pins,
             properties=properties,
+            gui=gui,
         )
 
     analog = []
