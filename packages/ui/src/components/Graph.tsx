@@ -24,7 +24,7 @@ import type { Edge, Node } from "reactflow";
 import Renderer from "../schematic/Renderer";
 import type { GuiHint, SchematicIR } from "../schematic/types";
 
-export interface GraphProps {
+interface GraphProps {
   nodes: Node[];
   edges: Edge[];
   /** `<gui>` position hints (issue #22 B). Empty by default. */
