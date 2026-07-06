@@ -4,6 +4,13 @@ name: CI
 #   core-py  -- full pytest suite with the real ngspice engine (apt-installed)
 #   ui       -- npm ci + lint + build, with dist/ artifact and gzipped size
 #
+# Workspaces refactor (issue #85): the ui job now runs `npm ci` at the repo
+# root. npm workspaces hoists a single copy of every shared dep
+# (fast-xml-parser via air-ts, eecircuit-engine via sim-wasm, etc.) and links
+# packages/{air-ts,agent,sim-wasm,ui} under node_modules/<name>. This closes the
+# #85 landmine (per-consumer pinning of fast-xml-parser via a Vite alias) --
+# there is exactly one copy per package now.
+#
 # Maintainer note: after this lands, mark BOTH `core-py` and `ui` as required
 # status checks in the branch-protection settings for `main` so no PR can merge
 # without them green.
@@ -80,9 +87,6 @@ jobs:
   ui:
     name: ui (lint + build)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: packages/ui
     steps:
       - uses: actions/checkout@v4
 
@@ -91,17 +95,33 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: packages/ui/package-lock.json
+          cache-dependency-path: package-lock.json
 
-      - name: Install dependencies
+      # Root install: workspaces layout. The UI consumes air-ts / agent /
+      # sim-wasm as real workspace deps (source-aliased in vite.config.ts for
+      # HMR); their transitive deps (fast-xml-parser, eecircuit-engine) are
+      # hoisted so there is a single copy per package.
+      - name: Install dependencies (workspaces, root)
         run: npm ci
 
       - name: Lint
-        run: npm run lint
+        run: npm --workspace ui run lint
+
+      # Build the sibling workspace packages first so ui's `tsc -b` finds their
+      # real .d.ts under node_modules/<name>/dist (workspace symlink -> the built
+      # dist). Vite bundles from SOURCE via the aliases in vite.config.ts, but
+      # TypeScript resolves the bare `air-ts` / `agent` / `sim-wasm` specifiers
+      # through package.json `types` -> `./dist/index.d.ts`, so they need to
+      # exist.
+      - name: Build workspace deps (air-ts, agent, sim-wasm)
+        run: |
+          npm --workspace air-ts run build
+          npm --workspace agent run build
+          npm --workspace sim-wasm run build
 
       # `npm run build` == `tsc -b && vite build`; fails on any TS or build error.
       - name: Build
-        run: npm run build
+        run: npm --workspace ui run build
 
       - name: Upload dist artifact
         uses: actions/upload-artifact@v4
@@ -112,6 +132,7 @@ jobs:
 
       # Total gzipped JS size -> job summary. Baseline for the M6 performance budget.
       - name: Report gzipped JS bundle size
+        working-directory: packages/ui
         run: |
           {
             echo "## ui bundle size (gzipped JS)"

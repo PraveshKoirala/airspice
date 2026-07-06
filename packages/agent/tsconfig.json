@@ -28,14 +28,15 @@
     "esModuleInterop": true,
     "resolveJsonModule": true
   },
-  /* The tool runtime (issue #18) consumes the air-ts engine. At BUILD time
-     `air-ts` is an AMBIENT module (src/air-ts.d.ts) declaring only the small
-     value surface the ported prompts use, so `tsc -b` never pulls air-ts's
-     SOURCE into this emitting composite project (its source is outside rootDir,
-     and packages/air-ts/node_modules is not installed in the `agent` CI job). At
-     RUNTIME the real air-ts source resolves via the Vite alias (UI) and the
-     Vitest alias (this package's tests) -- the same source-aliased peer
-     consumption packages/ui uses. */
+  /* Workspaces refactor (issue #85): `air-ts` is a real workspace dependency,
+     so `tsc -b` on this package resolves it via node_modules/air-ts -> the
+     built dist/index.d.ts (air-ts's package.json `exports.types`). The
+     project reference below tells TypeScript to build packages/air-ts first
+     when this project is built, so the .d.ts is present. The old
+     src/air-ts.d.ts ambient stub was deleted -- real types replace it. */
+  "references": [
+    { "path": "../air-ts" }
+  ],
   "include": ["src/**/*.ts"],
   "exclude": ["dist", "node_modules"]
 }

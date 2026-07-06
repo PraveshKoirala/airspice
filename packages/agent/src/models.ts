@@ -21,7 +21,10 @@ export interface ModelCatalogEntry {
 
 // PROVENANCE: gemini-3.5-flash and gpt-4o-mini mirror prompts.py's
 // DEFAULT_GEMINI_MODEL / DEFAULT_OPENAI_MODEL. claude-sonnet-5 is from issue #17.
-export const MODEL_CATALOG: Record<Exclude<ProviderId, "mock">, ModelCatalogEntry> = {
+// The house-agent lane (issue #20) owns its own model tier (the Worker enforces
+// it), so `house` is intentionally excluded from this catalog too — the
+// SettingsPanel BYOK picker only iterates the network providers below.
+export const MODEL_CATALOG: Record<Exclude<ProviderId, "mock" | "house">, ModelCatalogEntry> = {
   anthropic: {
     defaultModel: "claude-sonnet-5",
     models: ["claude-sonnet-5", "claude-opus-5", "claude-haiku-5"],

@@ -1,0 +1,53 @@
+name: house-agent
+
+# CI for the prototype house-agent Cloudflare Worker (packages/house-agent,
+# issue #20). Mirrors agent.yml: install → typecheck → test. Every test uses
+# an in-memory KV stub + a mocked upstream `fetch`, so NO network, NO real
+# provider key, NO wrangler dev, NO deploy. Live wrangler runs are manual
+# (documented in packages/house-agent/README.md); intentionally NOT run here.
+#
+# The house agent is feature-flagged OFF in production builds until spend
+# controls are verified live (docs/house_agent_design.md). CI enforces that
+# the prototype LOADS and its tests PASS in mock mode — the acceptance path
+# named in the issue.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - "packages/house-agent/**"
+      - ".github/workflows/house-agent.yml"
+
+concurrency:
+  group: house-agent-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  house-agent:
+    name: house-agent (typecheck + vitest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/house-agent
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: packages/house-agent/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck (strict)
+        run: npm run typecheck
+
+      - name: Test (vitest, mock mode)
+        run: npm test

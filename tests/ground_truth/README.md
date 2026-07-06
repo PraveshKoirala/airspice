@@ -33,7 +33,7 @@ ground-truth evidence — see #55).
 | `bjt_ce_bias` | collector V | 4.000 V | I_C=β·I_B=1 mA, 5−1 | pass |
 | `rc_step_response` | V@τ,2τ,5τ | 2.086 / 2.853 / 3.278 V | 3.3·(1−e^−t/τ) | pass |
 | `pwm_rc_average` | filtered avg | 1.650 V | D·Vstep, D=0.5 | pass (#59 fixed oracle-first) |
-| `rc_lowpass_fc` | −3 dB @ fc | **0.7071 V (want)** | 1/√2 at fc=995 Hz | **expected-fail #62** |
+| `rc_lowpass_fc` | −3 dB @ fc | −3.01 dB @ 995 Hz | 1/√2 at fc=995 Hz | pass (#62 fixed oracle-first) |
 | `led_forward_drop` | red LED Vf | **1.8–2.2 V (want)** | LED datasheet | **expected-fail: validation-blocked `UNDEFINED_SPICE_MODEL` (#55 fixed; pass via #60)** |
 | `zener_clamp` | clamp V | **5.1 V (want)** | Zener BV | **expected-fail: validation-blocked `UNDEFINED_SPICE_MODEL` (#55 fixed; pass via #60)** |
 | `inverting_opamp_gain` | Vout | **−2.200 V (want)** | −Rf/Rin·Vin | **expected-fail: validation-blocked `UNDEFINED_SPICE_MODEL` (#55 fixed; pass via #60)** |
@@ -44,7 +44,7 @@ ground-truth evidence — see #55).
 | `photoresistor_divider_dark` | LDR tap dark | 0.0495 V | GL5528 ≥1M dark; 5·10k/1.01M | pass (#105) |
 | `i2c_sensor_stub` | idle SDA/SCL | 5.000 V | open-drain pull-ups hold bus at rail | pass (#105) |
 
-10 passing + 4 documented expected-failures + 6 build-benchmark parts (#105) = 20 circuits.
+11 passing + 3 documented expected-failures + 6 build-benchmark parts (#105) = 20 circuits.
 
 ## Findings (oracle disagreements → filed issues)
 
@@ -55,9 +55,15 @@ ground-truth evidence — see #55).
   (`PW = ton − (TR+TF)/2`) so the emitted duty equals `ton/period`;
   `pwm_rc_average` flips to a passing `mean_check` on the unchanged [1.55, 1.75] V
   window.
-- **#62** — the compiler emits only `.tran` with DC sources, never `.ac`, so
-  frequency-domain checks (RC −3 dB at fc, roll-off) are unverifiable. Caught by
-  `rc_lowpass_fc`.
+- **#62** (fixed oracle-first) — the compiler used to emit only `.tran` with DC
+  sources, never `.ac`, so frequency-domain checks (RC −3 dB at fc, roll-off)
+  were unverifiable. `air/spice.py::compile_spice` now emits `.ac dec/oct/lin`
+  when a test carries an `<analysis type="ac"...>` child, tags voltage sources
+  with `AC {ac_magnitude}`, and probes `vdb(net)`/`vp(net)` per frequency point.
+  The simulator parses the frequency response and evaluates a new
+  `assert_gain_db_at_freq` assertion. `rc_lowpass_fc` flips to a passing three-
+  point check: −3.01 dB at fc=995 Hz, 0 dB in the passband (100 Hz), and −20 dB
+  in the stopband (10 kHz).
 - **#55** (fixed oracle-first in PR #61) — the SPICE compiler used to emit
   netlists referencing undefined models/subckts; ngspice exited non-zero and the
   simulator silently downgraded to the DC fallback reporting a hollow `passed`.

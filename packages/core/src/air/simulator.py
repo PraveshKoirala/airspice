@@ -11,6 +11,8 @@ from .model import Component, SystemIR, Test
 from .spice import compile_spice
 from .units import format_quantity, parse_quantity
 
+import math
+
 
 @dataclass(frozen=True)
 class SignalStats:
@@ -120,8 +122,20 @@ def simulate_analog(ir: SystemIR, profile_id: str, out_dir: Path) -> dict[str, o
         test = ir.tests[test_id]
         builder = DiagnosticBuilder()
 
-        # Merge extra probes with assertion-based probes for cleanup and stats
-        assertion_nets = {a.get("net", "") for a in test.assertions if a.get("op") == "assert_voltage" and a.get("net")}
+        is_ac_test = test.analysis is not None and test.analysis.type == "ac"
+
+        # Merge extra probes with assertion-based probes for cleanup and stats.
+        # For an AC test both assert_voltage and assert_gain_db_at_freq contribute
+        # probe nets (assert_voltage rarely appears under an AC analysis but the
+        # union stays honest if a design mixes the two).
+        if is_ac_test:
+            assertion_nets = {
+                a.get("net", "")
+                for a in test.assertions
+                if a.get("op") in ("assert_gain_db_at_freq", "assert_voltage") and a.get("net")
+            }
+        else:
+            assertion_nets = {a.get("net", "") for a in test.assertions if a.get("op") == "assert_voltage" and a.get("net")}
         all_probe_nets = sorted(assertion_nets | extra_probe_nets)
 
         _clear_test_waveforms_explicit(out_dir / "waveforms", test, all_probe_nets)
@@ -164,15 +178,33 @@ def simulate_analog(ir: SystemIR, profile_id: str, out_dir: Path) -> dict[str, o
         # agent are pointed at the topology, not at value-twiddling.
         if convergence["terminal"]:
             sim_diagnostics.append(_terminal_convergence_diagnostic(builder, test.id))
+        frequency_response: dict[str, list[dict[str, float]]] = {}
         if used_ngspice:
-            # ngspice wrote whitespace-delimited wrdata; normalize each probe CSV
-            # into the canonical comma+header form the UI/readback consume.
-            for net in all_probe_nets:
-                wave_path = out_dir / "waveforms" / f"{test.id}_{net}.csv"
-                samples = _read_samples(wave_path)
-                if samples:
-                    _write_canonical_waveform(wave_path, net, samples)
-        assertion_diagnostics = _evaluate_assertions(test, measured, stats)
+            if is_ac_test:
+                # AC path (issue #62): wrdata for ``vdb(net) vp(net)`` gives four
+                # numbers per row (freq vdb freq vphase). Reparse each probe CSV
+                # into a magnitude(dB)/phase(deg) frequency response and rewrite
+                # the CSV in a canonical ``freq_hz,mag_db,phase_deg`` form the UI
+                # / assertion evaluator both consume.
+                for net in all_probe_nets:
+                    wave_path = out_dir / "waveforms" / f"{test.id}_{net}.csv"
+                    points = _read_ac_points(wave_path)
+                    if points:
+                        _write_canonical_ac_waveform(wave_path, net, points)
+                        frequency_response[net] = points
+            else:
+                # ngspice wrote whitespace-delimited wrdata; normalize each probe
+                # CSV into the canonical comma+header form the UI/readback
+                # consume.
+                for net in all_probe_nets:
+                    wave_path = out_dir / "waveforms" / f"{test.id}_{net}.csv"
+                    samples = _read_samples(wave_path)
+                    if samples:
+                        _write_canonical_waveform(wave_path, net, samples)
+        if is_ac_test:
+            assertion_diagnostics = _evaluate_ac_assertions(test, frequency_response)
+        else:
+            assertion_diagnostics = _evaluate_assertions(test, measured, stats)
         diagnostics = sim_diagnostics + assertion_diagnostics
         if ngspice_run.failed:
             backend = "ngspice_failed"
@@ -198,6 +230,20 @@ def simulate_analog(ir: SystemIR, profile_id: str, out_dir: Path) -> dict[str, o
             "diagnostics": [d.to_dict() for d in report_diagnostics],
             "artifacts": [artifact.path for artifact in compile_result.artifacts] + waveform_artifacts,
         }
+        if is_ac_test:
+            # AC test: expose the frequency-response samples (freq, mag_db,
+            # phase_deg per net) so downstream consumers (UI, cosim, ground-truth
+            # runner) can inspect the physics without re-parsing the CSV. Empty
+            # dict when ngspice was missing/failed — the diagnostic path above
+            # already carries the reason.
+            report["frequency_response"] = frequency_response
+            report["analysis"] = {
+                "type": test.analysis.type,
+                "sweep": test.analysis.sweep,
+                "points": test.analysis.points,
+                "start": test.analysis.start,
+                "end": test.analysis.end,
+            }
         report_path = out_dir / "reports" / f"{test.id}.json"
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
@@ -769,5 +815,160 @@ def _duration_seconds(duration: str) -> float:
     if not duration:
         return 0.1
     return parse_quantity(duration, "s")
+
+
+# ---------------------------------------------------------------------------
+# AC small-signal analysis (issue #62)
+# ---------------------------------------------------------------------------
+
+def _read_ac_points(path: Path) -> list[dict[str, float]]:
+    """Parse an ngspice AC ``wrdata`` CSV into a frequency response.
+
+    The compiler emits one wrdata line per probed net:
+
+        wrdata ../waveforms/<test>_<net>.csv vdb(<net>) vp(<net>)
+
+    ngspice's ``wrdata`` repeats the X (frequency) column for each variable, so
+    every row has four numbers -- ``freq  vdb  freq  vphase`` (§15.6 ngspice-46
+    manual, "Simulation output: wrdata"). We take the two repeated-frequency
+    columns as the freq, the second number as magnitude in dB, the fourth as
+    phase in degrees. Rows with fewer than four numeric tokens are skipped (the
+    first line ngspice sometimes writes as a header).
+
+    Returns a list of ``{"freq_hz", "mag_db", "phase_deg"}`` dicts in the order
+    ngspice wrote them (ascending frequency for ``dec``/``lin`` sweeps).
+    """
+    points: list[dict[str, float]] = []
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return points
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        numbers: list[float] = []
+        for token in line.replace(",", " ").split():
+            try:
+                numbers.append(float(token))
+            except ValueError:
+                pass
+        if len(numbers) < 4:
+            continue
+        freq_hz = numbers[0]
+        mag_db = numbers[1]
+        # ngspice v46 ``vp()`` returns phase in RADIANS by default (§15.6.1 of the
+        # ngspice-46 manual, "Complex numbers ... vp is phase in radians"). We
+        # store phase in DEGREES in the report because that's the physics-natural
+        # unit for a filter check (a -3 dB corner has phase -45 deg) and matches
+        # every hand-derivation in tests/ground_truth. Convert here at the parse
+        # boundary so downstream code (assertions, UI, cosim) never sees radians.
+        phase_deg = math.degrees(numbers[3])
+        points.append({"freq_hz": freq_hz, "mag_db": mag_db, "phase_deg": phase_deg})
+    return points
+
+
+def _write_canonical_ac_waveform(path: Path, net: str, points: list[dict[str, float]], max_points: int = 500) -> None:
+    """Rewrite an AC waveform CSV in canonical ``freq_hz,mag_db,phase_deg`` form.
+
+    Downsampled the same way as the transient canonical form so long sweeps stay
+    small, always preserving the final (highest-frequency) point. Header names
+    include the net so the UI can distinguish probes when it stitches multiple
+    files.
+    """
+    rows = points
+    if len(rows) > max_points:
+        step = len(rows) // max_points
+        reduced = rows[::step]
+        if reduced[-1] != rows[-1]:
+            reduced.append(rows[-1])
+        rows = reduced
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(["freq_hz", f"vdb({net})", f"vp({net})"])
+        for pt in rows:
+            writer.writerow([pt["freq_hz"], pt["mag_db"], pt["phase_deg"]])
+
+
+def _evaluate_ac_assertions(
+    test: Test, frequency_response: dict[str, list[dict[str, float]]]
+) -> list[Diagnostic]:
+    """Evaluate AC-flavoured assertions against the parsed frequency response.
+
+    Today the only AC assertion is ``assert_gain_db_at_freq`` (issue #62): it
+    picks the closest-in-log-frequency sample point to the target frequency and
+    checks its magnitude in dB against the ``[min_db, max_db]`` window.
+
+    Rationale for the closest-log-freq lookup: ``dec`` sweeps space samples
+    logarithmically, so the closest LINEAR distance would systematically prefer
+    the higher-frequency neighbour; log-distance gives the true nearest sample.
+    Interpolating between the two neighbours would also work but adds a
+    numerically-noisy step for a physics check the sweep density already covers
+    (points/decade >= 10 gives < 0.05 dB error near a -3 dB corner).
+    """
+    builder = DiagnosticBuilder()
+    diagnostics: list[Diagnostic] = []
+    for assertion in test.assertions:
+        op = assertion.get("op")
+        if op != "assert_gain_db_at_freq":
+            continue
+        net = assertion.get("net", "")
+        freq_str = assertion.get("freq")
+        min_db_str = assertion.get("min_db")
+        max_db_str = assertion.get("max_db")
+        if not net or not freq_str or min_db_str is None or max_db_str is None:
+            diagnostics.append(
+                builder.make(
+                    "error",
+                    "analog",
+                    "ASSERT_FAILED",
+                    "assert_gain_db_at_freq requires net/freq/min_db/max_db attributes.",
+                    [test.id, net],
+                    expected={"attrs": ["net", "freq", "min_db", "max_db"]},
+                )
+            )
+            continue
+        target_hz = parse_quantity(freq_str, "Hz")
+        min_db = float(min_db_str)
+        max_db = float(max_db_str)
+        response = frequency_response.get(net)
+        if not response:
+            diagnostics.append(
+                builder.make(
+                    "error",
+                    "analog",
+                    "ASSERT_NO_MEASUREMENT",
+                    f"No AC frequency response available for {net}.",
+                    [test.id, net],
+                )
+            )
+            continue
+        closest = min(
+            response,
+            key=lambda pt: abs(math.log10(max(pt["freq_hz"], 1e-30)) - math.log10(max(target_hz, 1e-30))),
+        )
+        mag_db = closest["mag_db"]
+        if not (min_db <= mag_db <= max_db):
+            diagnostics.append(
+                builder.make(
+                    "error",
+                    "analog",
+                    "ASSERT_FAILED",
+                    f"|H({net})| at {freq_str} was outside expected range.",
+                    [test.id, net],
+                    observed={
+                        "mag_db": f"{mag_db:.6g}",
+                        "phase_deg": f"{closest['phase_deg']:.6g}",
+                        "sample_freq_hz": f"{closest['freq_hz']:.6g}",
+                    },
+                    expected={"min_db": min_db_str, "max_db": max_db_str, "freq": freq_str},
+                    suggested_actions=[
+                        "Adjust filter component values (R, C)",
+                        "Check the AC source ac_magnitude is set",
+                        "Verify the target frequency lies inside the sweep range",
+                    ],
+                )
+            )
+    return diagnostics
 
 

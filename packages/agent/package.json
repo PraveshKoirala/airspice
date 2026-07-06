@@ -26,9 +26,11 @@
     "bench": "tsx --tsconfig ./bench/tsconfig.bench.json ./bench/run.ts",
     "build-bench": "tsx --tsconfig ./bench/tsconfig.bench.json ./bench/build/run.ts"
   },
+  "dependencies": {
+    "air-ts": "*"
+  },
   "devDependencies": {
     "@types/node": "^22.20.0",
-    "fast-xml-parser": "^5.9.3",
     "tsx": "^4.19.2",
     "typescript": "~5.6.3",
     "vitest": "^2.1.8"

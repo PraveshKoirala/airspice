@@ -32,6 +32,18 @@ export { OpenAIProvider } from "./providers/openai.js";
 export { GeminiProvider } from "./providers/gemini.js";
 export { MockProvider } from "./providers/mock.js";
 export type { MockFixture, ScriptedEvent } from "./providers/mock.js";
+/**
+ * The hosted house-agent client (issue #20). Feature-flagged OFF in production
+ * builds until spend controls are verified (see `docs/house_agent_design.md`).
+ * Exported as a discoverable type; construction is gated by the caller passing
+ * a URL, so a build without `VITE_HOUSE_AGENT_URL` cannot reach an endpoint.
+ */
+export {
+  HouseProvider,
+  HOUSE_DEFAULT_MODEL,
+  HOUSE_MODELS,
+} from "./providers/house.js";
+export type { HouseProviderOptions, TokenStorage } from "./providers/house.js";
 
 export { createProvider } from "./factory.js";
 export type { NetworkProviderId } from "./factory.js";

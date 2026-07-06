@@ -13,7 +13,14 @@
  * different key), which is why one neutral `ToolSpec` serves all three.
  */
 
-export type ProviderId = "anthropic" | "openai" | "gemini" | "mock";
+/**
+ * `"house"` is the OPTIONAL hosted proxy (issue #20 / ADR 0008): the browser
+ * client (`HouseProvider`) talks to an edge Worker that carries OUR key and
+ * enforces a hard budget. It is the sole intentional server-side lane in an
+ * otherwise zero-backend architecture, feature-flagged OFF in production
+ * builds until spend controls are verified (VITE_ENABLE_HOUSE_AGENT).
+ */
+export type ProviderId = "anthropic" | "openai" | "gemini" | "house" | "mock";
 
 /** A single JSON-Schema-ish object describing a tool's parameters. */
 export interface JsonSchema {

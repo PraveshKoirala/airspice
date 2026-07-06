@@ -6,6 +6,7 @@ import xml.etree.ElementTree as ET
 from .xml_security import enforce_xml_security
 from .model import (
     AnalogSubsystem,
+    Analysis,
     Bridge,
     Component,
     ExportTarget,
@@ -211,12 +212,26 @@ def parse_tree(tree: ET.ElementTree) -> SystemIR:
                 setup[child.attrib.get("net", child.tag)] = child.attrib.get("value", "")
         assertions = [dict(assertion.attrib, op=assertion.tag) for assertion in test if assertion.tag.startswith("assert_")]
         run = test.find("run")
+        analysis_el = test.find("analysis")
+        analysis: Analysis | None = None
+        if analysis_el is not None:
+            # Only AC is defined today (issue #62). An unknown type is left as-is
+            # so validation can flag it; the compiler skips a non-"ac" analysis
+            # and falls back to the .tran path (backward compatible).
+            analysis = Analysis(
+                type=analysis_el.attrib.get("type", "ac"),
+                sweep=analysis_el.attrib.get("sweep", "dec"),
+                points=analysis_el.attrib.get("points", "20"),
+                start=analysis_el.attrib.get("start", "10Hz"),
+                end=analysis_el.attrib.get("end", "1MegHz"),
+            )
         tests[test_id] = Test(
             id=test_id,
             description=_text(test, "description"),
             setup=setup,
             duration=run.attrib.get("duration", "") if run is not None else "",
             assertions=assertions,
+            analysis=analysis,
         )
 
     profiles = {}

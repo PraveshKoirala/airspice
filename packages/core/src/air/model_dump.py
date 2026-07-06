@@ -75,6 +75,17 @@ def model_to_dict(ir: SystemIR) -> dict[str, Any]:
         sub_dict["probes"] = _sorted_list(sub.probes, "id")
         analog.append(sub_dict)
 
+    tests_dict = _sorted_map(ir.tests)
+    # A Test whose ``analysis`` field is None (the historical default -- all
+    # corpus designs) must dump WITHOUT the ``analysis`` key at all, not as
+    # ``"analysis": null``. This preserves byte-parity with the pre-#62 corpus
+    # (which was frozen before Test grew an analysis field) so no fixture needs
+    # regenerating. A Test that DOES carry an AC analysis serializes the nested
+    # dict via the dataclass fallback in ``_plain``.
+    for test_dict in tests_dict.values():
+        if isinstance(test_dict, dict) and test_dict.get("analysis") is None:
+            test_dict.pop("analysis", None)
+
     return {
         "name": ir.name,
         "ir_version": ir.ir_version,
@@ -89,7 +100,7 @@ def model_to_dict(ir: SystemIR) -> dict[str, Any]:
         "firmware_bindings": _sorted_map(ir.firmware_bindings),
         "firmware_tasks": _sorted_map(ir.firmware_tasks),
         "bridges": _sorted_list(ir.bridges, "id"),
-        "tests": _sorted_map(ir.tests),
+        "tests": tests_dict,
         "simulation_profiles": _sorted_map(ir.simulation_profiles),
         "exports": _sorted_list(ir.exports, "target"),
     }
