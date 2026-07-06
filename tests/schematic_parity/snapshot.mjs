@@ -34,14 +34,13 @@ function loadDesign(name) {
 }
 
 async function loadBuildSchematic() {
-  // Prefer the extracted module (post-refactor); fall back to the monolith.
-  try {
-    const mod = await import("../../packages/ui/src/schematic/layout.ts");
-    if (mod.buildSchematic) return mod.buildSchematic;
-  } catch (_e) {
-    // ignore
-  }
-  const mod = await import("../../packages/ui/src/components/Graph.tsx");
+  // Post-refactor entry point (Graph.tsx is components-only per the
+  // react-refresh/only-export-components lint rule; buildSchematic lives
+  // in schematic/layout.ts). The pre-refactor fallback that used to sit
+  // here was needed only to capture the BASELINE snapshot -- the
+  // committed baseline JSON is that snapshot, so this loader now targets
+  // the single extracted module.
+  const mod = await import("../../packages/ui/src/schematic/layout.ts");
   return mod.buildSchematic;
 }
 
