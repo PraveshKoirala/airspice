@@ -9,7 +9,16 @@ import { OpenAIProvider } from "./providers/openai.js";
 import { GeminiProvider } from "./providers/gemini.js";
 import type { AgentProvider, ProviderId, ProviderOptions } from "./types.js";
 
-export type NetworkProviderId = Exclude<ProviderId, "mock">;
+/**
+ * Providers this factory constructs: the three BYOK network providers.
+ *
+ * `mock` is out because it takes a fixture, not a `ProviderOptions`. `house`
+ * (issue #20) is out because it takes no user key — construct `HouseProvider`
+ * directly with a `HouseProviderOptions` (a URL from `VITE_HOUSE_AGENT_URL`,
+ * not an `apiKey`). Keeping the factory narrow means adding the house lane
+ * did NOT widen the BYOK code path.
+ */
+export type NetworkProviderId = Exclude<ProviderId, "mock" | "house">;
 
 export function createProvider(
   id: NetworkProviderId,

@@ -7,6 +7,10 @@ name: ui-sim
 # browser's report JSON against the golden corpus — the M2 proof that the browser
 # produces the Python oracle's report SCHEMA with NO backend.
 #
+# Workspaces refactor (issue #85): root `npm ci` installs everything the ui and
+# sim-wasm need in one place. eecircuit-engine is hoisted from sim-wasm; the ui
+# no longer pins it via a Vite alias.
+#
 # jsdom/node cannot run a WASM Web Worker, so this MUST be a real browser. No
 # ngspice apt install: the ngspice here is the one compiled INTO eecircuit-engine's
 # WASM (45.2), not the host's. No COOP/COEP headers: the single-threaded WASM
@@ -48,14 +52,26 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: packages/ui/package-lock.json
+          cache-dependency-path: package-lock.json
 
-      # The report pipeline consumes air-ts + sim-wasm from SOURCE (Vite aliases),
-      # and the sim-wasm engine worker dynamic-imports eecircuit-engine, which the
-      # UI's own vite/tsconfig aliases pin to packages/ui/node_modules. So the
-      # ui-only install is sufficient — no sibling-package install needed.
-      - name: Install dependencies
+      # Root install: the report pipeline consumes air-ts + sim-wasm from SOURCE
+      # (Vite aliases inside packages/ui/vite.config.ts) and the sim-wasm engine
+      # worker dynamic-imports eecircuit-engine, hoisted here by npm workspaces
+      # from its declaration in sim-wasm's package.json. Single lockfile lives
+      # at the repo root.
+      - name: Install dependencies (workspaces, root)
+        working-directory: ${{ github.workspace }}
         run: npm ci
+
+      # Build the sibling workspace packages so TypeScript resolution inside the
+      # ui harness finds their real .d.ts under node_modules/<name>/dist. Vite
+      # bundles from source via aliases, but tsc still needs the .d.ts.
+      - name: Build workspace deps (air-ts, agent, sim-wasm)
+        working-directory: ${{ github.workspace }}
+        run: |
+          npm --workspace air-ts run build
+          npm --workspace agent run build
+          npm --workspace sim-wasm run build
 
       # Real Chromium, real Web Worker, real WASM ngspice: run every corpus
       # design through the full browser pipeline and diff its report JSON against

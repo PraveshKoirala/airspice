@@ -1,0 +1,54 @@
+# Cloudflare Worker config for the AirSpice house-agent prototype (issue #20).
+# THIS FILE HAS NO SECRETS. The provider API key is added via
+#   `wrangler secret put ANTHROPIC_KEY --name airspice-house-agent`
+# and the HMAC signing secret via
+#   `wrangler secret put TOKEN_SIGNING_SECRET --name airspice-house-agent`
+# (AGENTS.md rule 15). If either secret is missing at runtime the Worker
+# fails closed with a typed error message pointing at BYOK — the whole
+# lane is opt-in.
+#
+# THIS PR DOES NOT DEPLOY. `wrangler deploy` is NOT invoked in CI, and the
+# spend controls listed in docs/house_agent_design.md must be verified live
+# before enabling. Vars below are the LAUNCH defaults, chosen deliberately
+# tight so that if a Worker is spun up by accident the blast radius is small:
+#
+#   HOUSE_AGENT_ENABLED   default off (`"false"`) — the operator's ejection
+#                         seat; when off the Worker returns a canned quota
+#                         error and the client renders the BYOK banner.
+#   DAILY_TOKEN_BUDGET    50_000 tokens/day per anonymous browser (~2-3
+#                         Sonnet-anchor repairs OR ~8 chat turns).
+#   IP_RPM_LIMIT          30 requests/minute per IP hash — hard second layer
+#                         so nobody can farm free inference by minting fresh
+#                         daily tokens on a loop.
+#   MONTHLY_USD_CAP_CENTS $50/month (in cents, so the KV counter is an int)
+#                         — global kill for cost blow-up; fails closed above
+#                         the cap; only the operator can raise it (deploy).
+#   UPSTREAM_MODEL        claude-haiku-5 by default (Haiku-class tier, per
+#                         the cost model). The Worker never lets a client
+#                         `model` hint escalate above the configured tier.
+#
+# The KV binding `BUDGET` holds the daily counters (per-token, per-IP) and
+# the running monthly-spend counter. Prototype tests use an in-memory stub
+# so nothing here has to exist for `npm test` to pass.
+
+name = "airspice-house-agent"
+main = "src/index.ts"
+compatibility_date = "2026-01-01"
+workers_dev = false
+
+[vars]
+HOUSE_AGENT_ENABLED = "false"
+DAILY_TOKEN_BUDGET = "50000"
+IP_RPM_LIMIT = "30"
+MONTHLY_USD_CAP_CENTS = "5000"
+UPSTREAM_MODEL = "claude-haiku-5"
+UPSTREAM_URL = "https://api.anthropic.com/v1/messages"
+
+# KV binding — create with:
+#   wrangler kv namespace create BUDGET --name airspice-house-agent
+# and paste the returned id below. Left as a placeholder so `wrangler deploy`
+# from this file would fail cleanly on a fresh checkout (belt and suspenders
+# on the "not deployed by this PR" guarantee).
+# [[kv_namespaces]]
+# binding = "BUDGET"
+# id      = "TODO-CREATE-BEFORE-DEPLOY"

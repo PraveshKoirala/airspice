@@ -7,9 +7,10 @@ import { fileURLToPath } from "node:url";
  * binding decision 2). ES module workers so the sim-wasm engine worker can
  * dynamic-import eecircuit-engine as a lazy chunk.
  *
- * The aliases mirror packages/ui/vite.config.ts so the harness resolves the port
- * packages from source and eecircuit-engine from the UI's own node_modules
- * (packages/sim-wasm/node_modules is not installed in the ui CI job).
+ * Workspaces refactor (issue #85): the harness no longer aliases
+ * fast-xml-parser / eecircuit-engine to per-consumer copies -- npm workspaces
+ * hoist a single copy of each. The source-alias for air-ts / sim-wasm is kept
+ * so Vite bundles their TS source directly (same as packages/ui/vite.config.ts).
  */
 export default defineConfig({
   root: fileURLToPath(new URL("./harness", import.meta.url)),
@@ -17,12 +18,6 @@ export default defineConfig({
     alias: {
       "air-ts": fileURLToPath(new URL("../../../air-ts/src/index.ts", import.meta.url)),
       "sim-wasm": fileURLToPath(new URL("../../../sim-wasm/src/index.ts", import.meta.url)),
-      "fast-xml-parser": fileURLToPath(
-        new URL("../../node_modules/fast-xml-parser/src/fxp.js", import.meta.url),
-      ),
-      "eecircuit-engine": fileURLToPath(
-        new URL("../../node_modules/eecircuit-engine/dist/eecircuit-engine.mjs", import.meta.url),
-      ),
     },
   },
   worker: { format: "es" },
@@ -35,8 +30,8 @@ export default defineConfig({
   server: {
     headers: {},
     fs: {
-      // Allow serving the sibling port packages (air-ts, sim-wasm) whose source
-      // this harness consumes via the aliases above.
+      // Allow serving the sibling workspace packages (air-ts, sim-wasm) whose
+      // source this harness consumes via the aliases above.
       allow: [fileURLToPath(new URL("../../..", import.meta.url))],
     },
   },
