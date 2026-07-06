@@ -35,6 +35,11 @@ export function providerDisplayName(provider: ProviderId): string {
       return "OpenAI";
     case "gemini":
       return "Gemini";
+    case "house":
+      // The hosted house-agent lane (issue #20). No user key is stored for it,
+      // so it never reaches the `slot()`/`get()` paths in practice; the name is
+      // used only by exhaustiveness-checked switches like this one.
+      return "the house agent";
     case "mock":
       return "the mock provider";
   }
