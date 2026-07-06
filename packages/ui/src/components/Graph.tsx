@@ -29,10 +29,18 @@ interface GraphProps {
   edges: Edge[];
   /** `<gui>` position hints (issue #22 B). Empty by default. */
   hints?: GuiHint[];
-  /** Enable click-to-select + Escape-to-clear (issue #22 C). */
+  /** Enable click-to-select + Escape-to-clear (issue #22 C) + drag/nudge (issue #23). */
   interactive?: boolean;
   /** Fires with the placed IR after each successful layout (issue #22 "Save layout"). */
   onLayout?: (ir: SchematicIR) => void;
+  /**
+   * Drag/nudge commit callback (issue #23). Called with the list of moved
+   * components' snapped coordinates on drop or keyboard-nudge; the app is
+   * expected to build a `<gui>`-upsert patch, run it through the gate,
+   * and land the result via setUserXml. Returning `{ ok: false, message }`
+   * makes the Renderer roll back the pending DOM transforms.
+   */
+  onCommitMove?: (moves: Array<{ id: string; x: number; y: number }>) => { ok: true } | { ok: false; message: string };
 }
 
 const Graph: React.FC<GraphProps> = (props) => <Renderer {...props} />;
