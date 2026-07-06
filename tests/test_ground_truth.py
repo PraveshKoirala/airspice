@@ -214,6 +214,37 @@ def _assert_pass(name: str, expected: dict, report: dict, backend: str, out_dir:
             f"[{check['min_v']}, {check['max_v']}] V. Basis: {check.get('basis')}"
         )
 
+    # AC-flavoured checks (issue #62): pick the closest-in-log-frequency sample
+    # point from the report's frequency_response section and compare its
+    # magnitude in dB to the hand-derived window. Mirrors the oracle's own
+    # closest-log-freq lookup in _evaluate_ac_assertions so parity holds.
+    ac_checks = expected.get("ac_checks", [])
+    if ac_checks:
+        response = report.get("frequency_response", {})
+        assert response, (
+            f"{name}: expected an AC frequency_response section in the report but "
+            f"got none. Analysis type / compiler emission may have regressed."
+        )
+        import math as _math
+        for check in ac_checks:
+            net = check["net"]
+            target_hz = float(check["freq_hz"])
+            points = response.get(net)
+            assert points, f"{name}: no frequency response samples for net {net!r}"
+            closest = min(
+                points,
+                key=lambda pt: abs(
+                    _math.log10(max(pt["freq_hz"], 1e-30))
+                    - _math.log10(max(target_hz, 1e-30))
+                ),
+            )
+            mag_db = closest["mag_db"]
+            assert check["min_db"] <= mag_db <= check["max_db"], (
+                f"{name}: |H({net})| at ~{closest['freq_hz']:.6g} Hz (target "
+                f"{target_hz} Hz) = {mag_db:.4g} dB, outside hand-derived "
+                f"[{check['min_db']}, {check['max_db']}] dB. Basis: {check.get('basis')}"
+            )
+
     for check in expected.get("time_checks", []):
         samples = _waveform_samples(out_dir, expected["test"], check["net"])
         t, value = _sample_at(samples, check["t_s"])

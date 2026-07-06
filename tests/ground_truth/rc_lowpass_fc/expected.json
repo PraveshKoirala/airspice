@@ -2,23 +2,32 @@
   "circuit": "rc_lowpass_fc",
   "profile": "analog_only",
   "test": "lpf_fc",
-  "outcome": "expected_fail",
-  "failure_mode": "no_ac_analysis",
-  "issue": 62,
-  "dc_settle_check": {
-    "net": "vout",
-    "nominal_v": 1.0,
-    "min_v": 0.97,
-    "max_v": 1.03,
-    "basis": "Compiler emits only .tran with a DC source, so vout DC-settles to Vin=1V (0dB at DC), NOT the -3dB=0.7071V corner value. Runner confirms the DC settle and the ABSENCE of the frequency response."
-  },
-  "would_pass_checks": [
+  "outcome": "pass",
+  "require_backend": "ngspice",
+  "ac_checks": [
     {
       "net": "vout",
-      "nominal_v": 0.7071,
-      "min_v": 0.697,
-      "max_v": 0.717,
-      "basis": "|H(fc)|=1/sqrt(2)=0.7071 at fc=1/(2piRC)=995Hz; -3.01dB. Needs .ac sweep which the compiler never emits."
+      "freq_hz": 994.72,
+      "nominal_db": -3.0103,
+      "min_db": -3.15,
+      "max_db": -2.87,
+      "basis": "|H(fc)| = 1/sqrt(2) at fc = 1/(2*pi*R*C) = 1/(2*pi*1600*100e-9) = 994.72 Hz. In dB: 20*log10(1/sqrt(2)) = -3.0103 dB. Window +-1.4% -> +-0.14 dB from component tolerance (see derivation.md)."
+    },
+    {
+      "net": "vout",
+      "freq_hz": 100,
+      "nominal_db": 0.0,
+      "min_db": -0.5,
+      "max_db": 0.1,
+      "basis": "Passband: 100 Hz is ~10x below fc, |H| ~= 1 (0 dB) within 0.05 dB. Confirms the DC gain of the divider is unity."
+    },
+    {
+      "net": "vout",
+      "freq_hz": 10000,
+      "nominal_db": -20.13,
+      "min_db": -20.6,
+      "max_db": -19.6,
+      "basis": "Stopband rolloff: at 10*fc the first-order rolloff gives |H| = 1/sqrt(1+100) = -20.04 dB; the sweep sample at 10 kHz (~10.05*fc) is -20.13 dB. Window +-0.5 dB covers component tolerance and log-nearest sample slip."
     }
   ]
 }
