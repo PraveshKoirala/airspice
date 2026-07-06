@@ -1,5 +1,5 @@
 {
-  "//": "Typecheck-only config for the standalone bench CLI (bench/run.ts), which imports air-ts by RELATIVE SOURCE path (so it runs under tsx without the agent's ambient air-ts.d.ts). It cannot be typechecked by the agent's tsconfig.test.json (that would pull air-ts source under the agent rootDir). Run: tsc -p bench/tsconfig.check.json.",
+  "//": "Typecheck-only config for the standalone bench CLI (bench/run.ts), which imports air-ts by RELATIVE SOURCE path (so it runs under tsx). It cannot be typechecked by the agent's tsconfig.test.json (that would pull air-ts source under the agent rootDir). Run: tsc -p bench/tsconfig.check.json.\n\nWorkspaces refactor (issue #85): the fast-xml-parser sub-alias is gone -- npm workspaces hoist a single copy. The air-ts source path stays because run.ts imports by relative source path AND prompts.ts uses the bare specifier at typecheck time.",
   "compilerOptions": {
     "noEmit": true,
     "target": "ES2022",
@@ -14,8 +14,7 @@
     "types": ["node"],
     "baseUrl": "..",
     "paths": {
-      "air-ts": ["../air-ts/src/index.ts"],
-      "fast-xml-parser": ["./node_modules/fast-xml-parser"]
+      "air-ts": ["../air-ts/src/index.ts"]
     }
   },
   "include": [
