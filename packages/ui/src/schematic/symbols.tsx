@@ -128,11 +128,22 @@ export function ComponentSvg({
   selected = false,
   highlightedNets,
   onSelect,
+  onPointerDown,
 }: {
   component: SchematicComponent;
   selected?: boolean;
   highlightedNets?: Set<string>;
-  onSelect?: () => void;
+  /**
+   * Click handler. `shift` is true when the user held Shift -- used by the
+   * multi-select flow to toggle instead of replace (issue #23).
+   */
+  onSelect?: (shift: boolean) => void;
+  /**
+   * Pointer-down handler that starts a drag on this component (issue #23).
+   * When present the outer `<g>` becomes the pointer target so the
+   * Renderer's SVG-level pointer-capture takes effect on this element.
+   */
+  onPointerDown?: (event: React.PointerEvent<SVGGElement>) => void;
 }) {
   const c = component;
   let symbol: React.ReactNode;
@@ -166,9 +177,12 @@ export function ComponentSvg({
   if (onSelect) {
     groupProps.onClick = (event) => {
       event.stopPropagation();
-      onSelect();
+      onSelect(event.shiftKey);
     };
-    groupProps.style = { cursor: "pointer" };
+    groupProps.style = { cursor: onPointerDown ? "grab" : "pointer" };
+  }
+  if (onPointerDown) {
+    groupProps.onPointerDown = onPointerDown;
   }
   return (
     <g {...groupProps} data-component-id={c.id}>

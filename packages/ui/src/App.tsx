@@ -10,6 +10,7 @@ import Graph from './components/Graph';
 import Inspector from './schematic/Inspector';
 import type { GuiHint, SchematicIR } from './schematic/types';
 import { parse as parseAir } from 'air-ts';
+import { runGate, saveHintsPatch } from './schematic/patches';
 import ResultPanel from './components/ResultPanel';
 import ChatRepl from './components/ChatRepl';
 import RepairPanel from './components/RepairPanel';
@@ -471,6 +472,44 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
     }
   }, [xml]);
 
+  // Issue #23 drag/nudge write path. The Renderer hands us a list of
+  // (id, snapped x, snapped y) moves; we parse the CURRENT design XML
+  // once, build ONE <patch> containing one <gui> op per move (via
+  // saveHintsPatch), run it through runGate, and either land the
+  // canonical XML via setUserXml (single undo step for the whole group)
+  // or return the diagnostic so the Renderer rolls back its DOM
+  // transforms. This mirrors the Inspector's commit pipeline exactly.
+  const commitMove = (moves: Array<{ id: string; x: number; y: number }>): { ok: true } | { ok: false; message: string } => {
+    if (moves.length === 0) return { ok: true };
+    const currentXml = useDesignStore.getState().xml;
+    let parsed;
+    try {
+      parsed = parseAir(currentXml);
+    } catch (err) {
+      return { ok: false, message: 'parse failed: ' + (err as Error).message };
+    }
+    const entries: Array<{ comp: Parameters<typeof saveHintsPatch>[0][number]['comp']; hint: GuiHint }> = [];
+    for (const move of moves) {
+      const comp = parsed.components.get(move.id);
+      if (!comp) return { ok: false, message: `unknown component: ${move.id}` };
+      entries.push({
+        comp,
+        hint: {
+          componentId: move.id,
+          x: move.x,
+          y: move.y,
+          rot: comp.gui?.rot ?? 0,
+        },
+      });
+    }
+    const patchXml = saveHintsPatch(entries);
+    if (!patchXml) return { ok: true };
+    const outcome = runGate(currentXml, patchXml);
+    if (!outcome.ok) return { ok: false, message: outcome.message };
+    setUserXml(outcome.xml);
+    return { ok: true };
+  };
+
   const renderPanel = () => {
     if (activeTab === 'schematic') {
       return (
@@ -481,6 +520,7 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
             hints={hints}
             interactive
             onLayout={setSchematicIR}
+            onCommitMove={commitMove}
           />
           <Inspector ir={schematicIR} />
         </div>
