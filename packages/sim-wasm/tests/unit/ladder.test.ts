@@ -69,45 +69,59 @@ describe("CONVERGENCE_LADDER (port parity with simulator.py)", () => {
 });
 
 describe("buildRungNetlist", () => {
-  const BASE = "V1 in 0 DC 5\nR1 in mid 10k\n.tran 1u 5m\n.end\n";
+  // Corpus-shaped deck: title comment on line 0 + devices + analysis. Every
+  // real deck (compileSpice output + hand-written ones in the /sim-lab) has
+  // a title on line 0 — SPICE ignores the first line by convention.
+  const BASE = "* Title comment\nV1 in 0 DC 5\nR1 in mid 10k\n.tran 1u 5m\n.end\n";
 
   it("rung 1 = prepareNetlist(base) unchanged (no options injected)", () => {
     const r1 = CONVERGENCE_LADDER[0]!;
     const out = buildRungNetlist(BASE, r1);
     expect(out).toBe(prepareNetlist(BASE));
-    expect(out).not.toMatch(/^\.options/m);
+    // No injected .options line anywhere.
+    expect(out).not.toMatch(/^\.options gminsteps/m);
   });
 
-  it("rung 2 injects a leading `.options gminsteps=1 itl1=500` line", () => {
+  it("rung 2 injects `.options gminsteps=1 itl1=500` AFTER the title line", () => {
+    // The SPICE title-line rule: line 0 is ignored, so the injected .options
+    // MUST go on line 1 to actually take effect. See ladder.ts for why this
+    // is not a plain prepend (it was the port bug in the first cut).
     const r2 = CONVERGENCE_LADDER[1]!;
     const out = buildRungNetlist(BASE, r2);
-    expect(out.startsWith(".options gminsteps=1 itl1=500\n")).toBe(true);
+    const lines = out.split("\n");
+    expect(lines[0]).toMatch(/^\*/); // title survives at line 0
+    expect(lines[1]).toBe(".options gminsteps=1 itl1=500");
     // The base circuit + analysis lines still ride below the injected .options.
     expect(out).toMatch(/V1 in 0 DC 5/);
     expect(out).toMatch(/\.tran 1u 5m/);
   });
 
-  it("rung 4 injects the Gear + relaxed reltol option line verbatim", () => {
+  it("rung 4 injects the Gear + relaxed reltol option line after the title", () => {
     const r4 = CONVERGENCE_LADDER[3]!;
     const out = buildRungNetlist(BASE, r4);
-    expect(out.startsWith(
-      ".options method=gear reltol=0.005 srcsteps=10 gminsteps=1 itl1=500 itl4=100\n",
-    )).toBe(true);
+    const lines = out.split("\n");
+    expect(lines[0]).toMatch(/^\*/);
+    expect(lines[1]).toBe(
+      ".options method=gear reltol=0.005 srcsteps=10 gminsteps=1 itl1=500 itl4=100",
+    );
   });
 
   it("preserves a `.control` block strip from prepareNetlist (transport still applies)", () => {
     const withControl =
-      "V1 a 0 1\n.control\nrun\nwrdata ../x.csv v(a)\n.endc\n.tran 1u 5m\n.end\n";
+      "* deck\nV1 a 0 1\n.control\nrun\nwrdata ../x.csv v(a)\n.endc\n.tran 1u 5m\n.end\n";
     const r2 = CONVERGENCE_LADDER[1]!;
     const out = buildRungNetlist(withControl, r2);
     expect(out).not.toMatch(/\.control/i);
     expect(out).not.toMatch(/wrdata/i);
-    expect(out.startsWith(".options gminsteps=1")).toBe(true);
+    // Injection sits after the title, not before it (which would be a comment).
+    const lines = out.split("\n");
+    expect(lines[0]).toBe("* deck");
+    expect(lines[1]).toBe(".options gminsteps=1 itl1=500");
   });
 });
 
 describe("runConvergenceLadder", () => {
-  const BASE = "V1 in 0 DC 5\nR1 in mid 10k\n.tran 1u 5m\n.end\n";
+  const BASE = "* title\nV1 in 0 DC 5\nR1 in mid 10k\n.tran 1u 5m\n.end\n";
 
   it("stops at rung 1 when it converges (no further rungs attempted)", async () => {
     const seenRungs: number[] = [];
@@ -175,9 +189,12 @@ describe("runConvergenceLadder", () => {
     await runConvergenceLadder(BASE, runOne);
     // Rung 1: no .options prefix (as-written).
     expect(seen[0]!.netlist).toBe(prepareNetlist(BASE));
-    // Rung 4: begins with the rung-4 .options line.
-    expect(seen[3]!.netlist.startsWith(
-      ".options method=gear reltol=0.005 srcsteps=10 gminsteps=1 itl1=500 itl4=100\n",
-    )).toBe(true);
+    // Rung 4: title on line 0, injected .options on line 1 (not before the
+    // title — the title-line rule).
+    const rung4Lines = seen[3]!.netlist.split("\n");
+    expect(rung4Lines[0]).toBe("* title");
+    expect(rung4Lines[1]).toBe(
+      ".options method=gear reltol=0.005 srcsteps=10 gminsteps=1 itl1=500 itl4=100",
+    );
   });
 });

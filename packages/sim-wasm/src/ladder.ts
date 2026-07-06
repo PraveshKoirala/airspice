@@ -127,11 +127,20 @@ export interface RungOutcome<T> {
 
 /**
  * Build the effective netlist for one rung: `prepareNetlist(base)` PLUS the
- * rung's extra ``.options`` line prepended so the WASM engine picks it up
- * alongside the compiler's own options. `.options` lines COMPOSE in ngspice
- * (ADR: aids stack across rungs 2->3, rung 4 subsumes and relaxes), so
- * INJECTING a fresh ``.options`` line does not conflict with the base deck's
- * options — ngspice unions them.
+ * rung's extra ``.options`` line inserted AFTER the SPICE title line so the
+ * WASM engine picks it up alongside the compiler's own options. `.options`
+ * lines COMPOSE in ngspice (aids stack across rungs 2->3, rung 4 subsumes and
+ * relaxes), so INJECTING a fresh ``.options`` line does not conflict with the
+ * base deck's options — ngspice unions them.
+ *
+ * SPICE TITLE-LINE RULE (the reason this is not a plain prepend): the FIRST
+ * line of every SPICE deck is a title/comment and is ignored by ngspice
+ * regardless of its content. Prepending ``.options`` at line 0 would silently
+ * turn the injected aid into a comment and leave the deck as-written — which
+ * is exactly the bug that keeps the ladder from actually helping. We insert
+ * the rung's ``.options`` on line 1 (after the title) so ngspice honours it.
+ * If the deck has no title comment (defensive), the injected line still lands
+ * before any devices.
  *
  * Rung 1's options tuple is empty; this function then simply returns
  * `prepareNetlist(base)` unchanged, guaranteeing an already-converging design
@@ -141,10 +150,15 @@ export function buildRungNetlist(base: string, rung: LadderRung): string {
   const prepared = prepareNetlist(base);
   if (rung.options.length === 0) return prepared;
   const optionLine = `.options ${rung.options.join(" ")}`;
-  // Insert the rung's .options line at the top of the netlist body. eecircuit
-  // is whitespace-tolerant; a title-comment-first convention isn't enforced,
-  // so a leading .options line is safe.
-  return `${optionLine}\n${prepared}`;
+  const lines = prepared.split("\n");
+  // Insert after the title line (line 0). If the deck is empty, degrade to a
+  // plain prepend — nothing to shadow. This mirrors the native ladder's
+  // approach: `_write_ladder_netlist` inserts after the `.options
+  // filetype=ascii` line the compiler always emits; we do the same,
+  // respecting the title-line convention.
+  if (lines.length === 0) return `${optionLine}\n`;
+  const titled = [lines[0], optionLine, ...lines.slice(1)].join("\n");
+  return titled;
 }
 
 /**
