@@ -52,6 +52,14 @@ const ID_SORTED_SECTIONS = new Set<string>([
   "simulation_profiles",
 ]);
 
+// Canonical position of the optional <gui> child within a <component>
+// (issue #22). The rule is deliberately MINIMAL to keep the pre-#22 corpus
+// byte-identical: only <gui> children are relocated -- everything else
+// retains document order. A <gui> child is moved so it appears IMMEDIATELY
+// AFTER the last <pin> child (or, if the component has no <pin>, after
+// <value>; failing that, at the front). Mirrors the Python canonicalizer's
+// `_order_component_children` in packages/core/src/air/canonicalizer.py.
+
 /** Canonicalize a raw element tree to the byte-exact canonical XML string. */
 export function canonicalizeTree(rawRoot: XmlElement): string {
   const root = cloneElement(rawRoot);
@@ -84,9 +92,55 @@ export function canonicalizeTree(rawRoot: XmlElement): string {
       );
       section.children = sorted;
     }
+    // Within <components>, also reorder each <component>'s own children
+    // into the canonical section groups (issue #22: value / pin / gui /
+    // property / anything-else). Mirrors the Python canonicalizer's
+    // _order_component_children.
+    if (section.tag === "components") {
+      for (const component of section.children) {
+        if (component.kind !== "element") continue;
+        orderComponentChildren(component);
+      }
+    }
   }
 
   return serializeMinidomStyle(root);
+}
+
+function orderComponentChildren(component: XmlElement): void {
+  const guiChildren: XmlElement[] = [];
+  const others: typeof component.children = [];
+  for (const child of component.children) {
+    if (child.kind === "element" && child.tag === "gui") {
+      guiChildren.push(child);
+    } else {
+      others.push(child);
+    }
+  }
+  if (guiChildren.length === 0) return; // No <gui> children -> keep document order verbatim.
+  // Insert-after: last <pin> element -> last <value> element -> front.
+  let insertAfter = -1;
+  for (let i = 0; i < others.length; i++) {
+    const child = others[i];
+    if (child !== undefined && child.kind === "element" && child.tag === "pin") insertAfter = i;
+  }
+  if (insertAfter === -1) {
+    for (let i = 0; i < others.length; i++) {
+      const child = others[i];
+      if (child !== undefined && child.kind === "element" && child.tag === "value") insertAfter = i;
+    }
+  }
+  const ordered: typeof component.children = [];
+  for (let i = 0; i <= insertAfter; i++) {
+    const child = others[i];
+    if (child !== undefined) ordered.push(child);
+  }
+  for (const g of guiChildren) ordered.push(g);
+  for (let i = insertAfter + 1; i < others.length; i++) {
+    const child = others[i];
+    if (child !== undefined) ordered.push(child);
+  }
+  component.children = ordered;
 }
 
 // --- attribute sort --------------------------------------------------------- #

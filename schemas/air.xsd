@@ -78,6 +78,29 @@
                 <xs:attribute name="value" type="xs:string" use="required"/>
               </xs:complexType>
             </xs:element>
+            <!--
+              Optional schematic position hint (issue #22). When present,
+              the UI renders the component at the exact (x,y) coordinates
+              on the schematic canvas instead of running auto-layout for
+              it; `rot` is a rotation in degrees (0/90/180/270). All three
+              attributes are unitless doubles / integers in the schematic's
+              own coordinate system (grid-snapped by the renderer).
+
+              CANONICAL ORDERING (both engines): a <gui> child sorts AFTER
+              <pin> children and BEFORE <property> children within a
+              <component>. Attributes are sorted alphabetically like every
+              other AIR attribute, which yields the order rot, x, y. The
+              existing pre-#22 corpus has no <gui> element on any design,
+              so adding this element is backward compatible -- no golden
+              fixture bytes change until a design opts in.
+            -->
+            <xs:element name="gui">
+              <xs:complexType>
+                <xs:attribute name="x" type="xs:decimal" use="required"/>
+                <xs:attribute name="y" type="xs:decimal" use="required"/>
+                <xs:attribute name="rot" type="xs:integer" use="optional" default="0"/>
+              </xs:complexType>
+            </xs:element>
           </xs:choice>
           <xs:attribute name="id" type="xs:string" use="required"/>
           <xs:attribute name="type" type="xs:string" use="required"/>

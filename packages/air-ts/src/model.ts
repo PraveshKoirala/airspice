@@ -53,6 +53,23 @@ export interface PinConnection {
   function: string | null;
 }
 
+/**
+ * Optional schematic-position hint on a component (issue #22).
+ *
+ * Mirror of the Python ``GuiHint`` dataclass. When present, the UI renders
+ * the component at these exact coordinates instead of running auto-layout;
+ * ``rot`` is a rotation in degrees (0/90/180/270). ``null`` on
+ * ``Component.gui`` == no hint == the fallback layout path (ELK). No
+ * pre-#22 corpus design carries a ``<gui>`` child, so this addition is
+ * BYTE-COMPATIBLE with the frozen model.json fixtures (see
+ * ``model_dump.ts`` for the omit-when-null serialization mirror).
+ */
+export interface GuiHint {
+  x: number;
+  y: number;
+  rot: number;
+}
+
 export interface Component {
   id: string;
   type: string;
@@ -62,6 +79,8 @@ export interface Component {
   value: string | null;
   pins: Map<string, PinConnection>;
   properties: Map<string, string>;
+  /** Optional schematic-position hint (issue #22). null == no hint. */
+  gui: GuiHint | null;
 }
 
 /** A child-tag attribute map, or a repeated tag's attribute maps as an array. */

@@ -34,6 +34,7 @@ import type {
   FirmwareOperation,
   FirmwareProject,
   FirmwareTask,
+  GuiHint,
   Interface,
   InterfaceDatum,
   Metadata,
@@ -131,6 +132,30 @@ export function parseTree(rawRoot: XmlElement): SystemIR {
     const valueEl = find(element, "value");
     const valueText =
       valueEl !== null ? elementText(valueEl) : "";
+    // Optional schematic-position hint (issue #22). Mirror of parser.py's
+    // GuiHint extraction: pick the FIRST <gui> child (element.find), pull
+    // required x/y as floats and optional rot as int (default 0). A
+    // malformed <gui> (missing x/y, non-numeric value) is silently ignored
+    // so a partially-typed edit doesn't fail the whole design parse -- the
+    // validator will surface the schema failure separately.
+    const guiEl = find(element, "gui");
+    let gui: GuiHint | null = null;
+    if (guiEl !== null) {
+      const xRaw = guiEl.attrib.get("x");
+      const yRaw = guiEl.attrib.get("y");
+      const rotRaw = guiEl.attrib.get("rot");
+      if (xRaw !== undefined && yRaw !== undefined) {
+        const x = Number(xRaw);
+        const y = Number(yRaw);
+        const rot = rotRaw !== undefined && rotRaw !== "" ? Number(rotRaw) : 0;
+        if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(rot)) {
+          // Mirror Python's `int(...)`: truncate rot to an integer (parseInt
+          // semantics would accept "0deg" too, which is NOT what int(x) does;
+          // we stick with `Number` + isFinite + `Math.trunc` here for parity).
+          gui = { x, y, rot: Math.trunc(rot) };
+        }
+      }
+    }
     components.set(componentId, {
       id: componentId,
       type: attr(element, "type", ""),
@@ -145,6 +170,7 @@ export function parseTree(rawRoot: XmlElement): SystemIR {
       value: valueEl !== null && valueText ? valueText.trim() : null,
       pins,
       properties,
+      gui,
     });
   }
 
