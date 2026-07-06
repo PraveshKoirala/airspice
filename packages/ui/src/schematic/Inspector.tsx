@@ -23,85 +23,18 @@
 
 import React, { useMemo, useState } from "react";
 import type { SystemIR } from "air-ts";
-import {
-  parse,
-  applyPatch as airApplyPatch,
-  previewPatch as airPreviewPatch,
-  validate as airValidate,
-  normalize as airNormalize,
-} from "air-ts";
+import { parse } from "air-ts";
 import { useDesignStore } from "../agent/designStore";
 import { useSchematicUI } from "./interaction";
 import type { GuiHint, SchematicIR } from "./types";
+import {
+  runGate,
+  saveHintOp,
+  saveHintPatch,
+  replaceValuePatch,
+  renameComponentPatch,
+} from "./patches";
 import { X } from "lucide-react";
-
-/**
- * Result of running the gate on a proposed patched design.
- * We keep this narrow (no ValidatedDesign brand) because the human write
- * path lands via `setUserXml` -- a plain string, no brand needed. The
- * safety invariant is that the string HAS been through
- * normalize+validate+applyPatch -- which this pipeline enforces.
- */
-type GateOutcome =
-  | { ok: true; xml: string }
-  | { ok: false; message: string };
-
-function runGate(currentXml: string, patchXml: string): GateOutcome {
-  try {
-    // 1) previewPatch surfaces validity BEFORE we mutate anything. If the
-    //    patched design carries any error-severity diagnostic OR
-    //    previewPatch itself throws (unresolvable path, malformed op), we
-    //    reject the edit and leave the store untouched.
-    const preview = airPreviewPatch(currentXml, patchXml);
-    if (!preview.success) {
-      const first = preview.after.diagnostics[0];
-      const msg =
-        first !== undefined
-          ? String(
-              (first as { code?: string; message?: string }).code ??
-                "invalid",
-            ) +
-            ": " +
-            String(
-              (first as { message?: string }).message ?? "edit rejected",
-            )
-          : "edit rejected (introduced " +
-            preview.introduced.length +
-            " error(s))";
-      return { ok: false, message: msg };
-    }
-    // 2) applyPatch produces the canonical patched XML. Then we normalize
-    //    + validate ONCE MORE on the applied bytes -- belt-and-braces: the
-    //    same shape agent gateDesign uses (normalize -> validate).
-    const patched = airApplyPatch(currentXml, patchXml);
-    const normalized = airNormalize(patched);
-    const diagnostics = airValidate(normalized);
-    const errors = diagnostics.filter((d) => d.severity === "error");
-    if (errors.length > 0) {
-      return {
-        ok: false,
-        message: errors[0]!.code + ": " + errors[0]!.message,
-      };
-    }
-    return { ok: true, xml: normalized };
-  } catch (err) {
-    return { ok: false, message: (err as Error).message };
-  }
-}
-
-/**
- * XML-escape a text run for embedding inside a `<value>` payload.
- * Values are validated by the schema so unusual characters are rare, but
- * we escape defensively -- an `&` in a resistor value string ("50R&") would
- * otherwise produce malformed patch XML.
- */
-function xmlEscape(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
 
 const Inspector: React.FC<{ ir?: SchematicIR | null }> = ({ ir }) => {
   const selection = useSchematicUI((s) => s.selection);
@@ -437,89 +370,5 @@ const ReadonlyRow: React.FC<{ label: string; value: string }> = ({ label, value 
     <code>{value}</code>
   </div>
 );
-
-// --- patch builders ---------------------------------------------------------
-
-/**
- * Build the child list of a `<component>` element as canonical XML, so a
- * `<replace path=".../component[@id='...']">` payload preserves every
- * existing pin/property/value/gui.
- */
-function serializeComponentBody(comp: {
-  id: string;
-  type: string;
-  part: string | null;
-  spice_model: string | null;
-  spice_subckt: string | null;
-  value: string | null;
-  pins: Map<string, { name: string; net: string; function: string | null }>;
-  properties: Map<string, string>;
-  gui: { x: number; y: number; rot: number } | null;
-}): { attrs: string; body: string } {
-  const attrs: string[] = [`id="${xmlEscape(comp.id)}"`, `type="${xmlEscape(comp.type)}"`];
-  if (comp.part) attrs.push(`part="${xmlEscape(comp.part)}"`);
-  if (comp.spice_model) attrs.push(`spice_model="${xmlEscape(comp.spice_model)}"`);
-  if (comp.spice_subckt) attrs.push(`spice_subckt="${xmlEscape(comp.spice_subckt)}"`);
-  const parts: string[] = [];
-  if (comp.value !== null) parts.push(`<value>${xmlEscape(comp.value)}</value>`);
-  for (const pin of comp.pins.values()) {
-    const bits: string[] = [`name="${xmlEscape(pin.name)}"`, `net="${xmlEscape(pin.net)}"`];
-    if (pin.function) bits.push(`function="${xmlEscape(pin.function)}"`);
-    parts.push(`<pin ${bits.join(" ")}/>`);
-  }
-  if (comp.gui) {
-    parts.push(
-      `<gui x="${comp.gui.x}" y="${comp.gui.y}" rot="${comp.gui.rot}"/>`,
-    );
-  }
-  for (const [name, value] of comp.properties) {
-    parts.push(`<property name="${xmlEscape(name)}" value="${xmlEscape(value)}"/>`);
-  }
-  return { attrs: attrs.join(" "), body: parts.join("") };
-}
-
-function replaceValuePatch(componentId: string, newValue: string): string {
-  const path = `components/component[@id='${componentId}']/value`;
-  // If <value> already exists we replace its text; otherwise we <add> a new
-  // value child. The former is by far the common case (every existing
-  // resistor/capacitor has a <value>), so we keep the flow simple: emit a
-  // <replace> payload with the new value. The applyPatch engine will fail
-  // fast with "Patch path not found" if there is no existing <value>,
-  // which we surface as an inline diagnostic.
-  return `<patch><replace path="${path}"><value>${xmlEscape(newValue)}</value></replace></patch>`;
-}
-
-function renameComponentPatch(
-  comp: Parameters<typeof serializeComponentBody>[0],
-  newId: string,
-): string {
-  const { attrs, body } = serializeComponentBody({ ...comp, id: newId });
-  const path = `components/component[@id='${comp.id}']`;
-  return `<patch><replace path="${path}"><component ${attrs}>${body}</component></replace></patch>`;
-}
-
-function saveHintOp(
-  comp: Parameters<typeof serializeComponentBody>[0],
-  hint: GuiHint,
-): string {
-  // Emit a full <replace> for the whole component so a fresh <gui> child
-  // slots in exactly where the canonicalizer wants it (after the last
-  // pin). Overriding an existing hint likewise works: we simply write the
-  // new one into serializeComponentBody's output.
-  const withHint = {
-    ...comp,
-    gui: { x: hint.x, y: hint.y, rot: hint.rot },
-  };
-  const { attrs, body } = serializeComponentBody(withHint);
-  const path = `components/component[@id='${comp.id}']`;
-  return `<replace path="${path}"><component ${attrs}>${body}</component></replace>`;
-}
-
-function saveHintPatch(
-  comp: Parameters<typeof serializeComponentBody>[0],
-  hint: GuiHint,
-): string {
-  return `<patch>${saveHintOp(comp, hint)}</patch>`;
-}
 
 export default Inspector;

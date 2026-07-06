@@ -1696,3 +1696,22 @@ body {
   fill: var(--accent, #6366f1);
   opacity: 1;
 }
+
+/* Issue #23: marquee selection rectangle drawn on the schematic canvas
+   while the user is dragging on the background. Transparent fill, thin
+   dashed outline in the accent colour. */
+.schematic-marquee {
+  fill: rgba(99, 102, 241, 0.08);
+  stroke: var(--accent, #6366f1);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+  pointer-events: none;
+}
+
+/* Issue #23: while a drag is active, disable text selection so a
+   Shift-held pointer-move doesn't accidentally select the surrounding
+   canvas text. */
+.svg-schematic-canvas svg.native-schematic {
+  user-select: none;
+  -webkit-user-select: none;
+}
