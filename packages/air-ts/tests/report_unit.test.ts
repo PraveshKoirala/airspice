@@ -125,6 +125,7 @@ describe("evaluateAssertions: codes + observed payloads (repair-context contract
       setup: new Map(),
       duration: "1ms",
       assertions,
+      analysis: null,
     };
   }
 
