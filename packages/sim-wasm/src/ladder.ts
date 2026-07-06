@@ -7,10 +7,10 @@
  * per-rung retry of its own: it runs the netlist AS-WRITTEN and either
  * converges or reports a singular-matrix / non-convergence stderr. Without a
  * browser ladder, a design that native ngspice solves via gmin/source-stepping
- * (e.g. complex_bms/charge_cycle) reports HONEST terminal non-convergence in
- * the browser (see report.ts DIVERGENCE B). This module closes that gap by
- * injecting the SAME per-rung ``.options`` the native ladder adds, in the SAME
- * order, so a rung that converges natively also converges in the browser.
+ * reports HONEST terminal non-convergence in the browser (see report.ts
+ * DIVERGENCE B). This module closes that gap by injecting the SAME per-rung
+ * ``.options`` the native ladder adds, in the SAME order, so a rung that
+ * converges natively also converges in the browser.
  *
  * PORT DISCIPLINE (issue #94 guardrail):
  *   - The rungs, their ``.options`` tokens, and the order are byte-identical
