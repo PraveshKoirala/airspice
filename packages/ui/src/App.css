@@ -1064,6 +1064,7 @@ body {
 
 .chat-repl {
   min-width: 0;
+  min-height: 0;
   background: var(--bg-sidebar);
   border-left: 1px solid var(--border);
   display: grid;
