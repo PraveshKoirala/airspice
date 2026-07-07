@@ -30,7 +30,7 @@ import type {
   ValidateKeyResult,
 } from "../types.js";
 
-const BASE = "https://generativelanguage.googleapis.com/v1beta/models";
+const DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 
 export class GeminiProvider implements AgentProvider {
   readonly id = "gemini" as const;
@@ -41,19 +41,25 @@ export class GeminiProvider implements AgentProvider {
   private readonly model: string;
   private readonly fetchImpl: typeof fetch;
   private readonly backoff: BackoffConfig;
+  private readonly baseUrl: string;
 
   constructor(opts: ProviderOptions) {
     this.key = opts.apiKey;
     this.model = opts.model ?? this.defaultModel;
-    this.fetchImpl = opts.fetchImpl ?? globalThis.fetch;
+    this.fetchImpl = opts.fetchImpl ?? globalThis.fetch.bind(globalThis);
     this.backoff = opts.retry ?? DEFAULT_BACKOFF;
+    this.baseUrl = opts.baseUrl ?? DEFAULT_BASE_URL;
   }
 
   async validateKey(key: string): Promise<ValidateKeyResult> {
     // GET the model metadata: 200 => key works, 400/403 => bad/again key. The
     // key is a query param, so it is never placed in a header we might log; and
     // any echoed body is scrubbed.
-    const url = `${BASE}/${encodeURIComponent(this.model)}?key=${encodeURIComponent(key)}`;
+    let base = this.baseUrl;
+    if (!base.endsWith("/models") && base === DEFAULT_BASE_URL) {
+       // if custom baseurl does not end in models, leave it, just append the model name.
+    }
+    const url = `${base}/${encodeURIComponent(this.model)}?key=${encodeURIComponent(key)}`;
     try {
       const response = await this.fetchImpl(url, { method: "GET" });
       if (response.ok) return { ok: true, detail: "Key accepted by Gemini." };
@@ -72,7 +78,7 @@ export class GeminiProvider implements AgentProvider {
 
   async *chat(req: ChatRequest): AsyncIterable<AgentEvent> {
     const url =
-      `${BASE}/${encodeURIComponent(this.model)}:streamGenerateContent` +
+      `${this.baseUrl}/${encodeURIComponent(this.model)}:streamGenerateContent` +
       `?alt=sse&key=${encodeURIComponent(this.key)}`;
     const body = buildRequestBody(req);
     let response: Response;

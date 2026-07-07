@@ -75,10 +75,21 @@ export class KeyVault {
     return `${KEY_PREFIX}${provider}`;
   }
 
+  private urlSlot(provider: ProviderId): string {
+    return `${KEY_PREFIX}${provider}.baseUrl`;
+  }
+
   /** Read the raw key for a provider (for a direct API call ONLY). */
   get(provider: ProviderId): string | undefined {
     if (!this.storage) return undefined;
     const value = this.storage.getItem(this.slot(provider));
+    return value === null ? undefined : value;
+  }
+
+  /** Read the custom base URL override for a provider, if set. */
+  getBaseUrl(provider: ProviderId): string | undefined {
+    if (!this.storage) return undefined;
+    const value = this.storage.getItem(this.urlSlot(provider));
     return value === null ? undefined : value;
   }
 
@@ -99,10 +110,27 @@ export class KeyVault {
     this.storage.setItem(this.slot(provider), trimmed);
   }
 
+  /** Store a base URL override. Empty/whitespace-only input clears it. */
+  setBaseUrl(provider: ProviderId, url: string): void {
+    if (!this.storage) return;
+    const trimmed = url.trim();
+    if (trimmed === "") {
+      this.clearBaseUrl(provider);
+      return;
+    }
+    this.storage.setItem(this.urlSlot(provider), trimmed);
+  }
+
   /** Remove the stored key for a provider (the "Clear" action). */
   clear(provider: ProviderId): void {
     if (!this.storage) return;
     this.storage.removeItem(this.slot(provider));
+  }
+
+  /** Remove the stored base URL override for a provider. */
+  clearBaseUrl(provider: ProviderId): void {
+    if (!this.storage) return;
+    this.storage.removeItem(this.urlSlot(provider));
   }
 
   /**

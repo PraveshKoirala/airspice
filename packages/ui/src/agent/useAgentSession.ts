@@ -134,9 +134,15 @@ export function useAgentSession() {
             setRunning(false);
             return;
           }
-          provider = createProvider(config.provider, { apiKey: key, ...(config.model ? { model: config.model } : {}) });
+          const baseUrl = vault.getBaseUrl(config.provider);
+          provider = createProvider(config.provider, { 
+            apiKey: key, 
+            ...(config.model ? { model: config.model } : {}),
+            ...(baseUrl ? { baseUrl } : {}) 
+          });
         }
       } catch (err) {
+        console.error("Agent startup failed:", err);
         push({ role: "system", content: `Could not start the agent: ${(err as Error).message}` });
         setRunning(false);
         return;
@@ -151,7 +157,12 @@ export function useAgentSession() {
         assistantBuf = "";
       };
 
+      let turnEmittedContent = false;
+
       const onEvent = (ev: RunnerEvent) => {
+        if (ev.type === "assistant-text" || ev.type === "tool-call") {
+          turnEmittedContent = true;
+        }
         switch (ev.type) {
           case "assistant-text":
             assistantBuf += ev.text;
@@ -178,6 +189,7 @@ export function useAgentSession() {
             break;
           case "error":
             flushAssistant();
+            console.error("Provider stream error:", ev);
             push({ role: "system", content: `Provider error: ${ev.message}` });
             break;
           case "done":
@@ -202,7 +214,11 @@ export function useAgentSession() {
           ...(config.model ? { modelId: config.model } : {}),
         });
         historyRef.current = messages;
+        if (!turnEmittedContent) {
+          push({ role: "system", content: "Run ended immediately with no outputs (check provider configuration or mock fixture)." });
+        }
       } catch (err) {
+        console.error("Agent run failed with exception:", err);
         push({ role: "system", content: `Agent run failed: ${(err as Error).message}` });
       } finally {
         setRunning(false);

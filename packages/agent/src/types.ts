@@ -198,6 +198,8 @@ export interface ProviderOptions {
   apiKey: string;
   /** Overrides `defaultModel`. Free-text is allowed (settings UI supports it). */
   model?: string;
+  /** Optional base URL override (e.g. for local proxies). */
+  baseUrl?: string;
   /** Injected for tests; defaults to the global `fetch`. */
   fetchImpl?: typeof fetch;
   /** Overrides the default exponential backoff (max 3 retries, 500ms base). */

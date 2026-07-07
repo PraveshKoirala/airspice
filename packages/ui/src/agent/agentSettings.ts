@@ -10,6 +10,8 @@
  */
 
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import type { NetworkProviderId } from "agent";
 
 export interface AgentSettingsState {
   /** Auto-apply staged proposals (still through the full gate). Default OFF. */
@@ -19,12 +21,31 @@ export interface AgentSettingsState {
   malformedCount: number;
   incMalformed: () => void;
   resetMalformed: () => void;
+  agentProvider: NetworkProviderId | 'mock';
+  setAgentProvider: (provider: NetworkProviderId | 'mock') => void;
+  agentModel: string;
+  setAgentModel: (model: string) => void;
+  freeTextModel: string;
+  setFreeTextModel: (model: string) => void;
 }
 
-export const useAgentSettings = create<AgentSettingsState>((set) => ({
-  autoApply: false,
-  setAutoApply: (on) => set({ autoApply: on }),
-  malformedCount: 0,
-  incMalformed: () => set((s) => ({ malformedCount: s.malformedCount + 1 })),
-  resetMalformed: () => set({ malformedCount: 0 }),
-}));
+export const useAgentSettings = create<AgentSettingsState>()(
+  persist(
+    (set) => ({
+      autoApply: false,
+      setAutoApply: (on) => set({ autoApply: on }),
+      malformedCount: 0,
+      incMalformed: () => set((s) => ({ malformedCount: s.malformedCount + 1 })),
+      resetMalformed: () => set({ malformedCount: 0 }),
+      agentProvider: 'openai',
+      setAgentProvider: (provider) => set({ agentProvider: provider }),
+      agentModel: 'gemini-3.5-flash-high',
+      setAgentModel: (model) => set({ agentModel: model }),
+      freeTextModel: 'gemini-3.5-flash-high',
+      setFreeTextModel: (model) => set({ freeTextModel: model }),
+    }),
+    {
+      name: 'airspice.agent.settings',
+    }
+  )
+);

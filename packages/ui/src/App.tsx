@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
-import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import type { Node, Edge } from 'reactflow';
 import { Activity, FileCode, FolderTree, RadioTower } from 'lucide-react';
 import Sidebar from './components/Sidebar';
@@ -40,9 +40,18 @@ import type { ApiError, Diagnostic, ValidationResult } from './types/api';
 import { getEngine, ENGINE_MODE, getRun } from './engine';
 import type { SimulationReport as OracleReport, SystemIR } from 'air-ts';
 import { WaveformViewer, type WaveformTrace } from './waveform';
+import { useProjectStore } from './storage/projectStore';
+import { saveToDisk, saveAsToDisk } from './storage/fileIo';
+import { exportAllRawRecords } from './storage/db';
 import { useDesignStore } from './agent/designStore';
 import { useAgentSettings } from './agent/agentSettings';
-import type { NetworkProviderId } from 'agent';
+import { KeyVault } from 'agent';
+
+const vault = new KeyVault();
+if (!vault.has('openai') && !vault.getBaseUrl('openai')) {
+  vault.set('openai', 'test-key-123');
+  vault.setBaseUrl('openai', 'http://localhost:8317/v1');
+}
 import './App.css';
 
 interface LogEntry {
@@ -207,16 +216,71 @@ const DEFAULT_XML = `<?xml version="1.0" encoding="UTF-8"?>
 function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', toggleTheme: () => void }) {
   const [activeTab, setActiveTab] = useState('schematic');
   const [designPath, setDesignPath] = useState(DEFAULT_DESIGN);
-  // The design XML is owned by the versioned design store (issue #18): the agent
-  // writes it ONLY via applyValidated (a gated ValidatedDesign) and the human
-  // edits it via setUserXml. Seed the store with the default design once.
   const xml = useDesignStore((s) => s.xml);
-  const setUserXml = useDesignStore((s) => s.setUserXml);
+  const projectsList = useProjectStore((s) => s.projectsList);
+  const activeProjectId = useProjectStore((s) => s.activeProjectId);
+  const selectProject = useProjectStore((s) => s.selectProject);
+  const createProject = useProjectStore((s) => s.createProject);
+  const saveActiveProjectXml = useProjectStore((s) => s.saveActiveProjectXml);
+  const setFileHandle = useProjectStore((s) => s.setFileHandle);
+  const conflictError = useProjectStore((s) => s.conflictError);
+  const setConflictError = useProjectStore((s) => s.setConflictError);
+
+  const activeProject = useMemo(() => {
+    return projectsList.find((p) => p.id === activeProjectId) || null;
+  }, [projectsList, activeProjectId]);
+
+  const activeProjectName = activeProject ? activeProject.name : 'ESP32 Battery Sensor';
+
   useEffect(() => {
-    if (useDesignStore.getState().xml === '') setUserXml(DEFAULT_XML);
-    // Seeding is a one-time init; setUserXml is stable (store setter).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const runInit = async () => {
+      if (useProjectStore.getState().isDowngraded) return;
+      const currentList = useProjectStore.getState().projectsList;
+      if (currentList.length === 0) {
+        // First-run migration
+        await createProject("Untitled Project", DEFAULT_XML);
+      } else if (!useProjectStore.getState().activeProjectId) {
+        // Select the most recently updated project
+        await selectProject(currentList[0].id);
+      }
+    };
+    runInit();
+  }, [projectsList.length, selectProject, createProject]);
+
+  // Keep a ref to the latest XML so visibilitychange/pagehide can access it
+  const xmlRef = useRef(xml);
+  useEffect(() => {
+    xmlRef.current = xml;
+  }, [xml]);
+
+  // Debounced autosave (1s)
+  useEffect(() => {
+    if (!activeProjectId || !xml) return;
+    const timer = setTimeout(() => {
+      saveActiveProjectXml(xml);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [xml, activeProjectId, saveActiveProjectXml]);
+
+  // Flush on tab close/visibility change
+  useEffect(() => {
+    const flushAutosave = () => {
+      if (activeProjectId && xmlRef.current) {
+        saveActiveProjectXml(xmlRef.current);
+      }
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        flushAutosave();
+      }
+    };
+    window.addEventListener('pagehide', flushAutosave);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('pagehide', flushAutosave);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [activeProjectId, saveActiveProjectXml]);
 
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
@@ -228,8 +292,8 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
   // BYOK agent config (issue #17/#18). Provider/model are picked in Settings; the
   // key lives only in the browser vault. Default to the mock provider so the
   // panel works with no key (deterministic demo / the CI-parity flow).
-  const [agentProvider, setAgentProvider] = useState<NetworkProviderId | 'mock'>('mock');
-  const [agentModel, setAgentModel] = useState<string | undefined>(undefined);
+  const agentProvider = useAgentSettings((s) => s.agentProvider);
+  const agentModel = useAgentSettings((s) => s.agentModel);
   const malformedCount = useAgentSettings((s) => s.malformedCount);
 
   // Undo/redo keyboard binding (issue #24 D5). Ctrl+Z / Cmd+Z undoes,
@@ -390,6 +454,36 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
       const apiError = error as ApiError;
       addLog(`Save failed: ${apiError.response?.data?.detail || apiError.message}`, 'error');
       return null;
+    }
+  };
+
+  const handleSave = async () => {
+    if (ENGINE_MODE !== 'local') {
+      const saved = await persistDesign();
+      if (saved) addLog(`Saved design to ${saved.design}`, 'success');
+      return;
+    }
+
+    if (!activeProject) {
+      addLog('No active project to save.', 'error');
+      return;
+    }
+
+    try {
+      if (activeProject.fileHandle) {
+        await saveToDisk(xml, activeProject.fileHandle);
+        addLog(`Saved project '${activeProject.name}' to disk.`, 'success');
+      } else {
+        const handle = await saveAsToDisk(xml, activeProject.name);
+        if (handle) {
+          await setFileHandle(activeProject.id, handle);
+          addLog(`Saved project as '${handle.name}' to disk.`, 'success');
+        } else {
+          addLog(`Project exported to downloads.`, 'success');
+        }
+      }
+    } catch (e) {
+      addLog(`Failed to save to disk: ${(e as Error).message}`, 'error');
     }
   };
 
@@ -814,10 +908,6 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
       return (
         <SettingsPanel
           malformedToolCallCount={malformedCount}
-          agentProvider={agentProvider}
-          agentModel={agentModel}
-          onAgentProviderChange={setAgentProvider}
-          onAgentModelChange={setAgentModel}
         />
       );
     }
@@ -828,12 +918,21 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
     <div className="app-container">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} theme={theme} toggleTheme={toggleTheme} />
       <main className="main-content">
-        <Toolbar onValidate={handleValidate} onSimulate={handleSimulate} onRepair={handleRepair} onSave={async () => { const saved = await persistDesign(); if (saved) addLog(`Saved design to ${saved.design}`, 'success'); }} />
+        {conflictError && (
+          <div className="conflict-banner">
+            <span>{conflictError}</span>
+            <div>
+              <button onClick={() => window.location.reload()} style={{ marginRight: 8 }}>Reload Page</button>
+              <button onClick={() => setConflictError(null)}>Dismiss</button>
+            </div>
+          </div>
+        )}
+        <Toolbar onValidate={handleValidate} onSimulate={handleSimulate} onRepair={handleRepair} onSave={handleSave} />
         <div className="workspace-shell">
           <div className="workspace-header">
             <div>
               <span className="eyebrow">AIR Workspace</span>
-              <h1>ESP32 Battery Sensor</h1>
+              <h1>{activeProjectName}</h1>
             </div>
             <div className="workspace-status">
               <span className={`engine-badge ${ENGINE_MODE}`} title={`Engine: ${ENGINE_MODE}`} data-testid="engine-mode">{ENGINE_MODE === 'local' ? 'Local engine' : 'Server engine'}</span>
@@ -1044,12 +1143,83 @@ function EmptyState({ icon, title, text }: { icon: React.ReactNode; title: strin
 // dependency (and its ~20MB WASM chunk) are pulled into the production build.
 const SimLab = import.meta.env.DEV ? lazy(() => import('./pages/SimLab')) : null;
 
+function DowngradeRefusalScreen() {
+  const diskVersion = useProjectStore((s) => s.diskVersion);
+  const db = useProjectStore((s) => s.db);
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    if (!db) return;
+    setExporting(true);
+    try {
+      const records = await exportAllRawRecords(db);
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(records, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `airspice_projects_backup_v${diskVersion}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    } catch (e) {
+      alert("Failed to export projects: " + (e as Error).message);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  return (
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      height: '100vh',
+      backgroundColor: '#111827',
+      color: '#cbd5e1',
+      fontFamily: 'system-ui, sans-serif',
+      padding: 24,
+      textAlign: 'center'
+    }}>
+      <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
+      <h1 style={{ fontSize: 24, color: '#f8fafc', marginBottom: 8 }}>Database Schema Version Mismatch</h1>
+      <p style={{ maxWidth: 500, color: '#94a3b8', marginBottom: 24, lineHeight: 1.5 }}>
+        The database on disk is from a newer version of the application (v{diskVersion}). 
+        Opening it with this version could cause data corruption. Please update your application.
+      </p>
+      <button 
+        onClick={handleExport}
+        disabled={exporting}
+        style={{
+          padding: '12px 24px',
+          fontSize: 14,
+          fontWeight: 'bold',
+          color: '#fff',
+          backgroundColor: '#0ea5a4',
+          border: 'none',
+          borderRadius: 8,
+          cursor: 'pointer',
+          transition: 'background-color 0.2s'
+        }}
+      >
+        {exporting ? 'Exporting...' : 'Export Projects to JSON'}
+      </button>
+    </div>
+  );
+}
+
 function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const initProjectStore = useProjectStore((s) => s.init);
+  const isDowngraded = useProjectStore((s) => s.isDowngraded);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-  }, [theme]);
+    initProjectStore();
+  }, [theme, initProjectStore]);
+
+  if (isDowngraded) {
+    return <DowngradeRefusalScreen />;
+  }
 
   return (
     <BrowserRouter>
@@ -1072,8 +1242,7 @@ function App() {
 }
 
 function LandingWrapper() {
-  const navigate = useNavigate();
-  return <Landing onNewProject={() => navigate('/project')} onOpenProject={() => navigate('/project')} />;
+  return <Landing />;
 }
 
 export default App;

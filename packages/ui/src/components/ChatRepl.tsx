@@ -40,8 +40,17 @@ const ChatRepl: React.FC<ChatReplProps> = ({ provider, model, maxTokensPerTurn, 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [transcript, proposals]);
+    const el = scrollRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => {
+      el.scrollTop = el.scrollHeight;
+    });
+    observer.observe(el);
+    for (const child of el.children) {
+      observer.observe(child);
+    }
+    return () => observer.disconnect();
+  }, [transcript, proposals, running, budget]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,12 +89,14 @@ const ChatRepl: React.FC<ChatReplProps> = ({ provider, model, maxTokensPerTurn, 
         </label>
       </div>
 
-      {budget && (
+      {budget ? (
         <div className="budget-meter" data-testid="budget-meter">
           <span title="provider turns">iter {budget.iterations}/{budget.limits.maxIterations}</span>
           <span title="tokens">tok {budget.tokens}/{budget.limits.maxTokens}</span>
           <span title="wall time">{Math.round(budget.elapsedMs / 1000)}s/{Math.round(budget.limits.maxWallMs / 1000)}s</span>
         </div>
+      ) : (
+        <div data-testid="budget-meter-empty" style={{ height: 0, padding: 0, margin: 0, border: 0 }}></div>
       )}
 
       <div className="chat-messages" ref={scrollRef}>

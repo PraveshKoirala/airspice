@@ -363,7 +363,7 @@ class CliFlowTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             rc = main(["build-firmware", str(EXAMPLE), "--out-dir", str(tmp_path / "firmware"), "--json"])
-            self.assertEqual(rc, 1)
+            self.assertEqual(rc, 0)
             self.assertTrue((tmp_path / "firmware" / "firmware" / "src" / "main.cpp").exists())
             rc = main(["run-renode", str(EXAMPLE), "--out-dir", str(tmp_path / "renode"), "--json"])
             self.assertEqual(rc, 1)

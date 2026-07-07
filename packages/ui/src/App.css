@@ -1055,6 +1055,7 @@ body {
 
 .chat-repl {
   min-width: 0;
+  min-height: 0;
   background: var(--bg-sidebar);
   border-left: 1px solid var(--border);
   display: grid;
@@ -1907,3 +1908,180 @@ body {
 .native-schematic .pin-hitbox {
   cursor: crosshair;
 }
+
+/* Conflict Banner & Storage UI */
+.conflict-banner {
+  background: var(--rail-power, #b91c1c);
+  color: #ffffff;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 14px;
+  font-weight: 500;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+}
+.conflict-banner button {
+  background: #ffffff;
+  color: #b91c1c;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 12px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 12px;
+  transition: opacity 0.2s;
+}
+.conflict-banner button:hover {
+  opacity: 0.9;
+}
+
+/* Sidebar Project List */
+.sidebar-project-section {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-grow: 1;
+  overflow-y: auto;
+}
+.sidebar-project-section h3 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin: 0;
+}
+.project-list-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.project-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+.project-list-item:hover {
+  background: var(--bg-hover);
+}
+.project-list-item.active {
+  background: var(--bg-hover);
+  border-color: var(--border);
+}
+.project-item-details {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  overflow: hidden;
+  text-align: left;
+}
+.project-item-name {
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--text-bright);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+.project-item-time {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.project-actions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.project-list-item:hover .project-actions {
+  opacity: 1;
+}
+.project-action-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+}
+.project-action-btn:hover {
+  color: var(--text-bright);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Sidebar Templates & Add Actions */
+.sidebar-create-actions {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sidebar-create-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: var(--bg-hover);
+  border: 1px dashed var(--border);
+  color: var(--text-primary);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  width: 100%;
+  justify-content: center;
+}
+.sidebar-create-btn:hover {
+  border-color: var(--accent);
+  color: var(--text-bright);
+}
+
+/* Toast Container & Notification */
+.toast-undo {
+  position: fixed;
+  bottom: 24px;
+  left: 24px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 12px var(--shadow);
+  border-radius: 8px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  z-index: 10000;
+  font-size: 14px;
+  color: var(--text-bright);
+  animation: slide-up 0.2s ease-out;
+}
+.toast-undo button {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 12px;
+}
+.toast-undo button:hover {
+  background: var(--accent-strong);
+}
+
+@keyframes slide-up {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+

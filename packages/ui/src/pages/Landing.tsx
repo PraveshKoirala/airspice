@@ -1,28 +1,84 @@
-import React from 'react';
-import { Plus, FolderOpen, CircuitBoard, Clock, ChevronRight } from 'lucide-react';
+import React from "react";
+import { Plus, FolderOpen, CircuitBoard, Clock, ChevronRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useProjectStore } from "../storage/projectStore";
+import { openFromDisk } from "../storage/fileIo";
 
-interface LandingProps {
-  onNewProject: () => void;
-  onOpenProject: (path: string) => void;
-}
+const BLANK_TEMPLATE = `<?xml version="1.0" encoding="UTF-8"?>
+<system name="blank_design" ir_version="0.1">
+  <metadata>
+    <title>Blank Design</title>
+    <description>A fresh, blank electronic design.</description>
+  </metadata>
+  <nets>
+    <net id="gnd" role="ground"/>
+  </nets>
+  <components/>
+  <simulation_profiles/>
+</system>`;
 
-const Landing: React.FC<LandingProps> = ({ onNewProject, onOpenProject }) => {
-  const recentProjects = [
-    { name: 'ESP32 Battery Sensor', path: 'examples/esp32_battery_sensor/design.air.xml', date: '2 hours ago' },
-    { name: 'Voltage Divider', path: 'examples/analog_primitives/design.air.xml', date: 'Yesterday' },
-    { name: 'Mixed Signal Switch', path: 'examples/mixed_signal_switch/design.air.xml', date: '3 days ago' },
-  ];
+const Landing: React.FC = () => {
+  const navigate = useNavigate();
+  const projectsList = useProjectStore((s) => s.projectsList);
+  const createProject = useProjectStore((s) => s.createProject);
+  const selectProject = useProjectStore((s) => s.selectProject);
+  const setFileHandle = useProjectStore((s) => s.setFileHandle);
+
+  const [now, setNow] = React.useState(() => Date.now());
+  React.useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const handleNewProject = async () => {
+    try {
+      await createProject("Untitled Project", BLANK_TEMPLATE);
+      navigate("/project");
+    } catch (e) {
+      alert("Failed to create project: " + (e as Error).message);
+    }
+  };
+
+  const handleOpenProject = async () => {
+    try {
+      const res = await openFromDisk();
+      if (!res) return;
+
+      const pId = await createProject(res.name, res.xml);
+      if (res.fileHandle) {
+        await setFileHandle(pId, res.fileHandle);
+      }
+      navigate("/project");
+    } catch (e) {
+      alert("Failed to open project: " + (e as Error).message);
+    }
+  };
+
+  const handleSelectRecent = async (id: string) => {
+    await selectProject(id);
+    navigate("/project");
+  };
+
+  const formatRelativeTime = (timestamp: number) => {
+    const diff = now - timestamp;
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "Just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return new Date(timestamp).toLocaleDateString();
+  };
 
   return (
     <div className="landing-container">
       <div className="landing-hero">
         <CircuitBoard size={64} className="hero-logo" />
-        <h1>AI Native Spice</h1>
+        <h1>AirSpice</h1>
         <p>The first electronics design platform powered by dynamic AI reasoning.</p>
       </div>
 
       <div className="landing-actions">
-        <button className="action-card primary" onClick={onNewProject}>
+        <button className="action-card primary" onClick={handleNewProject}>
           <div className="action-icon">
             <Plus size={32} />
           </div>
@@ -32,7 +88,7 @@ const Landing: React.FC<LandingProps> = ({ onNewProject, onOpenProject }) => {
           </div>
         </button>
 
-        <button className="action-card" onClick={() => onOpenProject('')}>
+        <button className="action-card" onClick={handleOpenProject}>
           <div className="action-icon">
             <FolderOpen size={32} />
           </div>
@@ -43,26 +99,32 @@ const Landing: React.FC<LandingProps> = ({ onNewProject, onOpenProject }) => {
         </button>
       </div>
 
-      <div className="recent-projects">
-        <div className="section-header">
-          <Clock size={18} />
-          <span>Recent Projects</span>
-        </div>
-        <div className="project-list">
-          {recentProjects.map((project, idx) => (
-            <div key={idx} className="project-item" onClick={() => onOpenProject(project.path)}>
-              <div className="project-info">
-                <span className="project-name">{project.name}</span>
-                <span className="project-path">{project.path}</span>
+      {projectsList.length > 0 && (
+        <div className="recent-projects">
+          <div className="section-header">
+            <Clock size={18} />
+            <span>Recent Projects</span>
+          </div>
+          <div className="project-list">
+            {projectsList.map((project) => (
+              <div
+                key={project.id}
+                className="project-item"
+                onClick={() => handleSelectRecent(project.id)}
+              >
+                <div className="project-info">
+                  <span className="project-name">{project.name}</span>
+                  <span className="project-path">IndexedDB Storage</span>
+                </div>
+                <div className="project-meta">
+                  <span>{formatRelativeTime(project.updatedAt)}</span>
+                  <ChevronRight size={16} />
+                </div>
               </div>
-              <div className="project-meta">
-                <span>{project.date}</span>
-                <ChevronRight size={16} />
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
