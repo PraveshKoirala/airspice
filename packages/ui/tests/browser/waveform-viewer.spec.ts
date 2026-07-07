@@ -25,7 +25,7 @@
 import { test, expect } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
-  await page.goto("/waveform.html");
+  await page.goto('/tests/browser/harness/waveform.html');
   await page.waitForFunction(() => (window as unknown as { __wf?: unknown }).__wf !== undefined);
 });
 
