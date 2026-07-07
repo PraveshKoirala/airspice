@@ -124,21 +124,24 @@ function TimelineRow({ row, theme }: { row: RepairTimelineRow; theme: "dark" | "
   const failing = evaluation ? evaluation.failingAssertions.length : 0;
 
   return (
-    <div className="repair-iteration" data-testid={`repair-iteration-${row.index}`}>
-      <div className="repair-iteration-header">
-        <span className="repair-iteration-index">Iteration {row.index + 1}</span>
-        {evaluation && (
-          <span className="repair-iteration-diag">
-            {errorCount > 0 && <span className="pill error">{errorCount} validation error(s)</span>}
-            {failing > 0 && <span className="pill error">{failing} failing assertion(s)</span>}
-            {evaluation.topologyFirst && (
-              <span className="pill warning" title="Terminal convergence — topology first (#45)">
-                topology first
+    <div className="repair-iteration" data-testid={`repair-iteration-${row.index}`} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '12px', marginBottom: '12px' }}>
+      <details open>
+        <summary style={{ cursor: 'pointer', outline: 'none' }}>
+          <div className="repair-iteration-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: '8px', marginBottom: '8px', width: '100%' }}>
+            <span className="repair-iteration-index">Iteration {row.index + 1}</span>
+            {evaluation && (
+              <span className="repair-iteration-diag">
+                {errorCount > 0 && <span className="pill error"><AlertTriangle size={12}/> {errorCount} validation error(s)</span>}
+                {failing > 0 && <span className="pill error"><AlertTriangle size={12}/> {failing} failing assertion(s)</span>}
+                {evaluation.topologyFirst && (
+                  <span className="pill warning" title="Terminal convergence — topology first (#45)">
+                    topology first
+                  </span>
+                )}
               </span>
             )}
-          </span>
-        )}
-      </div>
+          </div>
+        </summary>
 
       {/* Diagnosis — the model's reasoning this round. */}
       {row.diagnosis && (
@@ -204,6 +207,7 @@ function TimelineRow({ row, theme }: { row: RepairTimelineRow; theme: "dark" | "
           )}
         </div>
       )}
+      </details>
     </div>
   );
 }
