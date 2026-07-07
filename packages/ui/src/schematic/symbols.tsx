@@ -231,6 +231,7 @@ export function ComponentSvg({
             data-pin-x={point.x}
             data-pin-y={point.y}
           >
+            <title>{pin.name}</title>
             {/*
              * Wider transparent circle receives pointer events so tapping
              * near the pin (not exactly on the 3px dot) still initiates a
