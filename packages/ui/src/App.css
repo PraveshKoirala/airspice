@@ -1130,6 +1130,17 @@ button, input, textarea, select, .sidebar-tab, .theme-toggle, .message {
   gap: 12px;
 }
 
+/* The chat log is a column flex container, so its children are flex items that
+   shrink by default. `.proposal-card` sets `overflow: hidden`, which zeroes its
+   automatic minimum size (min-height: auto only protects items whose overflow is
+   visible) -- so on a long transcript the flex algorithm crushed the card to its
+   header, clipping the diff AND the Apply/Reject buttons out of existence while
+   leaving them clickable in the DOM. Children must keep their natural height and
+   let the log scroll. */
+.chat-messages > * {
+  flex-shrink: 0;
+}
+
 .message {
   display: grid;
   grid-template-columns: 26px minmax(0, 1fr);

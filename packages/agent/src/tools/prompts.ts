@@ -173,6 +173,15 @@ TESTS: <tests> of <test id="..."> with <setup> (<set_voltage net="..." value="..
 <set_current component="..." value="..."/>, <load_step component="..." from="..." to="..." at="..." rise="..."/>),
 <run duration="..."/>, and assertions <assert_voltage net="..." min="..." max="..."/> or
 <assert_current component="..." min="..." max="..."/>. Asserted nets/components MUST exist.
+  - SUPPLY OVERRIDES (critical for multi-condition tests): a test <set_voltage net="X"/>
+    drives net X ONLY if NO voltage_source component already drives X. If a
+    voltage_source is on X, the fixed component source WINS and the test override is
+    SILENTLY IGNORED (two parallel sources would abort the solver). So to sweep a
+    supply across tests (e.g. nominal vs low-battery), do NOT put a voltage_source on
+    that rail — declare it as a bare power net and energize it entirely from each
+    test's <set_voltage>. If you DO declare a fixed voltage_source, every test must
+    assert values consistent with that ONE declared voltage; never add a test that
+    assumes a different supply than the source you placed.
 
 SIMULATION PROFILES: <simulation_profiles> of <profile id="..." default="true">.
   - Each profile MUST contain at least one <backend type="ngspice"/> (or "renode").
@@ -227,6 +236,12 @@ export function chatSystemInstruction(): string {
     "1. NEW design: open with 'Building circuit...', a 1-2 sentence summary, then stage it via 'set_design'.\n" +
     "2. MODIFY existing: open with 'Editing circuit...', a short change summary, then stage via 'propose_patch' (or 'set_design' for a full rewrite).\n" +
     "3. QUESTION: answer conversationally; stage XML only if asked or clearly relevant.\n\n" +
+    "HONESTY ABOUT STAGING: never tell the user a design/patch is staged, ready, or waiting " +
+    "for 'Apply' unless your MOST RECENT 'set_design' or 'propose_patch' call's tool result " +
+    "literally contains `staged: true`. If validation keeps failing and you are running low on " +
+    "turns, say so plainly and list exactly what is still broken (or ask a clarifying question) " +
+    "instead of describing a success you have not confirmed — a false 'click Apply' wastes the " +
+    "user's time on a design that does not exist.\n\n" +
     airContract()
   );
 }

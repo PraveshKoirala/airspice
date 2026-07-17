@@ -64,4 +64,8 @@ export function designSnapshot(): { xml: string; version: number } {
 if (import.meta.env.DEV) {
   (globalThis as Record<string, unknown>).__airSetXml = (xml: string) =>
     useDesignStore.getState().setUserXml(xml);
+  // Inverse getter so the QA harness can capture the exact design the agent
+  // produced (for triage) without mounting Monaco.
+  (globalThis as Record<string, unknown>).__airGetXml = () =>
+    useDesignStore.getState().xml;
 }

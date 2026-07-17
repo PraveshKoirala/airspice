@@ -35,3 +35,7 @@ venv/
 
 # Playwright debug page dumps (ad-hoc, never committed)
 page-dump.html
+
+# QA circuit-refinement run artifacts (regenerable; keep the corpus + scripts + docs)
+qa/circuit-corpus/results/
+qa/circuit-corpus/results-rerun/

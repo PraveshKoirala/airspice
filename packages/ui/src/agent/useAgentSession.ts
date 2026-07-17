@@ -102,24 +102,34 @@ export function useAgentSession() {
     (proposal: StagedProposal) => {
       const snap = designSnapshot();
       const outcome = resolveApply(proposal, snap.xml, snap.version, createUiEngineHooks());
+
+      // Side effects (the store writes) run HERE, never inside the setProposals
+      // updater — a state updater must be pure, and React may run it twice
+      // (StrictMode) or during render, which would fire `applyValidated` mid-
+      // render (the "setState while rendering" warning). Compute the pure status
+      // patch first, perform the writes, then update proposal state purely.
+      let patch: Partial<UiProposal>;
+      switch (outcome.status) {
+        case "clean":
+          applyValidated(outcome.design);
+          maybeAdoptDesignTitle(outcome.design.xml);
+          patch = { status: "applied" };
+          break;
+        case "rebased":
+          applyValidated(outcome.design);
+          maybeAdoptDesignTitle(outcome.design.xml);
+          patch = { status: "applied", note: outcome.note };
+          break;
+        case "conflict":
+          patch = { status: "conflict", note: outcome.note, conflictCurrentXml: outcome.currentXml };
+          break;
+        case "stale_gate_failed":
+          patch = { status: "conflict", note: outcome.note };
+          break;
+      }
+
       setProposals((prev) =>
-        prev.map((p) => {
-          if (p.proposal.id !== proposal.id) return p;
-          switch (outcome.status) {
-            case "clean":
-              applyValidated(outcome.design);
-              maybeAdoptDesignTitle(outcome.design.xml);
-              return { ...p, status: "applied" };
-            case "rebased":
-              applyValidated(outcome.design);
-              maybeAdoptDesignTitle(outcome.design.xml);
-              return { ...p, status: "applied", note: outcome.note };
-            case "conflict":
-              return { ...p, status: "conflict", note: outcome.note, conflictCurrentXml: outcome.currentXml };
-            case "stale_gate_failed":
-              return { ...p, status: "conflict", note: outcome.note };
-          }
-        }),
+        prev.map((p) => (p.proposal.id === proposal.id ? { ...p, ...patch } : p)),
       );
     },
     [applyValidated],
@@ -174,12 +184,20 @@ export function useAgentSession() {
       const runtime = new ToolRuntime(snap, { hooks: createUiEngineHooks() });
 
       let assistantBuf = "";
+      let lastAssistantText = "";
       const flushAssistant = () => {
-        if (assistantBuf.trim()) push({ role: "assistant", content: assistantBuf });
+        if (assistantBuf.trim()) {
+          lastAssistantText = assistantBuf;
+          push({ role: "assistant", content: assistantBuf });
+        }
         assistantBuf = "";
       };
 
       let turnEmittedContent = false;
+      // Tracks whether ANY set_design/propose_patch call actually staged a
+      // proposal this run — the model narrating "click Apply" is not evidence
+      // of that; only a real proposal-staged event is (see the done handler).
+      let stagedThisRun = false;
 
       const onEvent = (ev: RunnerEvent) => {
         if (ev.type === "assistant-text" || ev.type === "tool-call") {
@@ -197,6 +215,7 @@ export function useAgentSession() {
             runtime.setDesignSnapshot(designSnapshot());
             break;
           case "proposal-staged":
+            stagedThisRun = true;
             setProposals((prev) => [...prev, { proposal: ev.proposal, status: "staged" }]);
             if (autoApply) applyProposal(ev.proposal);
             break;
@@ -218,6 +237,18 @@ export function useAgentSession() {
             flushAssistant();
             if (ev.reason !== "completed") {
               push({ role: "system", content: `Run ended: ${humanReason(ev.reason)}` });
+            } else if (!stagedThisRun && /\bapply\b/i.test(lastAssistantText)) {
+              // Safety net for a model that narrates success it never achieved
+              // (see prompts.ts HONESTY ABOUT STAGING): its closing text invites
+              // an Apply click, but no set_design/propose_patch call actually
+              // staged anything this run, so there is nothing to apply.
+              push({
+                role: "system",
+                content:
+                  "Note: no design or patch was actually staged in that reply — there is " +
+                  "nothing to Apply yet. Ask the assistant to fix any validation errors " +
+                  "and try again.",
+              });
             }
             break;
         }
