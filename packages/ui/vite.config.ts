@@ -27,7 +27,7 @@ export default defineConfig(({ mode }) => {
   // `loadEnv(mode, cwd, '')` merges process.env (which is where a CLI-provided
   // `VITE_ENGINE=local npm run build` lands) with any `.env`/`.env.<mode>` file.
   const env = loadEnv(mode, process.cwd(), '');
-  const engineMode = (env.VITE_ENGINE ?? '').toString().trim().toLowerCase() === 'local' ? 'local' : 'server';
+  const engineMode = (env.VITE_ENGINE ?? '').toString().trim().toLowerCase() === 'server' ? 'server' : 'local';
   // The engine-adapter seam (issue #86): swap the `@engine-adapter` specifier
   // used by `src/engine/index.ts` for either the local or server adapter file
   // at build time. Only the chosen adapter's transitive static-import graph

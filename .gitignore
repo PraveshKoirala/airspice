@@ -32,3 +32,6 @@ venv/
 !packages/agent/bench/build/**
 !packages/agent/tests/build/
 !packages/agent/tests/build/**
+
+# Playwright debug page dumps (ad-hoc, never committed)
+page-dump.html

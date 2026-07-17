@@ -12,10 +12,10 @@
  */
 
 import React from "react";
-import { DiffEditor } from "@monaco-editor/react";
+import { DiffEditor, type DiffBeforeMount } from "@monaco-editor/react";
 import { Check, X, GitBranch, AlertTriangle } from "lucide-react";
 
-const handleBeforeMount = (monaco: any) => {
+const handleBeforeMount: DiffBeforeMount = (monaco) => {
   monaco.editor.defineTheme('premium-dark', {
     base: 'vs-dark',
     inherit: true,

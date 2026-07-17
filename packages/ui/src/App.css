@@ -52,6 +52,26 @@ body {
   color: var(--text-primary);
 }
 
+.boot-status {
+  min-height: 100vh;
+  display: grid;
+  place-content: center;
+  gap: 12px;
+  padding: 32px;
+  text-align: center;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.boot-status h1,
+.boot-status p {
+  margin: 0;
+}
+
+.storage-error h1 {
+  color: var(--error);
+}
+
 .app-container {
   display: grid;
   grid-template-columns: 236px minmax(0, 1fr) 380px;
@@ -181,6 +201,11 @@ button, input, textarea, select, .sidebar-tab, .theme-toggle, .message {
   background: var(--bg-primary);
 }
 
+/* Local (zero-backend) mode has no design-path bar row. */
+.workspace-shell.no-path-bar {
+  grid-template-rows: auto minmax(0, 1fr) 176px;
+}
+
 .workspace-header {
   height: 78px;
   padding: 14px 18px 10px;
@@ -276,8 +301,11 @@ button, input, textarea, select, .sidebar-tab, .theme-toggle, .message {
 
 .view-container {
   min-height: 0;
+  height: 100%;
   overflow: hidden;
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 .editor-container,
@@ -288,8 +316,8 @@ button, input, textarea, select, .sidebar-tab, .theme-toggle, .message {
 }
 
 .schematic-canvas {
-  background: #0f172a;
-  color: #cbd5e1;
+  background: var(--sch-bg, var(--canvas, #0f172a));
+  color: var(--text-primary, #cbd5e1);
   position: relative;
 }
 
@@ -307,8 +335,8 @@ button, input, textarea, select, .sidebar-tab, .theme-toggle, .message {
 }
 
 .schematic-titlebar strong {
-  color: #0f172a;
-  font-size: 14px;
+  color: var(--text-bright, #f4f4f5);
+  font-size: 13px;
 }
 
 .schematic-legend {
@@ -586,13 +614,9 @@ button, input, textarea, select, .sidebar-tab, .theme-toggle, .message {
   width: 100%;
   height: 100%;
   display: block;
-  background-color: #0f172a;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-  background-size: 100px 100px, 100px 100px, 10px 10px, 10px 10px;
+  /* The drawing grid is rendered inside the SVG (userSpace patterns) so it
+     scales and aligns with the content; the element itself is flat. */
+  background-color: var(--sch-bg, #0f172a);
 }
 
 .schematic-net-wire path {
@@ -602,8 +626,9 @@ button, input, textarea, select, .sidebar-tab, .theme-toggle, .message {
 }
 
 .schematic-net-wire .wire-underlay {
-  stroke: #f8fafc;
-  stroke-width: 8;
+  /* Matches the canvas so wire crossings read as gaps, not double lines. */
+  stroke: var(--sch-bg, #0f172a);
+  stroke-width: 7;
 }
 
 .schematic-net-wire .wire-stroke {
@@ -619,9 +644,8 @@ button, input, textarea, select, .sidebar-tab, .theme-toggle, .message {
 }
 
 .schematic-junction {
-  fill: #0f766e;
-  stroke: #f8fafc;
-  stroke-width: 3;
+  fill: var(--sch-wire-signal, #0f766e);
+  stroke: none;
 }
 
 .schematic-net-label {
@@ -647,7 +671,7 @@ button, input, textarea, select, .sidebar-tab, .theme-toggle, .message {
 }
 
 .schematic-component {
-  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.5));
+  filter: none;
 }
 
 .schematic-component .symbol-line,
@@ -1992,4 +2016,156 @@ button, .sidebar-tab, .theme-toggle, input, select, textarea {
 }
 .chat-repl .message.loading .message-icon {
   animation: pulse-working 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* ---- Sidebar project manager (New Project button, My Projects list) ----
+   These classes shipped unstyled; every rule below is theme-token driven so
+   both light and dark modes render the list as proper rows. */
+.sidebar-create-actions {
+  padding: 12px 16px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sidebar-create-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--text-bright);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.sidebar-create-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+}
+
+.sidebar-project-section {
+  padding: 8px 16px 0;
+  overflow-y: auto;
+  max-height: 30vh;
+}
+
+.sidebar-project-section h3 {
+  margin: 4px 0 8px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.project-list-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.project-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.project-list-item:hover {
+  background: var(--bg-hover);
+}
+
+.project-list-item.active {
+  background: rgba(20, 184, 166, 0.12);
+  border-color: var(--accent);
+}
+
+.project-item-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.project-item-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.project-item-time {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.project-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0.35;
+}
+
+.project-list-item:hover .project-actions,
+.project-list-item.active .project-actions {
+  opacity: 1;
+}
+
+.project-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.project-action-btn:hover {
+  background: var(--bg-secondary);
+  color: var(--text-bright);
+}
+
+.toast-undo {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 13px;
+  box-shadow: 0 8px 24px var(--shadow);
+}
+
+.toast-undo button {
+  display: inline-flex;
+  align-items: center;
+  border: 0;
+  border-radius: 6px;
+  padding: 6px 10px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
 }

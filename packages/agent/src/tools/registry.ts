@@ -116,9 +116,15 @@ export const AGENT_TOOLS: ToolSpec[] = [
   {
     name: "propose_patch",
     description:
-      "Stage a SMALL edit to the current design as an AIR <patch> diff " +
-      "(replace/add/remove ops keyed by XPath). The patch is applied to the " +
-      "current design, then normalized and validated (the gate); on failure " +
+      "Stage a SMALL edit to the current design as an AIR <patch> diff. Every " +
+      "operation element REQUIRES a path attribute (ElementTree-style XPath, " +
+      'e.g. .//component[@id=\'R1\']/value). Format: <patch><reason>why</reason>' +
+      "<replace path=\"...\"><newElement.../></replace>" +
+      "<add path=\"...parent...\"><childToAppend.../></add>" +
+      "<remove path=\"...\"/></patch>. " +
+      "<replace> swaps the matched element for the payload; <add> appends the " +
+      "payload inside the matched parent; <remove> deletes the matched element. " +
+      "The patched design then runs the gate (normalize + validate); on failure " +
       "you receive diagnostics and nothing is applied. On success the resulting " +
       "design is staged as a proposal for Apply/Reject. Cheaper than set_design " +
       "for targeted changes.",
@@ -127,7 +133,9 @@ export const AGENT_TOOLS: ToolSpec[] = [
       properties: {
         patch_xml: {
           type: "string",
-          description: "An AIR <patch>...</patch> diff document.",
+          description:
+            "An AIR <patch> document whose replace/add/remove children each " +
+            "carry a path attribute.",
         },
         summary: {
           type: "string",
@@ -142,8 +150,9 @@ export const AGENT_TOOLS: ToolSpec[] = [
     description:
       "Preview an AIR <patch> against the current design WITHOUT staging it: " +
       "returns the structured op diff and the before/after diagnostic deltas " +
-      "(which errors it resolves or introduces). Use to check a patch before " +
-      "propose_patch.",
+      "(which errors it resolves or introduces). Same <patch> format as " +
+      "propose_patch (each op needs a path attribute). Use to check a patch " +
+      "before propose_patch.",
     parameters: {
       type: "object",
       properties: {

@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import type { Node, Edge } from 'reactflow';
-import { Activity, FileCode, FolderTree, RadioTower } from 'lucide-react';
+import { Activity, FileCode, FolderTree } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Toolbar from './components/Toolbar';
 import XmlEditor from './components/Editor';
@@ -35,6 +35,7 @@ import ResultPanel from './components/ResultPanel';
 import ChatRepl from './components/ChatRepl';
 import RepairPanel from './components/RepairPanel';
 import SettingsPanel from './components/SettingsPanel';
+import FirmwarePanel from './components/FirmwarePanel';
 import Landing from './pages/Landing';
 import type { ApiError, Diagnostic, ValidationResult } from './types/api';
 import { getEngine, ENGINE_MODE, getRun } from './engine';
@@ -45,13 +46,6 @@ import { saveToDisk, saveAsToDisk } from './storage/fileIo';
 import { exportAllRawRecords } from './storage/db';
 import { useDesignStore } from './agent/designStore';
 import { useAgentSettings } from './agent/agentSettings';
-import { KeyVault } from 'agent';
-
-const vault = new KeyVault();
-if (!vault.has('openai') && !vault.getBaseUrl('openai')) {
-  vault.set('openai', 'test-key-123');
-  vault.setBaseUrl('openai', 'http://localhost:8317/v1');
-}
 import './App.css';
 
 interface LogEntry {
@@ -218,6 +212,7 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
   const [designPath, setDesignPath] = useState(DEFAULT_DESIGN);
   const xml = useDesignStore((s) => s.xml);
   const projectsList = useProjectStore((s) => s.projectsList);
+  const projectStoreInitialized = useProjectStore((s) => s.initialized);
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
   const selectProject = useProjectStore((s) => s.selectProject);
   const createProject = useProjectStore((s) => s.createProject);
@@ -234,6 +229,7 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
 
   useEffect(() => {
     const runInit = async () => {
+      if (!projectStoreInitialized) return;
       if (useProjectStore.getState().isDowngraded) return;
       const currentList = useProjectStore.getState().projectsList;
       if (currentList.length === 0) {
@@ -245,7 +241,7 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
       }
     };
     runInit();
-  }, [projectsList.length, selectProject, createProject]);
+  }, [projectStoreInitialized, projectsList.length, selectProject, createProject]);
 
   // Keep a ref to the latest XML so visibilitychange/pagehide can access it
   const xmlRef = useRef(xml);
@@ -295,6 +291,7 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
   const agentProvider = useAgentSettings((s) => s.agentProvider);
   const agentModel = useAgentSettings((s) => s.agentModel);
   const malformedCount = useAgentSettings((s) => s.malformedCount);
+  const tokenBudget = useAgentSettings((s) => s.tokenBudget);
 
   // Undo/redo keyboard binding (issue #24 D5). Ctrl+Z / Cmd+Z undoes,
   // Ctrl+Shift+Z / Ctrl+Y / Cmd+Shift+Z redoes. Registered at capture
@@ -886,11 +883,7 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
       return <DiagnosticsPanel validation={validation} />;
     }
     if (activeTab === 'firmware') {
-      return <InfoPanel icon={<RadioTower size={18} />} title="Firmware" items={[
-        'Generated PlatformIO firmware is available from the backend compiler.',
-        'The current ESP32 task reads ADC, converts raw counts, and logs battery_mv.',
-        'Use Compile Firmware from the API/CLI to refresh generated source.',
-      ]} />;
+      return <FirmwarePanel xml={xml} />;
     }
     if (activeTab === 'artifacts') {
       return <ArtifactsPanel artifacts={artifacts} />;
@@ -900,6 +893,7 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
         <RepairPanel
           provider={agentProvider}
           {...(agentModel ? { model: agentModel } : {})}
+          maxTokensPerTurn={tokenBudget}
           theme={theme}
         />
       );
@@ -928,7 +922,7 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
           </div>
         )}
         <Toolbar onValidate={handleValidate} onSimulate={handleSimulate} onRepair={handleRepair} onSave={handleSave} />
-        <div className="workspace-shell">
+        <div className={`workspace-shell${ENGINE_MODE === 'local' ? ' no-path-bar' : ''}`}>
           <div className="workspace-header">
             <div>
               <span className="eyebrow">AIR Workspace</span>
@@ -939,10 +933,12 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
               <div className={`run-state ${isBusy ? 'busy' : 'idle'}`}>{isBusy ? 'Running' : 'Ready'}</div>
             </div>
           </div>
-          <div className="design-path-bar">
-            <span>Design</span>
-            <input value={designPath} onChange={(event) => setDesignPath(event.target.value)} />
-          </div>
+          {ENGINE_MODE !== 'local' && (
+            <div className="design-path-bar">
+              <span>Design</span>
+              <input value={designPath} onChange={(event) => setDesignPath(event.target.value)} />
+            </div>
+          )}
           <section className="view-container">{renderPanel()}</section>
           <ResultPanel logs={logs} />
         </div>
@@ -950,6 +946,7 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
       <ChatRepl
         provider={agentProvider}
         {...(agentModel ? { model: agentModel } : {})}
+        maxTokensPerTurn={tokenBudget}
         theme={theme}
       />
     </div>
@@ -1111,23 +1108,6 @@ function ArtifactsPanel({ artifacts }: { artifacts: string[] }) {
   );
 }
 
-function InfoPanel({ icon, title, items }: { icon: React.ReactNode; title: string; items: string[] }) {
-  return (
-    <div className="detail-panel">
-      <div className="panel-heading">
-        {icon}
-        <div>
-          <span className="eyebrow">Workspace</span>
-          <h2>{title}</h2>
-        </div>
-      </div>
-      <ul className="info-list">
-        {items.map((item) => <li key={item}>{item}</li>)}
-      </ul>
-    </div>
-  );
-}
-
 function EmptyState({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
   return (
     <div className="empty-state">
@@ -1211,11 +1191,30 @@ function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const initProjectStore = useProjectStore((s) => s.init);
   const isDowngraded = useProjectStore((s) => s.isDowngraded);
+  const initialized = useProjectStore((s) => s.initialized);
+  const storageError = useProjectStore((s) => s.storageError);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-    initProjectStore();
-  }, [theme, initProjectStore]);
+  }, [theme]);
+
+  useEffect(() => {
+    void initProjectStore();
+  }, [initProjectStore]);
+
+  if (!initialized) {
+    return <div className="boot-status" role="status">Opening local workspace...</div>;
+  }
+
+  if (storageError) {
+    return (
+      <div className="boot-status storage-error" role="alert">
+        <h1>Local storage unavailable</h1>
+        <p>{storageError}</p>
+        <p>Allow IndexedDB for this site, then reload. No project data was sent anywhere.</p>
+      </div>
+    );
+  }
 
   if (isDowngraded) {
     return <DowngradeRefusalScreen />;

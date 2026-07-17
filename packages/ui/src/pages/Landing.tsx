@@ -78,17 +78,17 @@ const Landing: React.FC = () => {
       </div>
 
       <div className="landing-actions">
-        <button className="action-card primary" onClick={handleNewProject}>
+        <button className="action-card primary" onClick={handleNewProject} aria-label="New Project">
           <div className="action-icon">
             <Plus size={32} />
           </div>
           <div className="action-text">
             <h3>New Project</h3>
-            <p>Start from a template or a blank design.</p>
+            <p>Start a blank design and tell the AI what to build.</p>
           </div>
         </button>
 
-        <button className="action-card" onClick={handleOpenProject}>
+        <button className="action-card" onClick={handleOpenProject} aria-label="Open Project">
           <div className="action-icon">
             <FolderOpen size={32} />
           </div>
@@ -114,7 +114,7 @@ const Landing: React.FC = () => {
               >
                 <div className="project-info">
                   <span className="project-name">{project.name}</span>
-                  <span className="project-path">IndexedDB Storage</span>
+                  <span className="project-path">Stored in this browser</span>
                 </div>
                 <div className="project-meta">
                   <span>{formatRelativeTime(project.updatedAt)}</span>

@@ -55,16 +55,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   const catalog = MODEL_CATALOG[provider];
 
+  const tokenBudget = useAgentSettings((s) => s.tokenBudget);
+  const setTokenBudget = useAgentSettings((s) => s.setTokenBudget);
+
   const [keyInput, setKeyInput] = useState('');
   const [baseUrlInput, setBaseUrlInput] = useState<string>(() => vault.getBaseUrl(provider) ?? '');
-  const [tokenBudget, setTokenBudget] = useState<number>(DEFAULT_TOKEN_BUDGET);
   const [validate, setValidate] = useState<ValidateState>({ status: 'idle' });
   const [storedMask, setStoredMask] = useState<string>(() => vault.masked(provider));
-
-  React.useEffect(() => {
-    setBaseUrlInput(vault.getBaseUrl(provider) ?? '');
-    setStoredMask(vault.masked(provider));
-  }, [provider]);
 
   const notice = useMemo(() => keyVaultNoticeFor(provider), [provider]);
 
@@ -183,7 +180,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         </label>
 
         <label className="settings-field">
-          <span>Token budget (default)</span>
+          <span>Token budget (per turn)</span>
           <input
             type="number"
             min={256}

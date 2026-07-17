@@ -28,7 +28,7 @@ export default defineConfig({
     command:
       "npx vite --host 127.0.0.1 --port 5180 --strictPort",
     url: "http://127.0.0.1:5180",
-    reuseExistingServer: false,
+    reuseExistingServer: true,
     timeout: 180_000,
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],

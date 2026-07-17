@@ -144,6 +144,24 @@ export {
 } from "./emit/spice.js";
 export type { SpiceArtifacts, CompileSpiceOptions } from "./emit/spice.js";
 
+// Firmware codegen (port of firmware.py, minus the filesystem): deterministic
+// PlatformIO/Arduino C++ (or MicroPython) source rendered from the design's
+// declarative <firmware> tasks. Consumed by the UI's Firmware tab.
+export {
+  emitFirmware,
+  emitMainCpp,
+  emitMainPy,
+  emitPinmapHeader,
+  firmwarePlatformioSettings,
+  resolveBindings,
+  periodToMs,
+} from "./emit/firmware.js";
+export type {
+  FirmwareFile,
+  PlatformioSettings,
+  ResolvedBinding,
+} from "./emit/firmware.js";
+
 // Simulation report pipeline (issue #14): PURE functions turning the WASM
 // engine's WaveTables + the design IR + the test's assertion specs into a report
 // object schema-identical to the Python oracle's simulator.py output (the

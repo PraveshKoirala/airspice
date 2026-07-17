@@ -28,8 +28,10 @@ import {
   type MockFixture,
   type NetworkProviderId,
 } from "agent";
+import { parse as parseAir } from "air-ts";
 import { useDesignStore, designSnapshot } from "./designStore";
 import { useAgentSettings } from "./agentSettings";
+import { useProjectStore } from "../storage/projectStore";
 import { createUiEngineHooks } from "./engineHooks";
 
 /** A chat transcript entry the panel renders. */
@@ -61,6 +63,24 @@ export interface AgentSessionConfig {
 
 const vault = new KeyVault();
 
+/**
+ * When the agent delivers a design into a project still called "Untitled
+ * Project", adopt the design's own title so the workspace header, landing list,
+ * and design metadata stop disagreeing. Best-effort: a parse failure changes
+ * nothing.
+ */
+function maybeAdoptDesignTitle(xml: string): void {
+  try {
+    const store = useProjectStore.getState();
+    const active = store.projectsList.find((p) => p.id === store.activeProjectId);
+    if (!active || active.name !== "Untitled Project") return;
+    const title = parseAir(xml).metadata.title.trim();
+    if (title && title !== "Blank Design") void store.renameProject(active.id, title);
+  } catch {
+    // best-effort only
+  }
+}
+
 export function useAgentSession() {
   const [transcript, setTranscript] = useState<ChatEntry[]>([]);
   const [proposals, setProposals] = useState<UiProposal[]>([]);
@@ -88,9 +108,11 @@ export function useAgentSession() {
           switch (outcome.status) {
             case "clean":
               applyValidated(outcome.design);
+              maybeAdoptDesignTitle(outcome.design.xml);
               return { ...p, status: "applied" };
             case "rebased":
               applyValidated(outcome.design);
+              maybeAdoptDesignTitle(outcome.design.xml);
               return { ...p, status: "applied", note: outcome.note };
             case "conflict":
               return { ...p, status: "conflict", note: outcome.note, conflictCurrentXml: outcome.currentXml };

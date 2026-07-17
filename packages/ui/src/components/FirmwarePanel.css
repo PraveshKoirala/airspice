@@ -1,0 +1,194 @@
+/* Firmware tab styles (FirmwarePanel.tsx). Scoped under .firmware-panel /
+   fw-* class names; shares the app-wide surface variables from App.css. */
+
+.firmware-panel .metric-section {
+  margin-bottom: 14px;
+}
+
+.fw-inline-icon {
+  vertical-align: -2px;
+  margin-right: 4px;
+  color: var(--accent-strong);
+}
+
+.fw-badges {
+  display: flex;
+  gap: 6px;
+}
+
+.fw-pill {
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent-strong);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  white-space: nowrap;
+}
+
+.fw-pill.fw-warn {
+  color: var(--warning);
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.fw-facts {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.fw-facts div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.fw-facts span {
+  color: var(--text-muted);
+}
+
+.fw-facts strong {
+  color: var(--text-bright);
+  font-weight: 600;
+  text-align: right;
+}
+
+.fw-tasks {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.fw-task {
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.fw-task-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.fw-task-head strong {
+  color: var(--text-bright);
+  font-size: 13px;
+}
+
+.fw-steps {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 3px;
+  font-size: 12.5px;
+  color: var(--text-primary);
+}
+
+.fw-steps li::marker {
+  color: var(--text-muted);
+}
+
+.fw-bindings-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.fw-bindings-table th {
+  text-align: left;
+  color: var(--text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+  padding: 4px 10px 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.fw-bindings-table td {
+  padding: 6px 10px 6px 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+}
+
+.fw-bindings-table tr:last-child td {
+  border-bottom: none;
+}
+
+.fw-bindings-table code {
+  color: var(--accent-strong);
+  font-size: 12px;
+}
+
+.fw-file-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.fw-file-tab {
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  cursor: pointer;
+}
+
+.fw-file-tab:hover {
+  color: var(--text-bright);
+  background: var(--bg-hover);
+}
+
+.fw-file-tab.active {
+  color: var(--accent-strong);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.fw-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fw-copy-btn:hover {
+  color: var(--text-bright);
+  background: var(--bg-hover);
+}
+
+.fw-code {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  overflow: auto;
+  max-height: 420px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--text-primary);
+  tab-size: 2;
+}
+
+.fw-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+}

@@ -95,3 +95,18 @@ export function summarizeStderr(lines: readonly string[], keep: number = 5): str
   const tail = lines.slice(lines.length - keep);
   return `[${lines.length} stderr lines; showing last ${keep}]\n` + tail.join("\n");
 }
+
+/** Strips markdown code block wrappers (e.g. ```xml ... ```) often emitted by LLMs. */
+export function stripMarkdown(text: string): string {
+  let s = text.trim();
+  if (s.startsWith("```")) {
+    const firstNewline = s.indexOf("\n");
+    if (firstNewline !== -1) {
+      s = s.substring(firstNewline + 1);
+    }
+    if (s.endsWith("```")) {
+      s = s.substring(0, s.length - 3).trim();
+    }
+  }
+  return s;
+}

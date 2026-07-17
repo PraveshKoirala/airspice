@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, ShieldCheck, Zap, Save, RefreshCw } from 'lucide-react';
+import { Play, ShieldCheck, Zap, Save } from 'lucide-react';
 
 interface ToolbarProps {
   onValidate: () => void;
@@ -27,10 +27,6 @@ const Toolbar: React.FC<ToolbarProps> = ({ onValidate, onSimulate, onRepair, onS
       <button onClick={onRepair} title="Auto Repair">
         <Zap size={18} />
         <span>Repair</span>
-      </button>
-      <div className="toolbar-divider" />
-      <button title="Reset">
-        <RefreshCw size={18} />
       </button>
     </div>
   );

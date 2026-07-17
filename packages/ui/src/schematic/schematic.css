@@ -1,0 +1,302 @@
+/**
+ * Schematic canvas theme (professional-schematic upgrade).
+ *
+ * Every colour the SVG renderer uses is a CSS variable scoped to
+ * `.svg-schematic-canvas`, with dark values as the default (the app's
+ * default theme) and light overrides under `[data-theme='light']`.
+ *
+ * App.css keeps the legacy structural rules for the same selectors; the
+ * rules below intentionally carry one extra ancestor class so they win
+ * the cascade without `!important`.
+ */
+
+.svg-schematic-canvas {
+  /* --- dark theme (default) --- */
+  --sch-bg: #0e1420;
+  --sch-grid-minor: rgba(148, 163, 184, 0.07);
+  --sch-grid-major: rgba(148, 163, 184, 0.14);
+  --sch-symbol: #dbe4f0;          /* component symbol strokes */
+  --sch-symbol-muted: #93a3b8;    /* shells, de-emphasised outlines */
+  --sch-body-fill: #151d2c;       /* IC / source body fill */
+  --sch-ref: #f1f5f9;             /* reference designators */
+  --sch-value: #9aa9bd;           /* value / part labels */
+  --sch-pin-name: #8fb8d8;        /* pin-name text */
+  --sch-pin-dot: #c7d3e2;
+  --sch-wire-signal: #2dd4bf;
+  --sch-wire-power: #f59e0b;
+  --sch-wire-ground: #8b9bb0;
+  --sch-halo: #0e1420;            /* text halo == canvas background */
+  --sch-select: #818cf8;
+}
+
+[data-theme='light'] .svg-schematic-canvas {
+  --sch-bg: #fbfcfe;
+  --sch-grid-minor: rgba(15, 23, 42, 0.055);
+  --sch-grid-major: rgba(15, 23, 42, 0.11);
+  --sch-symbol: #1e293b;
+  --sch-symbol-muted: #94a3b8;
+  --sch-body-fill: #ffffff;
+  --sch-ref: #0f172a;
+  --sch-value: #5b6b80;
+  --sch-pin-name: #33628c;
+  --sch-pin-dot: #334155;
+  --sch-wire-signal: #0f766e;
+  --sch-wire-power: #c2410c;
+  --sch-wire-ground: #64748b;
+  --sch-halo: #fbfcfe;
+  --sch-select: #4f46e5;
+}
+
+/* ------------------------------------------------------------------ */
+/* Canvas + grid                                                       */
+/* ------------------------------------------------------------------ */
+
+.svg-schematic-canvas {
+  background: var(--sch-bg);
+}
+
+.svg-schematic-canvas .native-schematic {
+  background: var(--sch-bg);
+  background-image: none;
+}
+
+.svg-schematic-canvas .sch-grid-minor {
+  stroke: var(--sch-grid-minor);
+  stroke-width: 1;
+}
+
+.svg-schematic-canvas .sch-grid-major {
+  stroke: var(--sch-grid-major);
+  stroke-width: 1;
+}
+
+/* Floating titlebar chip so the header stays readable over the drawing. */
+.svg-schematic-canvas .schematic-titlebar {
+  pointer-events: none;
+}
+
+.svg-schematic-canvas .schematic-titlebar > div:first-child {
+  background: color-mix(in srgb, var(--sch-bg) 82%, transparent);
+  backdrop-filter: blur(3px);
+  border-radius: 6px;
+  padding: 5px 10px;
+  min-width: 0;
+}
+
+.svg-schematic-canvas .schematic-titlebar strong {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.svg-schematic-canvas .schematic-titlebar strong {
+  color: var(--text-bright, #f4f4f5);
+  font-size: 13px;
+}
+
+.svg-schematic-canvas .schematic-legend {
+  background: color-mix(in srgb, var(--sch-bg) 82%, transparent);
+  backdrop-filter: blur(3px);
+  border-radius: 6px;
+  padding: 4px 10px;
+}
+
+.svg-schematic-canvas .schematic-legend .legend {
+  color: var(--text-muted, #a1a1aa);
+}
+
+.svg-schematic-canvas .schematic-legend .legend::before { background: var(--sch-wire-signal); }
+.svg-schematic-canvas .schematic-legend .legend.power::before { background: var(--sch-wire-power); }
+.svg-schematic-canvas .schematic-legend .legend.ground::before { background: var(--sch-wire-ground); }
+
+/* ------------------------------------------------------------------ */
+/* Wires                                                               */
+/* ------------------------------------------------------------------ */
+
+/* The underlay creates the classic "gap" where wires cross: it matches
+   the canvas colour, so no more double-line artifact. */
+.svg-schematic-canvas .schematic-net-wire .wire-underlay {
+  stroke: var(--sch-bg);
+  stroke-width: 7;
+}
+
+.svg-schematic-canvas .schematic-net-wire .wire-stroke {
+  stroke: var(--sch-wire-signal);
+  stroke-width: 2.25;
+}
+
+.svg-schematic-canvas .schematic-net-wire.power .wire-stroke {
+  stroke: var(--sch-wire-power);
+  stroke-width: 2.5;
+}
+
+.svg-schematic-canvas .schematic-net-wire.ground .wire-stroke {
+  stroke: var(--sch-wire-ground);
+  stroke-width: 2.25;
+}
+
+/* Junction dots take the colour of their net. */
+.svg-schematic-canvas .schematic-junction {
+  fill: var(--sch-wire-signal);
+  stroke: none;
+}
+.svg-schematic-canvas .schematic-net-wire.power .schematic-junction { fill: var(--sch-wire-power); }
+.svg-schematic-canvas .schematic-net-wire.ground .schematic-junction { fill: var(--sch-wire-ground); }
+
+/* Ground glyph (three shortening bars). */
+.svg-schematic-canvas .ground-glyph {
+  fill: none;
+  stroke: var(--sch-wire-ground);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.svg-schematic-canvas .schematic-gnd-label {
+  fill: var(--sch-wire-ground);
+  text-anchor: middle;
+  font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  paint-order: stroke;
+  stroke: var(--sch-halo);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
+/* Net name labels. */
+.svg-schematic-canvas .schematic-net-label {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  stroke: var(--sch-halo);
+  stroke-width: 4px;
+}
+.svg-schematic-canvas .schematic-net-label.signal { fill: var(--sch-wire-signal); }
+.svg-schematic-canvas .schematic-net-label.power { fill: var(--sch-wire-power); }
+.svg-schematic-canvas .schematic-net-label.ground { fill: var(--sch-wire-ground); }
+
+/* Selection glow on wires + ground glyphs. */
+.svg-schematic-canvas .schematic-net-wire.selected .wire-stroke,
+.svg-schematic-canvas .schematic-net-wire.selected .ground-glyph {
+  stroke-width: 3.2;
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--sch-select) 60%, transparent));
+}
+
+/* ------------------------------------------------------------------ */
+/* Component symbols                                                   */
+/* ------------------------------------------------------------------ */
+
+.svg-schematic-canvas .schematic-component {
+  filter: none;
+}
+
+.svg-schematic-canvas .schematic-component .symbol-line,
+.svg-schematic-canvas .schematic-component .ic-pin {
+  fill: none;
+  stroke: var(--sch-symbol);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.svg-schematic-canvas .schematic-component .symbol-shell {
+  fill: none;
+  stroke: var(--sch-symbol);
+  stroke-width: 2;
+  opacity: 0.65;
+}
+
+.svg-schematic-canvas .schematic-component .symbol-fill {
+  fill: var(--sch-symbol);
+  stroke: none;
+}
+
+.svg-schematic-canvas .source-body,
+.svg-schematic-canvas .ic-body {
+  fill: var(--sch-body-fill);
+  stroke: var(--sch-symbol);
+  stroke-width: 2.4;
+  filter: none;
+}
+
+/* Labels: halo matches canvas so text never vanishes over the grid. */
+.svg-schematic-canvas .component-ref,
+.svg-schematic-canvas .component-value,
+.svg-schematic-canvas .ic-name,
+.svg-schematic-canvas .ic-part,
+.svg-schematic-canvas .ic-pin-name,
+.svg-schematic-canvas .pin-marker text {
+  stroke: var(--sch-halo);
+  stroke-width: 3.5px;
+  paint-order: stroke;
+  stroke-linejoin: round;
+}
+
+.svg-schematic-canvas .component-ref {
+  fill: var(--sch-ref);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.svg-schematic-canvas .component-value,
+.svg-schematic-canvas .ic-part {
+  fill: var(--sch-value);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.svg-schematic-canvas .ic-name {
+  fill: var(--sch-ref);
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.svg-schematic-canvas .ic-part { font-size: 11px; }
+
+.svg-schematic-canvas .ic-pin-name {
+  fill: var(--sch-pin-name);
+  font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.svg-schematic-canvas .pin-marker circle {
+  fill: var(--sch-pin-dot);
+  opacity: 0.95;
+}
+
+/* The oversized wire-draw hitbox circle must stay invisible -- it sits on
+   top of the 3px pin dot and would otherwise render as a big blob. */
+.svg-schematic-canvas .pin-marker circle.pin-hitbox {
+  fill: transparent;
+  opacity: 1;
+}
+
+.svg-schematic-canvas .pin-marker text {
+  fill: var(--sch-pin-name);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+/* Selection highlight keeps working over the new palette. */
+.svg-schematic-canvas .schematic-component.selected .symbol-line,
+.svg-schematic-canvas .schematic-component.selected .symbol-shell,
+.svg-schematic-canvas .schematic-component.selected .ic-body,
+.svg-schematic-canvas .schematic-component.selected .ic-pin {
+  stroke: var(--sch-select);
+}
+.svg-schematic-canvas .schematic-component.selected .ic-body {
+  fill: color-mix(in srgb, var(--sch-select) 10%, var(--sch-body-fill));
+}
+.svg-schematic-canvas .pin-marker.on-highlighted-net circle {
+  fill: var(--sch-select);
+  opacity: 1;
+}
+
+/* Marquee + wire preview pick up theme-aware colours. */
+.svg-schematic-canvas .schematic-marquee {
+  fill: color-mix(in srgb, var(--sch-select) 10%, transparent);
+  stroke: var(--sch-select);
+}

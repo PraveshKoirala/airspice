@@ -131,6 +131,11 @@ let _contractCache: string | null = null;
 
 // PORT: prompts.py air_contract() — the full authoritative contract, verbatim
 // (with the registry-derived component/MCU rules spliced in, as in Python).
+// AMENDMENT (browser firmware story): the FIRMWARE block was expanded from the
+// one-line example into a schema cheatsheet covering every construct the
+// validation gate accepts (project/binding/task referential rules, the five
+// task ops, ADC vref constraint) so "add an MCU that reads X and logs it"
+// produces valid <firmware> XML. The rest of the contract text is untouched.
 export function airContract(): string {
   if (_contractCache !== null) return _contractCache;
   _contractCache = `AIR XML AUTHORING CONTRACT (v0.1) - follow EXACTLY; the validator enforces all of this.
@@ -174,11 +179,19 @@ SIMULATION PROFILES: <simulation_profiles> of <profile id="..." default="true">.
   - <run test="..."/> entries MUST reference existing test ids.
   - <include subsystem="..."/> entries MUST reference existing analog subsystems.
 
-FIRMWARE (optional): <firmware><project id="..." target="<mcu id>" framework="arduino" language="cpp">
-<board>...</board></project><binding id="..."><signal name="..."/><component ref="<mcu id>"/>
-<peripheral>ADC1</peripheral><channel>ADC1_CH0</channel><net>...</net></binding>
-<task id="..." target="<project id>"><period>60s</period><read_adc binding="..." into="raw"/>
-<convert expr="..." into="mv"/><log value="mv"/></task></firmware>.
+FIRMWARE (optional; add when asked to program/code the MCU): <firmware> holds three element kinds.
+  <project id="fw_main" target="U_MCU" framework="platformio" language="cpp"><board>esp32-c3-devkitm-1</board></project>
+    - \`target\` MUST be the id of an mcu component; \`language\` is "cpp" (Arduino C++) or "micropython".
+  <binding id="vbat_adc"><signal name="battery_voltage"/><component ref="U_MCU"/>
+  <peripheral>ADC1</peripheral><channel>ADC1_CH4</channel><net>battery_sense</net></binding>
+    - <component ref> and <net> MUST exist; <channel> must match the MCU pin's \`function\`
+      (e.g. <pin name="GPIO4" net="battery_sense" function="ADC1_CH4"/>); keep the bound net at or
+      below the ADC vref (use a divider) or validation fails with ADC_INPUT_EXCEEDS_VREF.
+  <task id="read_battery" target="fw_main"><period>1s</period>[steps]</task>
+    - \`target\` MUST be a declared project id; <period> like "250ms" or "60s". Steps run in order:
+      <read_adc binding="vbat_adc" into="raw"/>, <convert expr="battery_raw_to_mv(raw)" into="mv"/>,
+      <write_gpio pin="GPIO2" value="high"/> (or "low"), <delay duration="100ms"/>, <log value="mv"/>.
+  The UI's Firmware tab renders deterministic source generated from these tasks.
 
 COMMON MISTAKES TO AVOID: using \`name\` instead of \`id\` on nets/components/tests/profiles;
 putting the kind in \`part\` instead of \`type\`; wrapping pins in <pins>; omitting <backend>

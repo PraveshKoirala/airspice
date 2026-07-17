@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useProjectStore } from "../storage/projectStore";
 import { openFromDisk } from "../storage/fileIo";
+import { ENGINE_MODE } from "../engine";
 
 interface SidebarProps {
   activeTab: string;
@@ -171,7 +172,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, theme, toggl
     { id: "editor", icon: FileCode, label: "AIR XML" },
     { id: "simulation", icon: Activity, label: "Simulation" },
     { id: "firmware", icon: Cpu, label: "Firmware" },
-    { id: "artifacts", icon: FolderTree, label: "Artifacts" },
+    // Artifacts are server-run file outputs; the zero-backend local engine
+    // surfaces everything it produces in the Simulation tab instead.
+    ...(ENGINE_MODE === "local" ? [] : [{ id: "artifacts", icon: FolderTree, label: "Artifacts" }]),
     { id: "validation", icon: CheckCircle, label: "Validation" },
     { id: "repair", icon: Bug, label: "Repair" },
     { id: "settings", icon: Settings, label: "Settings" },

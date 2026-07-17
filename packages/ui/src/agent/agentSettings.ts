@@ -11,7 +11,27 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { NetworkProviderId } from "agent";
+import { DEFAULT_TOKEN_BUDGET, MODEL_CATALOG, type NetworkProviderId } from "agent";
+
+const DEFAULT_PROVIDER: NetworkProviderId = "openai";
+const DEFAULT_MODEL = MODEL_CATALOG[DEFAULT_PROVIDER].defaultModel;
+// Model ids a previous build persisted as the openai-lane default; they upgrade
+// to the current catalog default (the local proxy's tool-calling model).
+const STALE_DEFAULTS = new Set(["gemini-3.5-flash-high", "gpt-4o-mini"]);
+
+function migratePersistedSettings(persisted: unknown): unknown {
+  if (typeof persisted !== "object" || persisted === null) return persisted;
+  const state = persisted as Record<string, unknown>;
+  if (
+    state.agentProvider === DEFAULT_PROVIDER &&
+    (STALE_DEFAULTS.has(state.agentModel as string) ||
+      STALE_DEFAULTS.has(state.freeTextModel as string) ||
+      !state.agentModel)
+  ) {
+    return { ...state, agentModel: DEFAULT_MODEL, freeTextModel: "" };
+  }
+  return state;
+}
 
 export interface AgentSettingsState {
   /** Auto-apply staged proposals (still through the full gate). Default OFF. */
@@ -27,6 +47,9 @@ export interface AgentSettingsState {
   setAgentModel: (model: string) => void;
   freeTextModel: string;
   setFreeTextModel: (model: string) => void;
+  /** Per-turn token budget handed to chat + repair sessions. */
+  tokenBudget: number;
+  setTokenBudget: (budget: number) => void;
 }
 
 export const useAgentSettings = create<AgentSettingsState>()(
@@ -37,15 +60,19 @@ export const useAgentSettings = create<AgentSettingsState>()(
       malformedCount: 0,
       incMalformed: () => set((s) => ({ malformedCount: s.malformedCount + 1 })),
       resetMalformed: () => set({ malformedCount: 0 }),
-      agentProvider: 'openai',
+      agentProvider: DEFAULT_PROVIDER,
       setAgentProvider: (provider) => set({ agentProvider: provider }),
-      agentModel: 'gemini-3.5-flash-high',
+      agentModel: DEFAULT_MODEL,
       setAgentModel: (model) => set({ agentModel: model }),
-      freeTextModel: 'gemini-3.5-flash-high',
+      freeTextModel: '',
       setFreeTextModel: (model) => set({ freeTextModel: model }),
+      tokenBudget: DEFAULT_TOKEN_BUDGET,
+      setTokenBudget: (budget) => set({ tokenBudget: budget }),
     }),
     {
       name: 'airspice.agent.settings',
+      version: 2,
+      migrate: migratePersistedSettings,
     }
   )
 );

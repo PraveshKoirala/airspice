@@ -87,6 +87,18 @@ export function useRepairSession() {
       setRunning(true);
       const controller = new AbortController();
       abortRef.current = controller;
+      const failBeforeRun = (message: string) => {
+        setOutcome({
+          reason: "provider_error",
+          message,
+          fixed: false,
+          iterations: 0,
+          totalTokens: 0,
+        });
+        setStatus("");
+        setRunning(false);
+        abortRef.current = null;
+      };
 
       // Build the provider: mock replays a fixture; a network provider needs a
       // key from the local vault (never leaves the browser, #17).
@@ -97,18 +109,18 @@ export function useRepairSession() {
         } else {
           const key = vault.get(config.provider);
           if (!key) {
-            setStatus(`No ${config.provider} API key stored. Add one in Settings.`);
-            setRunning(false);
+            failBeforeRun(`No ${config.provider} API key stored. Add one in Settings.`);
             return;
           }
+          const baseUrl = vault.getBaseUrl(config.provider);
           provider = createProvider(config.provider, {
             apiKey: key,
             ...(config.model ? { model: config.model } : {}),
+            ...(baseUrl ? { baseUrl } : {}),
           });
         }
       } catch (err) {
-        setStatus(`Could not start repair: ${(err as Error).message}`);
-        setRunning(false);
+        failBeforeRun(`Could not start repair: ${(err as Error).message}`);
         return;
       }
 
@@ -172,7 +184,14 @@ export function useRepairSession() {
           onEvent,
         });
       } catch (err) {
-        setStatus(`Repair run failed: ${(err as Error).message}`);
+        setOutcome({
+          reason: "error",
+          message: `Repair run failed: ${(err as Error).message}`,
+          fixed: false,
+          iterations: 0,
+          totalTokens: 0,
+        });
+        setStatus("");
       } finally {
         setRunning(false);
         abortRef.current = null;

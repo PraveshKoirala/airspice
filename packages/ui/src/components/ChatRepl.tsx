@@ -145,7 +145,7 @@ const ChatRepl: React.FC<ChatReplProps> = ({ provider, model, maxTokensPerTurn, 
             e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`;
           }}
           onKeyDown={handleKeyDown}
-          placeholder="Ask AI to 'build a 3.3V divider from 9V and probe the midpoint'..."
+          placeholder="Describe a circuit to build or change..."
           disabled={running}
           rows={1}
           style={{ resize: 'none' }}

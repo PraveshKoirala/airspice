@@ -2,7 +2,7 @@
  * Server-mode engine adapter entry (issue #86: tree-shakable engine selection).
  *
  * The `vite.config.ts` `resolve.alias` swaps this file in for `./adapter` when
- * the build runs without `VITE_ENGINE=local` (i.e. server mode, the default).
+ * the build runs with explicit `VITE_ENGINE=server`.
  * Because the swap happens at build time, only the server adapter's
  * static-import graph enters the bundle -- the local adapter (and the sim-wasm
  * client, eecircuit-engine WASM chunk, and graph.worker chunk it drags in) is
