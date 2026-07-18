@@ -1,9 +1,0 @@
-{
-  "total": 1,
-  "byVerdict": {
-    "ok": 1
-  },
-  "mcuBuiltAndRendered": 1,
-  "simPassed": 1,
-  "bugs": []
-}
