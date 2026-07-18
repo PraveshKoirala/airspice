@@ -36,11 +36,16 @@ export const MODEL_CATALOG: Record<Exclude<ProviderId, "mock" | "house">, ModelC
     models: ["gemini-3.5-flash", "gemini-3.5-pro", "gemini-2.5-flash"],
   },
   openai: {
-    defaultModel: "claude-sonnet-4-6",
+    // Gemini pro leads the list: the local proxy's Claude/gpt-oss tiers
+    // rate-limit hard under sustained use (429 model_cooldown), while the
+    // Gemini tiers stay available. Any entry here is selectable in Settings.
+    defaultModel: "gemini-3.1-pro-low",
     models: [
+      "gemini-3.1-pro-low",
+      "gemini-pro-agent",
+      "gemini-3-flash",
       "claude-sonnet-4-6",
       "claude-opus-4-6-thinking",
-      "gemini-3-flash",
       "gpt-oss-120b-medium",
       "gpt-4o-mini",
       "gpt-4o",

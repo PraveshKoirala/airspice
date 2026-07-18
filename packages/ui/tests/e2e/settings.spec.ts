@@ -16,7 +16,7 @@ test.describe('Settings Panel', () => {
     await expect(providerPicker).toHaveValue('openai');
 
     const modelPicker = page.getByTestId('model-picker');
-    await expect(modelPicker).toHaveValue('claude-sonnet-4-6');
+    await expect(modelPicker).toHaveValue('gemini-3.1-pro-low');
     await expect(page.getByTestId('model-override')).toHaveValue('');
 
     await providerPicker.selectOption('gemini');
@@ -72,7 +72,7 @@ test.describe('Settings Panel', () => {
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
 
     await expect(page.getByTestId('provider-picker')).toHaveValue('openai');
-    await expect(page.getByTestId('model-picker')).toHaveValue('claude-sonnet-4-6');
+    await expect(page.getByTestId('model-picker')).toHaveValue('gemini-3.1-pro-low');
     await expect(page.getByTestId('model-override')).toHaveValue('');
   });
 });

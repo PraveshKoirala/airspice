@@ -17,7 +17,14 @@ const DEFAULT_PROVIDER: NetworkProviderId = "openai";
 const DEFAULT_MODEL = MODEL_CATALOG[DEFAULT_PROVIDER].defaultModel;
 // Model ids a previous build persisted as the openai-lane default; they upgrade
 // to the current catalog default (the local proxy's tool-calling model).
-const STALE_DEFAULTS = new Set(["gemini-3.5-flash-high", "gpt-4o-mini"]);
+// `claude-sonnet-4-6` is included because it was a former default that the local
+// proxy rate-limits for ~1.5h at a time — a persisted copy would 429 on the
+// user's first prompt. Re-selecting it explicitly in Settings still works.
+const STALE_DEFAULTS = new Set([
+  "gemini-3.5-flash-high",
+  "gpt-4o-mini",
+  "claude-sonnet-4-6",
+]);
 
 function migratePersistedSettings(persisted: unknown): unknown {
   if (typeof persisted !== "object" || persisted === null) return persisted;

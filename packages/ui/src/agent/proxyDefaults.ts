@@ -11,7 +11,11 @@ import { KeyVault } from "agent";
 
 export const LOCAL_PROXY_BASE_URL = "http://localhost:8317/v1";
 export const LOCAL_PROXY_KEY = "test-key-123";
-export const LOCAL_PROXY_MODEL = "claude-sonnet-4-6";
+// The proxy's Claude tiers rate-limit hard under sustained use (429
+// model_cooldown for ~1.5h). The Gemini pro tier is the reliable default on
+// this proxy — it built 71/71 circuits in the refinement loop. Switch models
+// any time in Settings.
+export const LOCAL_PROXY_MODEL = "gemini-3.1-pro-low";
 
 export function seedLocalProxyDefaults(): void {
   const vault = new KeyVault();
