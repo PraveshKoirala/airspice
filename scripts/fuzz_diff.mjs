@@ -28,17 +28,23 @@
  * clock, no Math.random, no Date.
  *
  * KNOWN-divergence classifier: findings matching a DISCLOSED/FILED divergence
- * family (#75 undefined-entity / malformed-ref handling; #76 attribute
- * whitespace normalization; #78 well-formedness gaps) are reported as KNOWN
- * (counted per family), NOT as failures. The classifier is NARROW and CAUSALLY
- * GATED: it keys off the mismatch KIND (a decision mismatch can only be #75/#78;
- * a hash mismatch can only be #76, and only when whitespace re-normalization
- * CONFIRMS the divergence is exactly the normalization difference), never on a
- * document-global property (the round-1 verifier finding: a stray CR must not
- * flip an unrelated divergence to KNOWN). It is self-tested (`--self-test`),
- * including the verifier's form-feed + CR flip experiment. A NEW divergence (no
- * family match) fails the run and is auto-shrunk to a minimal reproducer. #80
- * (multiple <setup>) was FIXED upstream and is NO LONGER a suppression family.
+ * family are reported as KNOWN (counted per family), NOT as failures. #78
+ * (well-formedness gaps: fast-xml-parser accepts constructs expat rejects as
+ * "not well-formed") is now the ONLY KNOWN family. The classifier is NARROW and
+ * CAUSALLY GATED: it keys off the mismatch KIND (only a DECISION mismatch can be
+ * #78), never a document-global property (the round-1 verifier finding: a stray
+ * CR must not flip an unrelated divergence to KNOWN). It is self-tested
+ * (`--self-test`), including the verifier's form-feed + CR flip experiment. A NEW
+ * divergence (no family match) fails the run and is auto-shrunk to a minimal
+ * reproducer.
+ *
+ * #75 (undefined-entity / malformed-ref handling) and #76 (attribute-value + CR
+ * whitespace normalization) were FIXED in air-ts's XML layer
+ * (packages/air-ts/src/xml.ts: rejectBadReferences + normalizeXmlWhitespace now
+ * match expat), so those divergences NO LONGER occur and are NO LONGER classifier
+ * families -- a re-introduced #75/#76-shaped divergence now surfaces as NEW and
+ * fails the run instead of being masked. #80 (multiple <setup>) was likewise
+ * FIXED upstream and is not a suppression family either.
  *
  * Usage:
  *   node scripts/fuzz_diff.mjs --seed 1 --cases 1000
