@@ -243,7 +243,7 @@ function diffKeyedSection(
 ): OpPair | null {
   const keyOf = (el: El): string | null => {
     const id = el.attrib.get("id");
-    return id === undefined ? null : `${el.tag} ${id}`;
+    return id === undefined ? null : `${el.tag}\u0000${id}`;
   };
   const toMap = (kids: El[]): Map<string, El> | null => {
     const m = new Map<string, El>();
