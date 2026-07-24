@@ -20,6 +20,16 @@
     "firmware": false
   },
   {
+    "id": "stm32_demo",
+    "title": "STM32 Blue Pill",
+    "description": "A minimal STM32F103 (Blue Pill) on a clean 3.3V rail with a PlatformIO firmware target.",
+    "tags": ["stm32", "mcu", "firmware"],
+    "difficulty": "beginner",
+    "sourcePath": "gallery/stm32_demo.air.xml",
+    "kind": "working",
+    "firmware": true
+  },
+  {
     "id": "esp32_battery_sensor",
     "title": "ESP32 Battery Sensor",
     "description": "Battery-powered ESP32-C3 node with an LDO rail and an ADC battery-voltage divider.",
@@ -36,46 +46,6 @@
     "tags": ["mosfet", "mixed-signal", "firmware"],
     "difficulty": "intermediate",
     "sourcePath": "gallery/mixed_signal_switch.air.xml",
-    "kind": "working",
-    "firmware": true
-  },
-  {
-    "id": "advanced_components",
-    "title": "Advanced Components Demo",
-    "description": "Exercises diodes, a custom MOSFET model, and a reusable subcircuit block.",
-    "tags": ["diode", "mosfet", "subcircuit"],
-    "difficulty": "advanced",
-    "sourcePath": "gallery/advanced_components.air.xml",
-    "kind": "working",
-    "firmware": false
-  },
-  {
-    "id": "solar_charger",
-    "title": "Solar Sensor Node",
-    "description": "A solar panel charges a battery while the MCU switches the load and senses two rails.",
-    "tags": ["power", "solar", "mcu"],
-    "difficulty": "advanced",
-    "sourcePath": "gallery/solar_charger.air.xml",
-    "kind": "working",
-    "firmware": true
-  },
-  {
-    "id": "iot_gateway",
-    "title": "Battery-Backed IoT Gateway",
-    "description": "A mixed-signal gateway with nested power domains and high-current load switching.",
-    "tags": ["power-domains", "mixed-signal", "load-switch"],
-    "difficulty": "advanced",
-    "sourcePath": "gallery/iot_gateway.air.xml",
-    "kind": "working",
-    "firmware": true
-  },
-  {
-    "id": "feedback_loop",
-    "title": "High-Speed Feedback Loop",
-    "description": "A fast regulator/motor-controller loop that stresses the co-simulation timing path.",
-    "tags": ["feedback", "co-simulation", "control"],
-    "difficulty": "advanced",
-    "sourcePath": "gallery/feedback_loop.air.xml",
     "kind": "working",
     "firmware": true
   },
