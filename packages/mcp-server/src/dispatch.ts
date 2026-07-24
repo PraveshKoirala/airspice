@@ -71,6 +71,8 @@ export async function callTool(
     switch (name) {
       case "validate_design": {
         const xml = requireString(args, "design_xml");
+        // The FULL air-ts validate() output, all severities, oracle order,
+        // unfiltered — exactly what a consumer gets from air-ts validate().
         const diagnostics = safeValidate(hooks, xml);
         const errors = diagnostics.filter((d) => d.severity === "error");
         const warnings = diagnostics.filter((d) => d.severity === "warning");
@@ -78,6 +80,7 @@ export async function callTool(
           valid: errors.length === 0,
           error_count: errors.length,
           warning_count: warnings.length,
+          diagnostics,
           errors,
           warnings,
         });

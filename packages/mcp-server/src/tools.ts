@@ -35,11 +35,12 @@ function sharedProp(toolName: string, propName: string): unknown {
   return prop;
 }
 
-// The SHARED property sub-schemas — the byte-identical #18 objects, by reference:
-//  - design_xml: the "one complete AIR <system> document" property (set_design).
-//  - patch_xml : the AIR <patch> property from #18's patch tool (propose_patch).
-const DESIGN_XML_PROP = sharedProp("set_design", "design_xml");
-const PATCH_XML_PROP = sharedProp("propose_patch", "patch_xml");
+// The SHARED property sub-schemas — the byte-identical #18 objects, by reference.
+// These are the canonical pins the contract fixes:
+//  - design_xml: from #18 `validate_design` (reused by EVERY design tool).
+//  - patch_xml : from #18 `preview_patch` (reused by BOTH patch tools).
+const DESIGN_XML_PROP = sharedProp("validate_design", "design_xml");
+const PATCH_XML_PROP = sharedProp("preview_patch", "patch_xml");
 
 // MCP-only properties (no #18 counterpart).
 const QUERY_PROP = {
