@@ -489,25 +489,52 @@ def _resolve_gpio_binding_net(design: Design, binding) -> str | None:
     and ``validation._validate_adc_binding`` resolve a binding by walking the
     referenced component's pins.
 
-    So: find the GPIO-capable pin on ``binding.component`` whose declared
-    ``function`` (or, defensively, ``name``) is the binding's ``channel``, and
-    return THAT pin's ``net``. The op's target net is the pin's real net, never the
-    binding's self-declared ``<net>`` — a binding that names the wrong pin resolves
-    to the wrong net (rejected by the caller's net comparison), and a binding that
-    names a component/channel with no matching declared GPIO pin resolves to
-    ``None`` (so it cannot satisfy the intent). This is what keeps the widening from
-    degenerating into "accept any op that has a binding attribute".
+    Resolution is UNAMBIGUOUS (never first-match):
+
+    1. Look up ``binding.component``; if it does not exist -> ``None``.
+    2. Among that component's DECLARED pins, collect the candidates: pins that are
+       GPIO-capable (``function`` in ``GPIO_FUNC_TOKENS``) AND whose ``channel``
+       matches the binding's ``channel`` — ``channel == pin.function`` OR
+       ``channel == pin.name`` — compared CASE-INSENSITIVELY.
+    3. Exactly one candidate -> return that candidate's ``net``.
+    4. More than one candidate (e.g. a component declaring two pins that share a
+       GPIO function token, bound with a generic channel) -> disambiguate using the
+       binding's own declared ``<net>``: if exactly one candidate has
+       ``net == binding.net`` return that candidate's ``net``; otherwise ``None``.
+    5. Zero candidates -> ``None``.
+
+    The op's target net is always a REAL channel-matched GPIO pin's ``net``, never
+    the binding's self-declared ``<net>`` taken on faith: ``<net>`` is used ONLY as
+    a disambiguator among legitimately channel-matched pins. A binding naming the
+    wrong pin resolves to the wrong net (rejected by the caller's net comparison),
+    an ambiguous binding whose ``<net>`` fails to single out one candidate is
+    rejected outright, and a binding with no matching declared GPIO pin resolves to
+    ``None`` — so the widening never degenerates into "accept any op that has a
+    binding attribute".
     """
     if binding is None or not binding.channel:
         return None
     component = design.ir.components.get(binding.component)
     if component is None:
         return None
-    for pin in component.pins.values():
-        if pin.function not in GPIO_FUNC_TOKENS:
-            continue
-        if pin.function == binding.channel or pin.name == binding.channel:
-            return pin.net
+    channel = binding.channel.strip().lower()
+    candidates = [
+        pin
+        for pin in component.pins.values()
+        if pin.function in GPIO_FUNC_TOKENS
+        and ((pin.function or "").lower() == channel or (pin.name or "").lower() == channel)
+    ]
+    if not candidates:
+        return None
+    if len(candidates) == 1:
+        return candidates[0].net
+    # Ambiguous channel: disambiguate ONLY by the binding's declared <net>, and
+    # only when it uniquely identifies one channel-matched candidate. A <net> that
+    # matches zero or multiple candidates leaves the binding ambiguous -> reject
+    # (NEVER fall back to first-match, NEVER trust <net> as blind acceptance).
+    net_matched = [pin for pin in candidates if pin.net == binding.net]
+    if len(net_matched) == 1:
+        return net_matched[0].net
     return None
 
 
@@ -547,6 +574,10 @@ def check_firmware_intent(design: Design, intents: list[str], u: Unifier) -> tup
     for task in ir.firmware_tasks.values():
         for op in task.operations:
             if op.get("op") == "write_gpio":
+                # A write_gpio op may carry pin=, binding=, or BOTH. Each present
+                # form contributes its resolved net; the op's reachable nets are the
+                # UNION (pin-name nets via the MCU below + binding-resolved nets
+                # here), so a design that names the pin both ways is not penalized.
                 if op.get("pin"):
                     gpio_op_pins.add(op["pin"])
                 binding_id = op.get("binding")
