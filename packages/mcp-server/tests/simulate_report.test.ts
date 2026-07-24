@@ -10,8 +10,19 @@
  *     says simulation is not available in this Node environment), the numeric
  *     assertion is SKIPPED (the honest regime the PRD permits).
  *   - If `simulate` returns a report, its measurements MUST match the committed
- *     corpus fixture within tolerance. A server that fabricates numbers, or
- *     returns a canned/forked report, FAILS.
+ *     corpus fixture within tolerance AND the report must come from REAL
+ *     ngspice. A server that fabricates numbers, returns a canned/forked report,
+ *     or silently regresses to the analytic DC fallback, FAILS.
+ *
+ * BACKEND LOCK (why measurements alone are not enough): for this resistive
+ * divider the analytic DC fallback (`builtin_dc_fallback`) produces the
+ * IDENTICAL numbers (2.5V/5V/10mA) and a full `status:passed` report. So the
+ * test also asserts `backend === "ngspice"`, `convergence.converged === true`,
+ * and that no convergence attempt is flagged `ngspice_missing` -- the fallback
+ * path sets `backend:"builtin_dc_fallback"`, `converged:false`, and flags its
+ * single rung-1 attempt `ngspice_missing:true`. A fallback report thus FAILS
+ * (it is NOT the honest-unavailability skip: that skip fires only on a genuine
+ * "sim can't run in Node" error signal, never on a returned report).
  *
  * The measurement strings the report pipeline emits ARE byte-pinned in the
  * corpus, so a real engine matches exactly; the numeric tolerance only absorbs
@@ -92,7 +103,12 @@ function findReport(payload: any, testName: string): any | null {
   return null;
 }
 
-const UNAVAILABLE = /(not\s+(yet\s+)?(available|supported|implemented)|unavailable|no\s+wasm|node)/i;
+// A GENUINE "simulation can't run in this Node environment" signal. Kept
+// specific on purpose: a bare "node" token would wrongly match e.g. "floating
+// node" and mask real failures, and a returned DC-fallback report (status
+// "passed") must NEVER be skipped -- it must fail the backend lock below.
+const UNAVAILABLE =
+  /(unavailable|unsupported|not\s+(yet\s+)?(available|supported|implemented|wired)|no\s+wasm|worker_threads|requires?\s+a\s+browser|can(?:no|')t\s+run\s+in\s+node)/i;
 
 describe("MCP simulate report parity", () => {
   let entry: string;
@@ -153,6 +169,34 @@ describe("MCP simulate report parity", () => {
         `simulate returned a report but none matched test '${VALID_SIM_TEST}'. ` +
           `payload=${JSON.stringify(payload).slice(0, 800)}`,
       ).toBeTruthy();
+
+      // BACKEND LOCK: the report must come from REAL ngspice, not the analytic
+      // DC fallback (which yields the identical divider numbers and status
+      // "passed"). The fallback sets backend "builtin_dc_fallback", converged
+      // false, and flags its sole attempt ngspice_missing -- so this block FAILS
+      // on any silent regression to the fallback while the WASM path in Node is
+      // the whole point of #40's Node-sim work.
+      expect(
+        report.backend,
+        `simulate must run REAL ngspice, not the analytic DC fallback ` +
+          `(got backend=${JSON.stringify(report.backend)})`,
+      ).toBe("ngspice");
+      const convergence = report.convergence ?? {};
+      const attempts = Array.isArray(convergence.attempts)
+        ? convergence.attempts
+        : [];
+      expect(
+        attempts.length,
+        "real ngspice must record at least one convergence attempt",
+      ).toBeGreaterThan(0);
+      expect(
+        attempts.some((a: any) => a?.ngspice_missing === true),
+        "no convergence attempt may be flagged ngspice_missing (that is the DC-fallback path)",
+      ).toBe(false);
+      expect(
+        convergence.converged,
+        "real ngspice must actually converge for the divider design",
+      ).toBe(true);
 
       // Every fixture measurement must be reproduced within tolerance. This is
       // what a fabricated-number or canned-report server fails.
