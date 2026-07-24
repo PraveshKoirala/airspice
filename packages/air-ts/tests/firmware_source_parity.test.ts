@@ -205,3 +205,32 @@ describe("firmware <source> control-char rejection parity (air-ts)", () => {
     });
   }
 });
+
+// ============= unicode-noncharacter rejection parity (#36 seam) =============
+// XML 1.0's Char production stops the BMP at #xFFFD, so U+FFFE and U+FFFF are
+// EXCLUDED. The Python oracle (expat) rejects a literal one; air-ts ACCEPTS it
+// today -- the seam. A VALID astral char (emoji U+1F600) is legal and must STILL
+// be accepted byte-exact, guarding the builder against over-rejecting surrogate
+// pairs. Chars are built via code point so no literal noncharacter byte sits in
+// this test source. Parity, not message.
+describe("firmware <source> unicode-noncharacter rejection parity (air-ts)", () => {
+  const CLEAN = FIXTURES.clean_plant_waterer;
+  const withChar = (ch: string): string => CLEAN.replace("import time", "import time" + ch);
+  const NONCHARS: Record<string, number> = { "U+FFFE": 0xfffe, "U+FFFF": 0xffff };
+
+  // RED today: air-ts accepts the noncharacter; GREEN once the builder extends
+  // the literal gate to reject it (matching expat).
+  for (const [name, cp] of Object.entries(NONCHARS)) {
+    it(`rejects a literal Unicode noncharacter at parse (${name})`, () => {
+      expect(() => parse(withChar(String.fromCharCode(cp)))).toThrow();
+    });
+  }
+
+  it("accepts a valid astral character (U+1F600 emoji) byte-exact", () => {
+    const emoji = String.fromCodePoint(0x1f600);
+    const xml = withChar(emoji);
+    const expected = sourceText(xml);
+    expect(expected).toContain(emoji);
+    expect(sourceText(canonicalize(xml))).toBe(expected);
+  });
+});

@@ -252,5 +252,29 @@ def test_valid_control_char_accepted_and_byte_exact(ch: str) -> None:
     assert _source_text(_canonicalize(xml)) == expected
 
 
+# ================= unicode-noncharacter rejection parity (#36 seam) =================
+# XML 1.0's Char production stops the BMP at #xFFFD, so the noncharacters U+FFFE
+# and U+FFFF are EXCLUDED and expat rejects a literal one; air-ts must match. A
+# VALID astral char (emoji U+1F600, in the #x10000-#x10FFFF range) is legal and
+# must STILL be accepted byte-exact -- the positive control guards the builder
+# against over-rejecting surrogate pairs. Chars are built via chr()/code point so
+# no literal noncharacter byte sits in this test source. Parity, not message.
+XML_INVALID_NONCHARS = {"u_fffe": 0xFFFE, "u_ffff": 0xFFFF}
+
+
+@pytest.mark.parametrize("cp", list(XML_INVALID_NONCHARS.values()), ids=list(XML_INVALID_NONCHARS))
+def test_unicode_noncharacter_rejected_at_parse(cp: int) -> None:
+    with pytest.raises(Exception):
+        parse_string(_source_with_char(chr(cp)))
+
+
+def test_astral_emoji_accepted_and_byte_exact() -> None:
+    emoji = chr(0x1F600)  # U+1F600, a valid XML astral char (surrogate pair in UTF-16)
+    xml = _source_with_char(emoji)
+    expected = _source_text(xml)
+    assert emoji in expected
+    assert _source_text(_canonicalize(xml)) == expected
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))
