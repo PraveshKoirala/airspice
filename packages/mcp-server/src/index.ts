@@ -1,20 +1,18 @@
 /**
  * Public surface of the AirSpice MCP server package (issue #40).
  *
- * Exposes the server factory and the tool catalog for programmatic use and for
- * a schema-parity test (importing both the #18 browser specs and these MCP tool
- * definitions and asserting the shared tools are byte-identical).
+ * Exposes the server factory and the stateless tool catalog for programmatic use
+ * and for a schema-parity test: importing `MCP_TOOLS` here (side-effect-free —
+ * no transport starts) alongside `AGENT_TOOLS` from `agent` lets a test assert
+ * the shared param property sub-schemas (design_xml / patch_xml) are the same
+ * byte-identical objects.
  */
 
-export { createAirspiceMcpServer, SERVER_NAME, SERVER_VERSION } from "./server.js";
 export {
-  AGENT_TOOLS,
-  AGENT_TOOL_NAMES,
-  MCP_EXTRA_TOOLS,
-  MCP_TOOL_SPECS,
-  MCP_TOOL_DEFINITIONS,
-  RENDER_SCHEMATIC_TOOL,
-  RUN_COSIM_TOOL,
-  toMcpTool,
-} from "./tools.js";
+  createAirspiceMcpServer,
+  cosimAvailableFromEnv,
+  SERVER_NAME,
+  SERVER_VERSION,
+} from "./server.js";
+export { MCP_TOOLS, RUN_COSIM_TOOL_NAME } from "./tools.js";
 export { createMcpEngineHooks } from "./engine/hooks.js";

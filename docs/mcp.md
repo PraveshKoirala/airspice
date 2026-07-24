@@ -70,37 +70,52 @@ Edit `claude_desktop_config.json` (Settings → Developer → Edit Config):
 
 Restart Claude Desktop; the AirSpice tools appear in the tool picker.
 
-## The working design (state model)
+## Stateless by design
 
-The browser agent edits a *current design* in the UI. Headlessly, the MCP server
-holds an in-process **working design** instead. The stateful tools operate on it:
+The server holds **no session state** — there is no server-side "current
+design". Every tool takes the complete design as a required `design_xml`
+argument (patch tools also require `patch_xml`); the calling agent owns the
+document and passes it on each call. This is the right shape for a stdio server:
+the browser agent's session tools (`get_design` / `set_design` / `read_waveform`)
+have no meaning here and are not exposed.
 
-- `validate_design` and `render_schematic` accept an optional `design_xml`; omit
-  it to act on the working design.
-- `set_design` / `propose_patch` run the deterministic gate (normalize →
-  validate) and stage a proposal; the server then **adopts** the gated result as
-  the working design — the headless equivalent of clicking *Apply* in the UI.
-- `run_simulation`, `get_design`, and `run_cosim` operate on the working design,
-  so stage a design (with `set_design`) before calling them.
+## Firmware co-sim gating (`AIRSPICE_MCP_DESIGN`)
+
+`run_cosim` is listed in `tools/list` **only** when the server was launched with
+the env var `AIRSPICE_MCP_DESIGN` set to a path to an AIR XML file whose design
+contains a `<firmware>` block. This is *launch-context* gating (read once at
+startup), not runtime state. Without it, the six base tools are offered and
+`run_cosim` is neither listed nor callable. To enable it:
+
+```jsonc
+{
+  "mcpServers": {
+    "airspice": {
+      "command": "node",
+      "args": ["packages/mcp-server/dist/cli.js"],
+      "env": { "AIRSPICE_MCP_DESIGN": "/abs/path/to/a/firmware-design.air.xml" }
+    }
+  }
+}
+```
 
 ## Tools
 
-The first eight are **byte-identical** to the browser agent's tool schemas
-(issue #18) — they are imported verbatim from the `agent` package, not
-re-declared. The last two are additive, MCP-only capabilities.
+| Tool | Arguments | Purpose | Engine |
+| --- | --- | --- | --- |
+| `validate_design` | `design_xml*` | Diagnostics (errors + warnings) JSON | air-ts |
+| `simulate` | `design_xml*`, `profile?` | Run ngspice → report JSON (#14) | sim-wasm (ngspice) |
+| `apply_patch` | `design_xml*`, `patch_xml*` | Gated patched design (`design_xml` out) | air-ts |
+| `preview_patch` | `design_xml*`, `patch_xml*` | Op diff + before/after diagnostic deltas | air-ts |
+| `render_schematic` | `design_xml*` | Deterministic, headless **SVG** string | air-ts |
+| `get_registry` | `query?` | Component types + MCU parts (optional filter) | air-ts |
+| `run_cosim` | `design_xml*` | Firmware ⇄ analog co-sim (gated; see below) | sim-wasm |
 
-| Tool | Purpose | Engine |
-| --- | --- | --- |
-| `get_design` | Return the working design + live diagnostics | air-ts |
-| `set_design` | Stage a full design through the gate (then adopted) | air-ts |
-| `validate_design` | Diagnostics for `design_xml` (or the working design) | air-ts |
-| `run_simulation` | Run the default ngspice profile → report JSON (#14) | sim-wasm (ngspice) |
-| `propose_patch` | Stage an AIR `<patch>` through the gate (then adopted) | air-ts |
-| `preview_patch` | Structured op diff + before/after diagnostic deltas | air-ts |
-| `read_waveform` | Decimated summary of a probed net from the last run | sim-wasm |
-| `list_registry_components` | Component types + MCU parts in the registry | air-ts |
-| `render_schematic` | Deterministic, headless **SVG** of the schematic-graph | air-ts |
-| `run_cosim` | Firmware ⇄ analog co-sim (see regime note) — **only listed when the working design has a `<firmware>` block** | sim-wasm |
+`*` = required. The **shared parameter sub-schemas** (`design_xml`, `patch_xml`)
+are the byte-identical property objects from the browser agent's tool specs
+(`AGENT_TOOLS`, issue #18), reused by reference — one source of truth. The tool
+names and `required` arrays are the semantic stateless surface; the shared
+property schemas are not re-declared.
 
 ### `render_schematic`
 
@@ -122,18 +137,20 @@ real **t=0 analog priming solve**, and explicitly marks `firmware_steps_executed
 
 ## End-to-end example: "validate this divider, then fix it"
 
-A broken divider that references an undeclared net (the agent would call these
-tools; shown here as tool calls):
+A broken divider (the agent would call these tools; shown here as tool calls):
 
 1. `validate_design({ design_xml: "<system>…</system>" })` → diagnostics JSON
    with the error(s).
-2. `preview_patch({ patch_xml: "<patch>…</patch>" })` → confirms the patch
-   resolves the error without introducing new ones (`resolved` / `introduced`).
-3. `propose_patch({ patch_xml: "<patch>…</patch>" })` → the patched design passes
-   the gate and is adopted as the working design.
-4. `run_simulation({})` → the report JSON; e.g. the corpus LiPo divider measures
-   `battery_sense = 1.04211V` and the test **passes**.
-5. `render_schematic({})` → an SVG of the corrected schematic.
+2. `preview_patch({ design_xml, patch_xml: "<patch>…</patch>" })` → confirms the
+   patch resolves the error without introducing new ones (`resolved` /
+   `introduced`).
+3. `apply_patch({ design_xml, patch_xml })` → the patched design passes the gate;
+   the canonical patched `design_xml` is returned. Feed it into the next call.
+4. `simulate({ design_xml: patchedXml })` → the report JSON; e.g. the corpus LiPo
+   divider measures `battery_sense = 1.04211V` and the test **passes**.
+5. `render_schematic({ design_xml: patchedXml })` → an SVG of the corrected
+   schematic.
 
-For a design with a `<firmware>` block, `run_cosim({})` additionally reports the
-ADC pin bindings and the real t=0 analog solve.
+For a design with a `<firmware>` block (with the server launched under
+`AIRSPICE_MCP_DESIGN`), `run_cosim({ design_xml })` reports the ADC pin bindings
+and the real t=0 analog solve.

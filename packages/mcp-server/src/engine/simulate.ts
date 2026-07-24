@@ -105,25 +105,35 @@ function aborted(signal: AbortSignal): Error {
 }
 
 /**
- * Run the design's default ngspice profile in Node and return the report +
- * retained-waveform run id. Throws if the design has no ngspice-backed profile
- * (the caller surfaces that). `signal` cancels an in-flight run (worker
- * terminate + respawn, ADR 0011).
+ * Run a design's ngspice profile in Node and return the report + retained-
+ * waveform run id. `requestedProfileId` selects a specific profile; omit it to
+ * run the design's default ngspice profile. Throws if the design (or requested
+ * profile) has no ngspice-backed profile (the caller surfaces that). `signal`
+ * cancels an in-flight run (worker terminate + respawn, ADR 0011).
  */
 export async function simulateDesign(
   xml: string,
   signal: AbortSignal,
+  requestedProfileId?: string,
 ): Promise<NodeSimulationResult> {
   if (signal.aborted) throw aborted(signal);
   const ir: SystemIR = parse(xml);
-  const profileId = defaultNgspiceProfile(ir);
-  if (profileId === null) {
-    throw new Error(
-      "This design has no default simulation profile with an ngspice backend.",
-    );
+  let profileId: string | null;
+  if (requestedProfileId !== undefined) {
+    if (!ir.simulation_profiles.has(requestedProfileId)) {
+      throw new Error(`Unknown simulation profile '${requestedProfileId}'.`);
+    }
+    profileId = requestedProfileId;
+  } else {
+    profileId = defaultNgspiceProfile(ir);
+    if (profileId === null) {
+      throw new Error(
+        "This design has no default simulation profile with an ngspice backend.",
+      );
+    }
   }
   const profile = ir.simulation_profiles.get(profileId);
-  if (!profile) throw new Error(`Unknown default profile '${profileId}'.`);
+  if (!profile) throw new Error(`Unknown profile '${profileId}'.`);
 
   const runId = `mcp-sim-${++runCounter}`;
   const runWaveforms = new Map<string, RetainedWaveform>();
