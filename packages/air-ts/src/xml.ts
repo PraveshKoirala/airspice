@@ -422,50 +422,56 @@ function rejectInvalidCharRefs(xmlText: string): void {
 }
 
 /**
- * A LITERAL character that is NOT in the XML 1.0 `Char` production. The valid
- * chars are #x9 (tab), #xA (LF), #xD (CR), #x20-#xD7FF, #xE000-#xFFFD,
- * #x10000-#x10FFFF; so the invalid C0 range is #x0-#x8, #xB, #xC, #xE-#x1F.
- * DEL (#x7F) is a VALID XML char and is NOT matched here.
- */
-const INVALID_LITERAL_CONTROL_CHAR =
-  /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/;
-
-/**
- * Reject a LITERAL XML-1.0-invalid control character anywhere in the document,
- * exactly as expat does ("not well-formed (invalid token)").
+ * Reject a LITERAL XML-1.0-invalid character anywhere in the document, exactly as
+ * expat does ("not well-formed (invalid token)").
  *
- * PROVENANCE (oracle, `xml.etree.ElementTree.fromstring`, probed at fix time):
- *   REJECT (literal): #x0-#x8, #xB, #xC, #xE-#x1F -- in EVERY context (element
- *     text, attribute value, comment, CDATA section, processing instruction, and
- *     the whitespace between tags); the XML 1.0 Char production governs every
+ * The decision is driven off `isXmlChar` -- the WHOLE XML 1.0 `Char` production
+ * (defined just below) -- scanned by CODE POINT, so the gate rejects EXACTLY
+ * expat's literal-invalid set and can never miss a code point. That set is
+ * #x0-#x8, #xB, #xC, #xE-#x1F (the C0 controls other than tab/LF/CR) AND the BMP
+ * upper exclusions #xFFFE / #xFFFF.
+ *
+ * PROVENANCE (oracle, `xml.etree.ElementTree.fromstring` / `parse_string`, probed
+ * at fix time across the whole Char production):
+ *   REJECT (literal): #x0-#x8, #xB, #xC, #xE-#x1F, #xFFFE, #xFFFF -- in EVERY
+ *     context (element text, attribute value, comment, CDATA section, processing
+ *     instruction, and inter-tag whitespace); the Char production governs every
  *     character in the document, not just element content.
- *   ACCEPT (literal): #x9 (tab), #xA (LF), #xD (CR), and #x7F (DEL) -- expat
- *     accepts these and air-ts preserves them; we keep that parity and do NOT
- *     reject them.
+ *   ACCEPT (literal): #x9/#xA/#xD, #x7F (DEL), the C1 range (#x84/#x85), #x2028,
+ *     the FDD0-FDEF and per-plane Unicode NONcharacters ABOVE the BMP (#x1FFFE,
+ *     #x1FFFF, ... #x10FFFF), and every valid astral char (e.g. an emoji,
+ *     U+1F600). XML 1.0 excludes ONLY the BMP #xFFFE/#xFFFF, NOT the Unicode
+ *     noncharacters, so those stay accepted; air-ts preserves all of these and we
+ *     keep that parity.
  *
- * Sibling gate to `rejectInvalidCharRefs`: that one handles the numeric-char-REF
- * form (`&#8;`, resolved+dropped by fast-xml-parser); this one handles the
- * LITERAL byte (preserved verbatim by fast-xml-parser). Without this gate, a
- * control-char-bearing firmware `<source>` (or any text) parses in air-ts but is
- * rejected by the Python oracle -- the literal-control-char sub-case of the
- * FXP-vs-expat well-formedness family (#78). We scan the WHOLE input (not the
- * char-ref "scannable" subset) because expat rejects the literal char in every
- * span kind, including comments/CDATA/PIs.
+ * Iterating by CODE POINT (`for...of` combines surrogate pairs) is what keeps a
+ * valid astral char accepted: it is checked once as its scalar value, never via
+ * its surrogate code units -- so an emoji (D83D DE00) is one U+1F600 check, not
+ * two surrogate checks. Lone surrogates (D800-DFFF) are the ENCODING gate's
+ * domain -- SEC-007 refuses the invalid UTF-8 (e.g. ED A0 80) at the byte level in
+ * both engines -- so we SKIP that range here and leave that path untouched.
  *
- * Raised as a code-less `XmlParseError` (not a SEC- code), matching the oracle's
- * `XmlParseRejection` -> reject with `codes: []` (fuzz_eval.py): a plain
- * not-well-formed rejection, so the differential harness sees both engines refuse
- * with the same (empty) rejection class.
+ * Sibling gate to `rejectInvalidCharRefs`, which handles the numeric-char-REF form
+ * (`&#65534;`, already rejected via `isXmlChar` + SEC-008); this one handles the
+ * LITERAL byte (preserved verbatim by fast-xml-parser). We scan the WHOLE input
+ * (not the char-ref "scannable" subset) because expat rejects the literal char in
+ * every span kind, including comments/CDATA/PIs. Raised as a code-less
+ * `XmlParseError` (not a SEC- code), matching the oracle's `XmlParseRejection` ->
+ * reject with `codes: []` (fuzz_eval.py): a plain not-well-formed rejection, so
+ * the differential harness sees both engines refuse with the same (empty) class.
  */
 function rejectInvalidControlChars(xmlText: string): void {
-  const match = INVALID_LITERAL_CONTROL_CHAR.exec(xmlText);
-  if (match !== null) {
-    const cp = xmlText.charCodeAt(match.index);
-    const hex = cp.toString(16).toUpperCase().padStart(4, "0");
-    throw new XmlParseError(
-      `not well-formed (invalid token): literal control character U+${hex} ` +
-        `is not a legal XML 1.0 character`,
-    );
+  for (const ch of xmlText) {
+    const cp = ch.codePointAt(0) as number;
+    // Lone surrogate -> the encoding gate's (SEC-007) job; leave it untouched.
+    if (cp >= 0xd800 && cp <= 0xdfff) continue;
+    if (!isXmlChar(cp)) {
+      const hex = cp.toString(16).toUpperCase().padStart(4, "0");
+      throw new XmlParseError(
+        `not well-formed (invalid token): literal character U+${hex} ` +
+          `is not a legal XML 1.0 character`,
+      );
+    }
   }
 }
 
