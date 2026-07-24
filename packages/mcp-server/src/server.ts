@@ -46,6 +46,22 @@ export function cosimAvailableFromEnv(): boolean {
   }
 }
 
+/** Default per-call timeout ceiling in ms. */
+const DEFAULT_TOOL_TIMEOUT_MS = 120_000;
+
+/**
+ * Per-call timeout (ms). A simulate/run_cosim call that exceeds it is aborted
+ * via the threaded signal — the sim-wasm worker is terminated + respawned
+ * (ADR 0011) — so a pathological design cannot hang the server. Generous by
+ * default so normal runs are never affected; override with
+ * `AIRSPICE_MCP_TIMEOUT_MS`.
+ */
+function toolTimeoutMs(): number {
+  const raw = process.env["AIRSPICE_MCP_TIMEOUT_MS"];
+  const n = raw ? Number(raw) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_TOOL_TIMEOUT_MS;
+}
+
 /**
  * Construct the AirSpice MCP `Server`. `hooks` is injectable so tests can supply
  * a deterministic engine; the default wires the real air-ts + sim-wasm engine.
@@ -85,8 +101,16 @@ export function createAirspiceMcpServer(
       };
     }
     const controller = new AbortController();
-    const args = (request.params.arguments ?? {}) as Record<string, unknown>;
-    return callTool(request.params.name, args, hooks, controller.signal);
+    const timer = setTimeout(() => controller.abort(), toolTimeoutMs());
+    // Don't let the timer alone keep the process alive; it's cleared as soon as
+    // the call settles.
+    timer.unref?.();
+    try {
+      const args = (request.params.arguments ?? {}) as Record<string, unknown>;
+      return await callTool(request.params.name, args, hooks, controller.signal);
+    } finally {
+      clearTimeout(timer);
+    }
   });
 
   return server;

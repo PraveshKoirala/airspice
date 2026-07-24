@@ -23,33 +23,8 @@ import type {
   GateDiagnostic,
   PatchPreviewResult,
   SimulationReportLike,
-  WaveformSummary,
 } from "agent";
-import { simulateDesign, retainedRun, type RetainedWaveform } from "./simulate.js";
-
-/** Decimate `[time,value]` samples to at most `maxPoints` (stride + keep last). */
-function decimate(
-  time: Float64Array,
-  values: Float64Array,
-  maxPoints: number,
-): Array<[number, number]> {
-  const n = values.length;
-  if (n === 0) return [];
-  if (n <= maxPoints) {
-    const out: Array<[number, number]> = [];
-    for (let i = 0; i < n; i++) out.push([time[i] ?? i, values[i] as number]);
-    return out;
-  }
-  const step = Math.floor(n / maxPoints) || 1;
-  const out: Array<[number, number]> = [];
-  for (let i = 0; i < n; i += step) out.push([time[i] ?? i, values[i] as number]);
-  const lastIdx = n - 1;
-  const lastTime = time[lastIdx] ?? lastIdx;
-  if (out.length === 0 || out[out.length - 1]![0] !== lastTime) {
-    out.push([lastTime, values[lastIdx] as number]);
-  }
-  return out;
-}
+import { simulateDesign } from "./simulate.js";
 
 /**
  * Build the EngineHooks the agent tool runtime consumes. Pure delegation to
@@ -83,41 +58,12 @@ export function createMcpEngineHooks(): EngineHooks {
         status: result.status,
         reports: result.reports as unknown[],
         notes: result.notes,
-        runId: result.runId,
       };
       return out;
     },
-    readWaveform: (runId, net, maxPoints) => {
-      const run = retainedRun(runId);
-      if (!run) return null;
-      let found: RetainedWaveform | null = null;
-      for (const [, wf] of run) {
-        if (wf.net === net) {
-          found = wf;
-          break;
-        }
-      }
-      if (!found) return null;
-      const points = decimate(found.time, found.values, maxPoints);
-      let min = Infinity;
-      let max = -Infinity;
-      for (let i = 0; i < found.values.length; i++) {
-        const v = found.values[i] as number;
-        if (v < min) min = v;
-        if (v > max) max = v;
-      }
-      const summary: WaveformSummary = {
-        net,
-        test: found.test,
-        totalPoints: found.values.length,
-        returnedPoints: points.length,
-        points,
-        final: found.values.length ? (found.values[found.values.length - 1] as number) : 0,
-        min: Number.isFinite(min) ? min : 0,
-        max: Number.isFinite(max) ? max : 0,
-        unit: "V",
-      };
-      return summary;
-    },
+    // The stateless server exposes no waveform tool, so nothing is retained and
+    // there is nothing to read back. Required by the EngineHooks interface; a
+    // non-retaining stub (never an ever-growing cache with no reader).
+    readWaveform: () => null,
   };
 }
