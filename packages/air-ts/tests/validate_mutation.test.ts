@@ -2,7 +2,7 @@
  * Mutation test (issue #8 acceptance criterion 3): take a PASSING design,
  * programmatically introduce each violation class, and assert the right
  * diagnostic fires. This guards against rules that exist in the port but never
- * trigger -- the corpus exercises only ~12 of the 47 codes, so the other ~35
+ * trigger -- the corpus exercises only ~15 of the 50 codes, so the other ~35
  * are proven live here.
  *
  * Strategy: a single valid base design (BASE) that validates with ZERO
@@ -14,7 +14,7 @@
  *
  * A separate "every validation-owned registry code is covered" assertion checks
  * that the union of {corpus-emitted codes} ∪ {mutation-covered codes} equals the
- * 47 validation-owned codes in registry/diagnostics.json -- the doc-vs-source
+ * 50 validation-owned codes in registry/diagnostics.json -- the doc-vs-source
  * count made executable.
  */
 
@@ -505,7 +505,7 @@ const STRUCTURALLY_UNREACHABLE_FROM_XML = new Set([
   "DUPLICATE_COMPONENT_ID", // dict de-dups ids before the len-vs-set compare; DUPLICATE_ID fires instead
 ]);
 
-describe("coverage ledger vs registry (47 validation-owned codes)", () => {
+describe("coverage ledger vs registry (50 validation-owned codes)", () => {
   it("every validation-owned code is covered by corpus OR mutation OR documented-unreachable", () => {
     // Registry codes owned by validation.
     const REPO_ROOT = join(HERE, "..", "..", "..");
@@ -513,7 +513,7 @@ describe("coverage ledger vs registry (47 validation-owned codes)", () => {
       diagnostics: Array<{ code: string; owner: string }>;
     };
     const validationCodes = new Set(registry.diagnostics.filter((d) => d.owner === "validation").map((d) => d.code));
-    expect(validationCodes.size).toBe(47);
+    expect(validationCodes.size).toBe(50);
 
     // Codes the corpus fixtures emit (dynamically read; no design names in source).
     const corpusCodes = new Set<string>();
