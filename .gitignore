@@ -40,3 +40,4 @@ page-dump.html
 qa/circuit-corpus/results/
 qa/circuit-corpus/results-rerun/
 qa/circuit-corpus/results-smoke/
+build-out/

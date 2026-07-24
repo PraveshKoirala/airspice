@@ -29,6 +29,44 @@ split the issue** (ruling: issue #13 comment 4885120883):
 its test evidence, and the deferred-work recommendation are retained below unchanged
 — they are the justification for the split and the spec for #88.
 
+## UPDATE (2026-07-24): a control-capable ngspice-WASM was built and verified — via a DIFFERENT mechanism
+
+The "deferred, upstream-blocked" conclusion below is **superseded**. A control-capable
+ngspice-WASM now builds and runs, and mid-transient host control is verified with
+correct physics. Two findings changed the picture:
+
+1. **ASYNCIFY halt/alter/resume is a genuine dead end for ngspice** (confirming the wall
+   below, concretely): ASYNCIFY crashes with ngspice's `setjmp/longjmp` under legacy
+   SjLj, and `wasm-opt --asyncify` aborts under `-fwasm-exceptions`, which `SUPPORT_LONGJMP=wasm`
+   requires. ngspice cannot drop `setjmp/longjmp`, so ASYNCIFY cannot be the yield mechanism.
+
+2. **Control does not need a yield mechanism at all.** ngspice's shared library exposes a
+   **synchronous** external-source API — `ngSpice_Init_Sync` + a `GetVSRCData` callback:
+   during ONE continuous transient, ngspice asks the host for each controlled source's
+   value at every timepoint; paired with `SendData` (host reads node voltages back), this
+   is full transient-preserving firmware⇄analog co-sim, entirely synchronously, with NO
+   ASYNCIFY, threads, or SharedArrayBuffer.
+
+**Build recipe:** `Dockerfile.ngshared` at the repo root — emsdk 3.1.60, **ngspice-46**
+(the `github.com/ngspice` mirror is stale at v26; the tarball is fetched on the host and
+`COPY`ed in because SF's mirror redirect is unreachable from inside the podman machine),
+`--with-ngshared`, `SUPPORT_LONGJMP=wasm -fwasm-exceptions`, **no ASYNCIFY**, exporting
+the sync C API + `addFunction`/`ALLOW_TABLE_GROWTH` (so JS can register the callbacks).
+Runtime gotcha: provide a fake `/proc/meminfo` or ngspice's memory sizing blows up to a
+1 GB alloc and aborts.
+
+**Verified** (`packages/sim-wasm/src/node/ngshared.control.test.mjs`): a JS-driven source
+(5 V→0 V at 2.5 ms) makes `V(out)` of an RC (τ=1 ms) charge to 4.589 V then discharge to
+0.379 V in one continuous run — matching `5(1−e⁻²·⁵)` and `4.59·e⁻²·⁵` exactly. The
+discharge-from-charged-state is impossible for quasi-static re-solve (cosim.ts), so this
+is the real control capability.
+
+**Still open (integration, not capability):** wire `ngshared` into the sim-wasm engine
+protocol behind `capabilities.control`; rewrite `CoSimOrchestrator` to use
+`GetVSRCData`+`SendData` driving the mpy-wasm firmware synchronously; the `/proc/meminfo`
+shim in the loader; version alignment vs eecircuit-45.2; hermetic tests. M8 co-sim is
+unblocked.
+
 ## Context
 
 Epic #12 requires **real ngspice in the browser**, in a Web Worker, lazy-loaded,

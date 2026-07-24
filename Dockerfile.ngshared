@@ -1,0 +1,92 @@
+# Dockerfile.ngshared
+# Draft Dockerfile for Issue #88: ngspice single-threaded WASM engine with halt/alter/resume control capabilities
+# Uses --with-ngshared and Emscripten -s ASYNCIFY
+
+FROM emscripten/emsdk:3.1.60 AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install build prerequisites for ngspice autotools compilation
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    build-essential \
+    autoconf \
+    automake \
+    libtool \
+    bison \
+    flex \
+    libfftw3-dev \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+
+# Download a MODERN ngspice release. The github.com/ngspice mirror is stale at v26;
+# the canonical releases live on SourceForge. Release tarballs ship a pre-generated
+# ./configure, so no autogen.sh / autotools regeneration is needed.
+ARG NGSPICE_VERSION=46
+# The tarball is fetched on the HOST and COPYed in — SourceForge's mirror redirect is
+# unreachable from inside the podman machine. The build context must contain
+# ngspice-${NGSPICE_VERSION}.tar.gz (see the accompanying build invocation).
+COPY ngspice-${NGSPICE_VERSION}.tar.gz ngspice.tar.gz
+RUN tar xzf ngspice.tar.gz \
+    && mv "ngspice-${NGSPICE_VERSION}" ngspice \
+    && rm ngspice.tar.gz
+
+WORKDIR /src/ngspice
+
+# Configure ngspice for shared library (--with-ngshared) and single-threaded execution
+# --disable-openmp prevents pthreads/SharedArrayBuffer dependencies
+# --disable-xspice simplifies build for embedded WASM target
+RUN emconfigure ./configure \
+    --with-ngshared \
+    --disable-debug \
+    --disable-openmp \
+    --disable-xspice \
+    --without-readline \
+    CPPFLAGS="-O2 -DHAS_STRERROR=1 -DHAVE_STRERROR=1" \
+    CFLAGS="-O2 -Wno-error=int-conversion -sSUPPORT_LONGJMP=wasm" \
+    LDFLAGS="-O2 -s ASYNCIFY -sSUPPORT_LONGJMP=wasm"
+
+RUN sed -i 's/sys_errlist\[errno\]/strerror(errno)/g' src/include/ngspice/ngspice.h
+
+# Compile ngspice libraries
+RUN emmake make -j$(nproc)
+
+# Link ngshared C API symbols into single-threaded ASYNCIFY WASM module
+# Exported C API symbols:
+#   - ngSpice_Init: Pass callback function pointers (SendChar, SendStat, ControlledExit, SendData, SendInitData, etc.)
+#   - ngSpice_Command: Issue control commands ("run", "stop when time > T", "alter ...", "resume")
+#   - ngGet_Vec_Info: Retrieve vector state after halting
+#   - ngSpice_Circ: Send circuit netlist
+#   - ngSpice_HALT: Force halt running simulation
+WORKDIR /src/ngspice
+# FIXES (vs the first draft, which produced an un-drivable binary):
+#  - ENVIRONMENT adds `node` (draft was web,worker -> tried to fetch() the .wasm and failed in Node/tests)
+#  - ALLOW_TABLE_GROWTH=1 + addFunction/removeFunction exported: REQUIRED so JS can register the
+#    ngSpice_Init callbacks (SendChar/SendData/...). Without them ngSpice_Init callbacks are un-settable
+#    and `run` traps (`unreachable`). This was the core reason the draft binary could not be driven.
+#  - ccall + lengthBytesUTF8 exported (draft shipped cwrap only).
+#  - _ngSpice_running exported so the control loop can poll run/halt state.
+#  - ASYNCIFY_STACK_SIZE raised: ngspice has deep call stacks; the 4 KB default overflows on unwind.
+# NO ASYNCIFY: emscripten ASYNCIFY is incompatible with ngspice's setjmp/longjmp
+# (crashes with legacy SjLj; `wasm-opt --asyncify` aborts with -fwasm-exceptions which
+# wasm-SjLj requires). Control is driven synchronously via ngSpice_Init_Sync's
+# GetVSRCData callback instead of halt/alter/resume, so no stack-unwinding is needed.
+RUN emcc -O2 \
+    -s SUPPORT_LONGJMP=wasm \
+    -fwasm-exceptions \
+    -s MODULARIZE=1 \
+    -s EXPORT_NAME="NgsharedModule" \
+    -s ENVIRONMENT="web,worker,node" \
+    -s ALLOW_MEMORY_GROWTH=1 \
+    -s ALLOW_TABLE_GROWTH=1 \
+    -s EXPORTED_FUNCTIONS='["_ngSpice_Init", "_ngSpice_Command", "_ngSpice_Init_Sync", "_ngGet_Vec_Info", "_ngSpice_Circ", "_ngSpice_CurPlot", "_ngSpice_AllPlots", "_ngSpice_AllVecs", "_ngSpice_running", "_malloc", "_free"]' \
+    -s EXPORTED_RUNTIME_METHODS='["ccall", "cwrap", "addFunction", "removeFunction", "getValue", "setValue", "UTF8ToString", "stringToUTF8", "lengthBytesUTF8", "FS"]' \
+    src/.libs/libngspice.so.*.*.* \
+    -o /src/ngshared.js
+
+FROM scratch AS artifacts
+COPY --from=builder /src/ngshared.js /
+COPY --from=builder /src/ngshared.wasm /
