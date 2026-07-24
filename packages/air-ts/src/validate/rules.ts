@@ -33,6 +33,7 @@ import {
   SUPPORTED_SPICE_TYPES,
   BUILTIN_SPICE_MODELS,
   BUILTIN_SPICE_SUBCKTS,
+  SPICE_MODELS,
   type McuSpec,
 } from "../registry/index.js";
 import { type Diagnostic, DiagnosticBuilder } from "./diagnostics.js";
@@ -667,7 +668,15 @@ function validateSpiceModels(component: Component, builder: DiagnosticBuilder): 
     );
   }
   const model = component.spice_model;
-  if (model && MODELLED_SPICE_TYPES.has(component.type) && !BUILTIN_SPICE_MODELS.has(model.trim().toUpperCase())) {
+  if (
+    model &&
+    MODELLED_SPICE_TYPES.has(component.type) &&
+    !BUILTIN_SPICE_MODELS.has(model.trim().toUpperCase()) &&
+    // A part backed by a real imported `.model` card (SPICE_MODELS, issue #60) is
+    // DEFINED: the emitter emits its card, so ngspice can run it. A model name in
+    // NEITHER set (e.g. FOOBAR999) still errors -- discrimination preserved.
+    !Object.prototype.hasOwnProperty.call(SPICE_MODELS, model.trim().toUpperCase())
+  ) {
     const sortedModels = sortedStrings(BUILTIN_SPICE_MODELS);
     const joined = sortedModels.join(", ");
     diagnostics.push(

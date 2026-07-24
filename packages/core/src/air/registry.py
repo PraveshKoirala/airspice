@@ -87,3 +87,37 @@ def load_component_specs() -> dict[str, dict[str, object]]:
 
 
 COMPONENT_SPECS = load_component_specs()
+
+
+def load_spice_models() -> dict[str, dict[str, str]]:
+    """Load part-level SPICE ``.model`` cards imported into registry/imported/.
+
+    Returns a map keyed by the UPPERCASED model name to its stored card and
+    provenance: ``{name: {"card": <.model text>, "source": <provenance>}}``.
+
+    Only entries that carry a real, captured ``spice_card`` back a part (issue
+    #60). A minimal name+type entry with no ``spice_card`` (e.g. ``BSS138`` /
+    ``1N4148`` imported from a library whose card body was not captured) is NOT
+    a model source and stays UNBACKED -- validation still errors on it, so
+    discrimination is preserved. Files are read in sorted filename order for a
+    deterministic, byte-stable map (mirrors gen-registry.mjs on the air-ts side).
+    """
+    registry_dir = Path(__file__).resolve().parents[4] / "registry" / "imported"
+    models: dict[str, dict[str, str]] = {}
+    if registry_dir.exists():
+        for path in sorted(registry_dir.glob("*.json")):
+            data = json.loads(path.read_text(encoding="utf-8"))
+            name = data.get("spice_model")
+            card = data.get("spice_card")
+            if name and card:
+                models[str(name).upper()] = {
+                    "card": card,
+                    "source": data.get("source", ""),
+                }
+    return models
+
+
+# Part-level SPICE model library: real ``.model`` cards imported from SPICE
+# libraries (see registry/imported/*.json). Consulted by spice.compile_spice (to
+# EMIT the card) and validation._validate_spice_models (to BACK the part).
+SPICE_MODELS = load_spice_models()

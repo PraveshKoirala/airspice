@@ -4,7 +4,7 @@ from xml.etree import ElementTree as ET
 
 from .diagnostics import Diagnostic, DiagnosticBuilder
 from .model import SystemIR
-from .registry import COMPONENT_SPECS, MCUS, PASSIVE_TYPES, SUPPORTED_SPICE_TYPES
+from .registry import COMPONENT_SPECS, MCUS, PASSIVE_TYPES, SPICE_MODELS, SUPPORTED_SPICE_TYPES
 from .spice import BUILTIN_SPICE_MODELS, BUILTIN_SPICE_SUBCKTS
 from .units import parse_quantity
 
@@ -302,6 +302,11 @@ def _validate_spice_models(component, builder: DiagnosticBuilder) -> list[Diagno
         model
         and component.type in _MODELLED_SPICE_TYPES
         and model.strip().upper() not in BUILTIN_SPICE_MODELS
+        # A part backed by a real imported ``.model`` card (registry.SPICE_MODELS,
+        # issue #60) is DEFINED: spice.compile_spice emits its card, so ngspice
+        # can run it. A model name in NEITHER set (e.g. FOOBAR999) still errors --
+        # discrimination preserved.
+        and model.strip().upper() not in SPICE_MODELS
     ):
         diagnostics.append(
             builder.make(
