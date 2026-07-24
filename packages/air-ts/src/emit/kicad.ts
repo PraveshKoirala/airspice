@@ -18,7 +18,9 @@
  *    text — the export is diffable and testable.
  *
  * S-expression escaping is applied to every user string; the emitter guarantees
- * balanced parentheses (asserted by the M7 test).
+ * balanced parentheses (asserted by the M7 test). Connectivity is machine-verified
+ * against real kicad-cli — `scripts/validate_kicad.mjs` exports the netlist with
+ * `kicad-cli sch export netlist` and checks each AIR net's pin-set is reproduced.
  */
 import type { SystemIR, Component } from "../model.js";
 
