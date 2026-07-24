@@ -72,14 +72,14 @@ export interface Style {
 
 /** Default palette (dark theme; the viewer overrides for the light theme). */
 export const DEFAULT_STYLE: Style = {
-  bg: "#0f172a",
-  axis: "#94a3b8",
-  axisText: "#e2e8f0",
-  gridMinor: "rgba(148, 163, 184, 0.10)",
-  gridMajor: "rgba(148, 163, 184, 0.20)",
-  cursor: "#facc15",
-  assertionBandPass: "rgba(34, 197, 94, 0.10)",
-  assertionBandFail: "rgba(239, 68, 68, 0.28)",
+  bg: "#0b1120",
+  axis: "#475569",
+  axisText: "#f8fafc",
+  gridMinor: "rgba(255, 255, 255, 0.03)",
+  gridMajor: "rgba(255, 255, 255, 0.08)",
+  cursor: "#38bdf8",
+  assertionBandPass: "rgba(16, 185, 129, 0.10)",
+  assertionBandFail: "rgba(244, 63, 94, 0.25)",
 };
 
 /** Clear the plot region with the background color. */
@@ -167,7 +167,7 @@ export function drawAxes(
   // Labels — small, high contrast; drawn OUTSIDE the plot area so trace
   // pixels never overlap them.
   ctx.fillStyle = style.axisText;
-  ctx.font = "10px system-ui, -apple-system, sans-serif";
+  ctx.font = "12px system-ui, -apple-system, sans-serif";
   ctx.textBaseline = "top";
   ctx.textAlign = "center";
   for (const t of tTicks) {
@@ -250,7 +250,7 @@ export function drawCursor(ctx: Ctx, p: Plot, t: number, style: Style, label?: s
   ctx.setLineDash([]);
   if (label) {
     ctx.fillStyle = style.cursor;
-    ctx.font = "10px system-ui, -apple-system, sans-serif";
+    ctx.font = "12px system-ui, -apple-system, sans-serif";
     ctx.textBaseline = "top";
     ctx.textAlign = "left";
     ctx.fillText(label, x + 4, p.y0 + 4);

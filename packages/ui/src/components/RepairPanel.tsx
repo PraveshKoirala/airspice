@@ -28,9 +28,11 @@ import {
   XCircle,
   StopCircle,
   CircleSlash,
+  KeyRound,
 } from "lucide-react";
 import type { MockFixture, NetworkProviderId, RepairStopReason } from "agent";
 import { useRepairSession, type RepairOutcome, type RepairTimelineRow } from "../agent/useRepairSession";
+import { hasUserProviderKey, hasAnyProviderKey } from "../agent/providerReadiness";
 
 interface RepairPanelProps {
   provider: NetworkProviderId | "mock";
@@ -39,6 +41,8 @@ interface RepairPanelProps {
   maxIterations?: number;
   mockFixture?: MockFixture;
   theme?: "dark" | "light";
+  /** Jump to the Settings tab (the BYOK key entry). */
+  onOpenSettings?: () => void;
 }
 
 const RepairPanel: React.FC<RepairPanelProps> = ({
@@ -48,10 +52,26 @@ const RepairPanel: React.FC<RepairPanelProps> = ({
   maxIterations,
   mockFixture,
   theme = "dark",
+  onOpenSettings,
 }) => {
-  const { timeline, outcome, running, status, start, stop, reset } = useRepairSession();
+  const { timeline, outcome, running, status, start, stop, reset, signalNoProvider } = useRepairSession();
+  // The repair loop is the one feature that needs an AI provider. When the user
+  // has no key of their own (only the seeded shared demo proxy, or nothing), show
+  // an honest BYOK pointer instead of hard-failing — the run still works against
+  // the demo proxy when it is reachable.
+  const needsKey = !hasUserProviderKey(provider);
 
+  // Run is ALWAYS clickable (never a disabled/dead button — that would be a soft
+  // hard-fail). Readiness is re-checked AT CLICK TIME (a fresh vault read), so a
+  // key cleared after this panel mounted is honored. With no provider configured
+  // at all, clicking short-circuits to a graceful provider_error outcome pointing
+  // at Settings — no provider is built and no network call is made. Otherwise the
+  // loop runs normally (against the seeded demo proxy or the user's own key).
   const onRun = () => {
+    if (!hasAnyProviderKey(provider)) {
+      signalNoProvider("No AI provider is configured. Add one in Settings.");
+      return;
+    }
     void start({
       provider,
       ...(model ? { model } : {}),
@@ -89,6 +109,22 @@ const RepairPanel: React.FC<RepairPanelProps> = ({
         </div>
       </div>
 
+      {needsKey && (
+        <div className="repair-byok-pointer" data-testid="repair-byok-pointer">
+          <KeyRound size={15} />
+          <div>
+            <strong>Add a provider key to run this repair.</strong>
+            <p>
+              The autonomous loop calls an AI provider to diagnose and patch the design. Add your own
+              key in Settings — it stays in this browser and is never sent to a server.
+            </p>
+          </div>
+          <button type="button" onClick={onOpenSettings} data-testid="repair-byok-settings">
+            Open Settings
+          </button>
+        </div>
+      )}
+
       {running && (
         <div className="repair-status" data-testid="repair-status">
           <RefreshCw size={13} className="animate-spin" /> {status || "Working…"}
@@ -124,21 +160,24 @@ function TimelineRow({ row, theme }: { row: RepairTimelineRow; theme: "dark" | "
   const failing = evaluation ? evaluation.failingAssertions.length : 0;
 
   return (
-    <div className="repair-iteration" data-testid={`repair-iteration-${row.index}`}>
-      <div className="repair-iteration-header">
-        <span className="repair-iteration-index">Iteration {row.index + 1}</span>
-        {evaluation && (
-          <span className="repair-iteration-diag">
-            {errorCount > 0 && <span className="pill error">{errorCount} validation error(s)</span>}
-            {failing > 0 && <span className="pill error">{failing} failing assertion(s)</span>}
-            {evaluation.topologyFirst && (
-              <span className="pill warning" title="Terminal convergence — topology first (#45)">
-                topology first
+    <div className="repair-iteration" data-testid={`repair-iteration-${row.index}`} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '12px', marginBottom: '12px' }}>
+      <details open>
+        <summary style={{ cursor: 'pointer', outline: 'none' }}>
+          <div className="repair-iteration-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: '8px', marginBottom: '8px', width: '100%' }}>
+            <span className="repair-iteration-index">Iteration {row.index + 1}</span>
+            {evaluation && (
+              <span className="repair-iteration-diag">
+                {errorCount > 0 && <span className="pill error"><AlertTriangle size={12}/> {errorCount} validation error(s)</span>}
+                {failing > 0 && <span className="pill error"><AlertTriangle size={12}/> {failing} failing assertion(s)</span>}
+                {evaluation.topologyFirst && (
+                  <span className="pill warning" title="Terminal convergence — topology first (#45)">
+                    topology first
+                  </span>
+                )}
               </span>
             )}
-          </span>
-        )}
-      </div>
+          </div>
+        </summary>
 
       {/* Diagnosis — the model's reasoning this round. */}
       {row.diagnosis && (
@@ -204,6 +243,7 @@ function TimelineRow({ row, theme }: { row: RepairTimelineRow; theme: "dark" | "
           )}
         </div>
       )}
+      </details>
     </div>
   );
 }

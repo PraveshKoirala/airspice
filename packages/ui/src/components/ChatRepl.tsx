@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Sparkles, User, Bot, Info, Square, Loader2 } from 'lucide-react';
+import { Send, Sparkles, User, Bot, Info, Square, Loader2, KeyRound } from 'lucide-react';
 import type { MockFixture, NetworkProviderId } from 'agent';
 import { useAgentSession } from '../agent/useAgentSession';
 import { useDesignStore } from '../agent/designStore';
 import { useAgentSettings } from '../agent/agentSettings';
+import { hasUserProviderKey } from '../agent/providerReadiness';
 import ProposalDiff from './ProposalDiff';
 
 /**
@@ -26,9 +27,11 @@ interface ChatReplProps {
   /** Fixture for the mock provider (dev/demo/CI-parity flows). */
   mockFixture?: MockFixture;
   theme?: 'dark' | 'light';
+  /** Jump to the Settings tab (the BYOK key entry). */
+  onOpenSettings?: () => void;
 }
 
-const ChatRepl: React.FC<ChatReplProps> = ({ provider, model, maxTokensPerTurn, mockFixture, theme = 'dark' }) => {
+const ChatRepl: React.FC<ChatReplProps> = ({ provider, model, maxTokensPerTurn, mockFixture, theme = 'dark', onOpenSettings }) => {
   const { transcript, proposals, budget, running, send, stop, applyProposal, rejectProposal } = useAgentSession();
   const currentXml = useDesignStore((s) => s.xml);
   const currentVersion = useDesignStore((s) => s.version);
@@ -39,9 +42,23 @@ const ChatRepl: React.FC<ChatReplProps> = ({ provider, model, maxTokensPerTurn, 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Keyless empty-state pointer (issue #28 D5): when no key of the user's own is
+  // configured, point at Settings. The agent may still run against the shared
+  // demo proxy, so this is a pointer, not a block.
+  const needsKey = !hasUserProviderKey(provider);
+
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [transcript, proposals]);
+    const el = scrollRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => {
+      el.scrollTop = el.scrollHeight;
+    });
+    observer.observe(el);
+    for (const child of el.children) {
+      observer.observe(child);
+    }
+    return () => observer.disconnect();
+  }, [transcript, proposals, running, budget]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,11 +97,25 @@ const ChatRepl: React.FC<ChatReplProps> = ({ provider, model, maxTokensPerTurn, 
         </label>
       </div>
 
-      {budget && (
+      {budget ? (
         <div className="budget-meter" data-testid="budget-meter">
           <span title="provider turns">iter {budget.iterations}/{budget.limits.maxIterations}</span>
           <span title="tokens">tok {budget.tokens}/{budget.limits.maxTokens}</span>
           <span title="wall time">{Math.round(budget.elapsedMs / 1000)}s/{Math.round(budget.limits.maxWallMs / 1000)}s</span>
+        </div>
+      ) : (
+        <div data-testid="budget-meter-empty" style={{ height: 0, padding: 0, margin: 0, border: 0 }}></div>
+      )}
+
+      {needsKey && (
+        <div className="chat-byok-pointer" data-testid="chat-byok-pointer">
+          <KeyRound size={14} />
+          <div>
+            <p>Add your own provider key to run the agent. Your key stays in this browser and is never sent to a server.</p>
+            <button type="button" onClick={onOpenSettings} data-testid="chat-byok-settings">
+              Open Settings (BYOK)
+            </button>
+          </div>
         </div>
       )}
 
@@ -126,6 +157,7 @@ const ChatRepl: React.FC<ChatReplProps> = ({ provider, model, maxTokensPerTurn, 
 
       <form className="chat-input-area" onSubmit={handleSubmit}>
         <textarea
+          id="agent-chat-input"
           ref={textareaRef}
           value={input}
           onChange={(e) => {
@@ -134,7 +166,7 @@ const ChatRepl: React.FC<ChatReplProps> = ({ provider, model, maxTokensPerTurn, 
             e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`;
           }}
           onKeyDown={handleKeyDown}
-          placeholder="Ask AI to 'build a 3.3V divider from 9V and probe the midpoint'..."
+          placeholder="Describe a circuit to build or change..."
           disabled={running}
           rows={1}
           style={{ resize: 'none' }}

@@ -8,6 +8,7 @@ import {
   keyVaultNoticeFor,
   type NetworkProviderId,
 } from 'agent';
+import { useAgentSettings } from '../agent/agentSettings';
 
 /**
  * BYOK settings panel (issue #17 deliverables 3 & 4).
@@ -35,50 +36,53 @@ type ValidateState =
 interface SettingsPanelProps {
   /** Malformed-tool-call events observed this session (recovery-ladder counter). */
   malformedToolCallCount?: number;
-  /** The provider the agent panel uses (mock = keyless demo). */
-  agentProvider?: NetworkProviderId | 'mock';
-  /** The model the agent panel uses. */
-  agentModel?: string | undefined;
-  /** Notify the workspace that the agent provider changed. */
-  onAgentProviderChange?: (provider: NetworkProviderId | 'mock') => void;
-  /** Notify the workspace that the agent model changed. */
-  onAgentModelChange?: (model: string | undefined) => void;
 }
 
 const vault = new KeyVault();
 
 const SettingsPanel: React.FC<SettingsPanelProps> = ({
   malformedToolCallCount = 0,
-  onAgentProviderChange,
-  onAgentModelChange,
 }) => {
-  const [provider, setProvider] = useState<NetworkProviderId>('anthropic');
+  const rawProvider = useAgentSettings((s) => s.agentProvider);
+  const provider = rawProvider === 'mock' ? 'openai' : rawProvider;
+  const setAgentProvider = useAgentSettings((s) => s.setAgentProvider);
+  
+  const agentModel = useAgentSettings((s) => s.agentModel);
+  const setAgentModel = useAgentSettings((s) => s.setAgentModel);
+  
+  const freeTextModel = useAgentSettings((s) => s.freeTextModel);
+  const setFreeTextModel = useAgentSettings((s) => s.setFreeTextModel);
+
   const catalog = MODEL_CATALOG[provider];
-  const [model, setModel] = useState<string>(catalog.defaultModel);
-  const [freeTextModel, setFreeTextModel] = useState('');
+
+  const tokenBudget = useAgentSettings((s) => s.tokenBudget);
+  const setTokenBudget = useAgentSettings((s) => s.setTokenBudget);
+
   const [keyInput, setKeyInput] = useState('');
-  const [tokenBudget, setTokenBudget] = useState<number>(DEFAULT_TOKEN_BUDGET);
+  const [baseUrlInput, setBaseUrlInput] = useState<string>(() => vault.getBaseUrl(provider) ?? '');
   const [validate, setValidate] = useState<ValidateState>({ status: 'idle' });
   const [storedMask, setStoredMask] = useState<string>(() => vault.masked(provider));
 
   const notice = useMemo(() => keyVaultNoticeFor(provider), [provider]);
 
   const onProviderChange = (next: NetworkProviderId) => {
-    setProvider(next);
-    setModel(MODEL_CATALOG[next].defaultModel);
+    setAgentProvider(next);
+    const nextModel = MODEL_CATALOG[next].defaultModel;
+    setAgentModel(nextModel);
     setFreeTextModel('');
     setKeyInput('');
+    setBaseUrlInput(vault.getBaseUrl(next) ?? '');
     setValidate({ status: 'idle' });
     setStoredMask(vault.masked(next));
-    // Drive the agent panel to this provider + its default model.
-    onAgentProviderChange?.(next);
-    onAgentModelChange?.(MODEL_CATALOG[next].defaultModel);
   };
 
-  const effectiveModel = freeTextModel.trim() !== '' ? freeTextModel.trim() : model;
+  const effectiveModel = agentModel;
 
   const handleSaveKey = () => {
-    vault.set(provider, keyInput);
+    if (keyInput.trim() !== '') {
+      vault.set(provider, keyInput);
+    }
+    vault.setBaseUrl(provider, baseUrlInput);
     setStoredMask(vault.masked(provider));
     setKeyInput('');
     setValidate({ status: 'idle' });
@@ -86,8 +90,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   const handleClearKey = () => {
     vault.clear(provider);
+    vault.clearBaseUrl(provider);
     setStoredMask('');
     setKeyInput('');
+    setBaseUrlInput('');
     setValidate({ status: 'idle' });
   };
 
@@ -95,13 +101,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     // Validate the key the user just typed, or the stored one if the field is
     // empty. The raw key is read here ONLY to hand to the direct provider call.
     const key = keyInput.trim() !== '' ? keyInput.trim() : vault.get(provider);
+    const baseUrlToUse = baseUrlInput.trim() !== '' ? baseUrlInput.trim() : vault.getBaseUrl(provider);
     if (!key) {
       setValidate({ status: 'error', detail: 'Enter a key first.' });
       return;
     }
     setValidate({ status: 'checking' });
     try {
-      const client = createProvider(provider, { apiKey: key, model: effectiveModel });
+      const client = createProvider(provider, { apiKey: key, model: effectiveModel, baseUrl: baseUrlToUse });
       const result = await client.validateKey(key);
       // `result.detail` is provider-produced and already redacted; never contains the key.
       setValidate(
@@ -141,17 +148,15 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         <label className="settings-field">
           <span>Model</span>
           <select
-            value={model}
-            onChange={(e) => {
-              setModel(e.target.value);
-              if (freeTextModel.trim() === '') onAgentModelChange?.(e.target.value);
-            }}
+            value={freeTextModel.trim() !== '' ? '' : agentModel}
+            onChange={(e) => setAgentModel(e.target.value)}
             disabled={freeTextModel.trim() !== ''}
             data-testid="model-picker"
           >
             {catalog.models.map((m) => (
               <option key={m} value={m}>{m}</option>
             ))}
+            {freeTextModel.trim() !== '' && <option value="" hidden></option>}
           </select>
         </label>
 
@@ -162,15 +167,20 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             placeholder="e.g. a newly released model id"
             value={freeTextModel}
             onChange={(e) => {
-              setFreeTextModel(e.target.value);
-              onAgentModelChange?.(e.target.value.trim() !== '' ? e.target.value.trim() : model);
+              const val = e.target.value;
+              setFreeTextModel(val);
+              if (val.trim() !== '') {
+                setAgentModel(val.trim());
+              } else {
+                setAgentModel(catalog.defaultModel);
+              }
             }}
             data-testid="model-override"
           />
         </label>
 
         <label className="settings-field">
-          <span>Token budget (default)</span>
+          <span>Token budget (per turn)</span>
           <input
             type="number"
             min={256}
@@ -178,6 +188,17 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             value={tokenBudget}
             onChange={(e) => setTokenBudget(Number(e.target.value) || DEFAULT_TOKEN_BUDGET)}
             data-testid="token-budget"
+          />
+        </label>
+
+        <label className="settings-field">
+          <span>Base URL override (optional)</span>
+          <input
+            type="text"
+            placeholder="e.g. http://localhost:8317/v1"
+            value={baseUrlInput}
+            onChange={(e) => setBaseUrlInput(e.target.value)}
+            data-testid="base-url-override"
           />
         </label>
       </div>
@@ -195,8 +216,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           />
         </label>
         <div className="settings-key-actions">
-          <button type="button" onClick={handleSaveKey} disabled={keyInput.trim() === ''} data-testid="save-key">
-            Save key
+          <button type="button" onClick={handleSaveKey} disabled={keyInput.trim() === '' && baseUrlInput.trim() === (vault.getBaseUrl(provider) ?? '')} data-testid="save-key">
+            Save
           </button>
           <button type="button" onClick={handleValidate} data-testid="validate-key">
             {validate.status === 'checking' ? <Loader2 size={14} className="animate-spin" /> : 'Validate'}

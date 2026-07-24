@@ -12,6 +12,7 @@ from .model import (
     ExportTarget,
     FirmwareBinding,
     FirmwareProject,
+    FirmwareSource,
     FirmwareTask,
     GuiHint,
     Interface,
@@ -166,6 +167,7 @@ def parse_tree(tree: ET.ElementTree) -> SystemIR:
     firmware_projects = {}
     firmware_bindings = {}
     firmware_tasks = {}
+    firmware_source: FirmwareSource | None = None
     firmware_el = root.find("firmware")
     if firmware_el is not None:
         for project in firmware_el.findall("project"):
@@ -200,6 +202,26 @@ def parse_tree(tree: ET.ElementTree) -> SystemIR:
                 target=task.attrib.get("target", ""),
                 period=_text(task, "period"),
                 operations=operations,
+            )
+        # Inline firmware source block (issue #36). It COEXISTS with the
+        # declarative project/binding/task children above; a <firmware> without
+        # a <source> child leaves firmware_source=None (backward compatible).
+        # The mcu/language/entry/pins attributes live on <firmware>; the raw
+        # program text is the <source> CDATA content, captured BYTE-EXACT (no
+        # strip/reindent -- expat resolves the CDATA + line-ending rules, and we
+        # keep whatever it hands us). `pins` is the DECLARED-PINS manifest: a
+        # comma-separated list parsed to a tuple in document order; empty tokens
+        # are dropped and each token is whitespace-trimmed.
+        source_el = firmware_el.find("source")
+        if source_el is not None:
+            pins_attr = firmware_el.attrib.get("pins", "")
+            declared_pins = tuple(p.strip() for p in pins_attr.split(",") if p.strip())
+            firmware_source = FirmwareSource(
+                mcu=firmware_el.attrib.get("mcu", ""),
+                language=firmware_el.attrib.get("language", ""),
+                entry=firmware_el.attrib.get("entry", ""),
+                pins=declared_pins,
+                source=source_el.text if source_el.text is not None else "",
             )
 
     bridges = []
@@ -291,6 +313,7 @@ def parse_tree(tree: ET.ElementTree) -> SystemIR:
         firmware_projects=firmware_projects,
         firmware_bindings=firmware_bindings,
         firmware_tasks=firmware_tasks,
+        firmware_source=firmware_source,
         bridges=bridges,
         tests=tests,
         simulation_profiles=profiles,

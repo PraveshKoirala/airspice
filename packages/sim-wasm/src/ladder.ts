@@ -30,7 +30,7 @@
  * exactly the way `_convergence_section` does natively.
  */
 
-import { prepareNetlist } from "./netlist";
+import { prepareNetlist } from "./netlist.js";
 
 /**
  * One rung of the browser ladder. Byte-identical to simulator.py `LadderRung`

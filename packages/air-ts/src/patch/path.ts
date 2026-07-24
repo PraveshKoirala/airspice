@@ -11,9 +11,10 @@
  * and, when a patch author writes a raw ElementPath in `path=`, whatever else
  * ElementTree's find accepts. We implement the ElementPath grammar CPython's
  * `xml.etree.ElementPath` supports for a single result (`find` returns the FIRST
- * match): tag steps, `.` and `..`, `*`, `[@attr]`, `[@attr='v']`/`[@attr="v"]`,
- * `[tag]` (has-child), `[tag='v']` (child-text equality), and `[n]` (1-based
- * positional). Namespaces are not used in AIR, so `{ns}tag` handling is omitted.
+ * match): tag steps, `.` and `..`, `*`, the `//` descendant axis (`.//tag`,
+ * `a//b`), `[@attr]`, `[@attr='v']`/`[@attr="v"]`, `[tag]` (has-child),
+ * `[tag='v']` (child-text equality), and `[n]` (1-based positional).
+ * Namespaces are not used in AIR, so `{ns}tag` handling is omitted.
  *
  * `find` returns the first matching element or null (ElementTree returns None),
  * exactly matching the oracle's `if found is None`.
@@ -34,18 +35,23 @@ export function findFirst(context: XmlElement, path: string): XmlElement | null 
   if (steps === null) return null;
   let current: XmlElement[] = [context];
   let first = true;
+  let deep = false;
   for (const step of steps) {
-    if (step === "" ) {
-      // A leading "." step or empty segment: keep the current context.
+    if (step === "") {
+      // An empty segment is a `//` separator (or a leading `/`): the NEXT step
+      // searches the descendant axis, matching ElementTree's `.//tag`.
+      if (!first) deep = true;
       first = false;
       continue;
     }
     const next: XmlElement[] = [];
     for (const node of current) {
-      collectStep(node, step, next, first);
+      if (deep) collectStepDeep(node, step, next);
+      else collectStep(node, step, next, first);
     }
     current = next;
     first = false;
+    deep = false;
     if (current.length === 0) return null;
   }
   return current.length > 0 ? current[0]! : null;
@@ -122,6 +128,38 @@ function collectStep(
     matched = picked ? [picked] : [];
   }
   for (const cand of matched) out.push(cand);
+}
+
+/**
+ * Apply one step on the DESCENDANT axis (the step after a `//`): match every
+ * element anywhere below `node` (children, grandchildren, ...), in document
+ * order, against the step's tag + predicates.
+ */
+function collectStepDeep(node: XmlElement, step: string, out: XmlElement[]): void {
+  const { tag, predicates } = parseStep(step);
+  if (tag === "." || tag === "..") return; // not meaningful on this axis
+  const local = predicates.filter((p) => p.kind !== "position");
+  const positions = predicates.filter(
+    (p): p is Extract<Predicate, { kind: "position" }> => p.kind === "position",
+  );
+  const all: XmlElement[] = [];
+  walkDescendants(node, all);
+  let matched = all.filter(
+    (c) => (tag === "*" || c.tag === tag) && matchesAll(c, local),
+  );
+  for (const pos of positions) {
+    const picked = matched[pos.index - 1];
+    matched = picked ? [picked] : [];
+  }
+  for (const cand of matched) out.push(cand);
+}
+
+/** Collect every descendant element of `node` in document order. */
+function walkDescendants(node: XmlElement, out: XmlElement[]): void {
+  for (const child of childElements(node)) {
+    out.push(child);
+    walkDescendants(child, out);
+  }
 }
 
 interface ParsedStep {

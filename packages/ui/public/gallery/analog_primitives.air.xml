@@ -1,0 +1,60 @@
+<system name="analog_primitives" ir_version="0.1">
+  <metadata>
+    <title>Analog Primitives</title>
+    <description>Explicit voltage source, load current, and current assertion example.</description>
+    <author>AIR</author>
+  </metadata>
+  <nets>
+    <net id="gnd" role="ground"/>
+    <net id="vin" role="power" nominal_voltage="5V"/>
+    <net id="mid" role="analog_signal"/>
+  </nets>
+  <components>
+    <component id="V_IN" type="voltage_source">
+      <value>5V</value>
+      <pin name="p" net="vin"/>
+      <pin name="n" net="gnd"/>
+    </component>
+    <component id="R_TOP" type="resistor">
+      <value>10k</value>
+      <pin name="1" net="vin"/>
+      <pin name="2" net="mid"/>
+    </component>
+    <component id="R_BOTTOM" type="resistor">
+      <value>10k</value>
+      <pin name="1" net="mid"/>
+      <pin name="2" net="gnd"/>
+    </component>
+    <component id="LOAD_A" type="generic_load">
+      <value>10mA</value>
+      <pin name="p" net="vin"/>
+      <pin name="n" net="gnd"/>
+    </component>
+  </components>
+  <analog>
+    <subsystem id="analog_core">
+      <uses component="V_IN"/>
+      <uses component="R_TOP"/>
+      <uses component="R_BOTTOM"/>
+      <uses component="LOAD_A"/>
+      <probe id="probe_mid" net="mid" quantity="voltage"/>
+    </subsystem>
+  </analog>
+  <tests>
+    <test id="divider_with_load">
+      <setup>
+        <load_step component="LOAD_A" from="2mA" to="10mA" at="1ms"/>
+      </setup>
+      <run duration="5ms"/>
+      <assert_voltage net="mid" min="2.45V" max="2.55V"/>
+      <assert_current component="LOAD_A" max="12mA"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="analog_only" default="true">
+      <backend type="ngspice"/>
+      <include subsystem="analog_core"/>
+      <run test="divider_with_load"/>
+    </profile>
+  </simulation_profiles>
+</system>

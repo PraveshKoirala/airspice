@@ -1,0 +1,157 @@
+{
+  "analog": [],
+  "bridges": [],
+  "components": {
+    "C_FILTER": {
+      "id": "C_FILTER",
+      "part": null,
+      "pins": {
+        "1": {
+          "function": null,
+          "name": "1",
+          "net": "led_dc"
+        },
+        "2": {
+          "function": null,
+          "name": "2",
+          "net": "gnd"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "capacitor",
+      "value": "1uF"
+    },
+    "R_FILTER": {
+      "id": "R_FILTER",
+      "part": null,
+      "pins": {
+        "1": {
+          "function": null,
+          "name": "1",
+          "net": "pwm_raw"
+        },
+        "2": {
+          "function": null,
+          "name": "2",
+          "net": "led_dc"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "resistor",
+      "value": "1k"
+    },
+    "U_MCU": {
+      "id": "U_MCU",
+      "part": "ESP32-C3",
+      "pins": {
+        "3V3": {
+          "function": null,
+          "name": "3V3",
+          "net": "3v3"
+        },
+        "GND": {
+          "function": null,
+          "name": "GND",
+          "net": "gnd"
+        },
+        "GPIO5": {
+          "function": "GPIO_OUT",
+          "name": "GPIO5",
+          "net": "pwm_raw"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "mcu",
+      "value": null
+    }
+  },
+  "exports": [
+    {
+      "enabled": true,
+      "target": "firmware"
+    }
+  ],
+  "firmware_bindings": {},
+  "firmware_projects": {},
+  "firmware_source": {
+    "entry": "main",
+    "language": "micropython",
+    "mcu": "U_MCU",
+    "pins": [
+      "GPIO5"
+    ],
+    "source": "\nfrom machine import Pin, PWM\nimport time\n\nled = PWM(Pin(5))\nled.freq(1000)\n\ndef main():\n    duty = 0\n    step = 512\n    while True:\n        led.duty_u16(duty)\n        duty += step\n        if duty >= 65535 or duty <= 0:\n            step = -step\n        time.sleep_ms(20)\n"
+  },
+  "firmware_tasks": {},
+  "interfaces": {},
+  "ir_version": "0.1",
+  "metadata": {
+    "author": "AI",
+    "created_at": "2026-07-24T00:00:00Z",
+    "description": "ESP32-C3 drives an LED through an RC low-pass filter using PWM. Carries inline MicroPython firmware source (issue #36).",
+    "title": "PWM LED Dimmer"
+  },
+  "name": "firmware_pwm_dimmer",
+  "nets": {
+    "3v3": {
+      "id": "3v3",
+      "nominal_voltage": "3.3V",
+      "role": "power"
+    },
+    "gnd": {
+      "id": "gnd",
+      "nominal_voltage": null,
+      "role": "ground"
+    },
+    "led_dc": {
+      "id": "led_dc",
+      "nominal_voltage": null,
+      "role": "analog_signal"
+    },
+    "pwm_raw": {
+      "id": "pwm_raw",
+      "nominal_voltage": null,
+      "role": "digital_signal"
+    }
+  },
+  "power_domains": {},
+  "requirements": [],
+  "simulation_profiles": {
+    "firmware_profile": {
+      "backends": [
+        "renode"
+      ],
+      "default": true,
+      "id": "firmware_profile",
+      "included_subsystems": [],
+      "properties": {},
+      "tests": [
+        "filter_dc_level"
+      ]
+    }
+  },
+  "tests": {
+    "filter_dc_level": {
+      "assertions": [
+        {
+          "max": "3.3V",
+          "min": "0.0V",
+          "net": "led_dc",
+          "op": "assert_voltage"
+        }
+      ],
+      "description": "RC filter settles toward the driven rail.",
+      "duration": "10ms",
+      "id": "filter_dc_level",
+      "setup": {
+        "pwm_raw": "3.3V"
+      }
+    }
+  }
+}

@@ -29,7 +29,7 @@ from .validation import has_errors, validate_ir, validate_tree
 def main(argv: list[str] | None = None) -> int:
     try:
         from dotenv import load_dotenv
-        load_dotenv()
+        load_dotenv(override=True)
     except ImportError:
         pass
         

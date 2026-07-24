@@ -121,6 +121,47 @@ class FirmwareTask:
 
 
 @dataclass(frozen=True)
+class FirmwareSource:
+    """Inline firmware source carried in a ``<firmware>`` block (issue #36).
+
+    The design XML attaches ``mcu``/``language``/``entry``/``pins`` attributes to
+    the ``<firmware>`` element and puts the REAL program text inside a
+    ``<source><![CDATA[ ... ]]></source>`` child. This dataclass is the typed
+    view of that block::
+
+        <firmware mcu="U_MCU" language="micropython" entry="main" pins="4,5">
+          <source><![CDATA[
+        from machine import ADC, Pin
+        ...
+          ]]></source>
+        </firmware>
+
+    * ``mcu`` -- id of a component whose registry type is an MCU (validated).
+    * ``language`` -- runtime language tag (``micropython`` today; this is what
+      #37's mpy-wasm runtime executes).
+    * ``entry`` -- entry-point symbol the runtime invokes.
+    * ``pins`` -- an explicit DECLARED-PINS manifest: the comma-separated pin ids
+      the firmware uses, parsed to a tuple in document order. Validation checks
+      each against the MCU registry; the source is NEVER statically analyzed to
+      discover pins (the sanctioned simpler design per the issue).
+    * ``source`` -- the raw program text, preserved BYTE-EXACT (no reindent, no
+      newline normalization beyond the XML parser's line-ending rule, no
+      trimming). The canonicalizer re-emits it in CDATA, split-escaping any
+      literal ``]]>`` so it round-trips exactly.
+
+    This addition is BACKWARD COMPATIBLE: ``SystemIR.firmware_source`` is ``None``
+    for every design without a ``<source>`` child, and ``model_dump`` omits the
+    key entirely when ``None`` so the frozen corpus bytes are unchanged.
+    """
+
+    mcu: str
+    language: str
+    entry: str
+    pins: tuple[str, ...] = ()
+    source: str = ""
+
+
+@dataclass(frozen=True)
 class Bridge:
     id: str
     type: str
@@ -194,6 +235,9 @@ class SystemIR:
     firmware_projects: dict[str, FirmwareProject] = field(default_factory=dict)
     firmware_bindings: dict[str, FirmwareBinding] = field(default_factory=dict)
     firmware_tasks: dict[str, FirmwareTask] = field(default_factory=dict)
+    # Optional inline firmware source block (issue #36). None for every design
+    # without a <firmware><source> child; omitted from model.json when None.
+    firmware_source: FirmwareSource | None = None
     bridges: list[Bridge] = field(default_factory=list)
     tests: dict[str, Test] = field(default_factory=dict)
     simulation_profiles: dict[str, SimulationProfile] = field(default_factory=dict)

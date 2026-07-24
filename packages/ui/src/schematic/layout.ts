@@ -439,9 +439,11 @@ export function pinOffset(
     if (pinName === "-" || pinName === "2") return { x: 0, y: 74 };
   }
 
+  // Passive symbols are drawn spanning exactly ±76 along their axis, so the
+  // pin must sit at ±76 in both orientations or the lead overshoots the wire.
   if (orientation === "vertical") {
-    if (pinName === "1" || pinName === "A" || pinName === "+") return { x: 0, y: -68 };
-    return { x: 0, y: 68 };
+    if (pinName === "1" || pinName === "A" || pinName === "+") return { x: 0, y: -76 };
+    return { x: 0, y: 76 };
   }
   if (pinName === "1" || pinName === "A" || pinName === "+") return { x: -76, y: 0 };
   return { x: 76, y: 0 };

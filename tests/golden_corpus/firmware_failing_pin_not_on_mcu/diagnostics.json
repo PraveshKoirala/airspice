@@ -1,0 +1,19 @@
+{
+  "diagnostics": [
+    {
+      "code": "VAL-003",
+      "domain": "firmware",
+      "expected": {},
+      "id": "diag_00001",
+      "message": "Firmware source declares pin GPIO99 that is not on MCU U_MCU.",
+      "observed": {},
+      "related_elements": [
+        "U_MCU",
+        "GPIO99"
+      ],
+      "severity": "error",
+      "suggested_actions": []
+    }
+  ],
+  "success": false
+}

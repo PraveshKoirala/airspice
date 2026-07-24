@@ -3,8 +3,9 @@ from __future__ import annotations
 from xml.etree import ElementTree as ET
 
 from .diagnostics import Diagnostic, DiagnosticBuilder
+from .diagnostics_registry import render_message, severity_for
 from .model import SystemIR
-from .registry import COMPONENT_SPECS, MCUS, PASSIVE_TYPES, SUPPORTED_SPICE_TYPES
+from .registry import COMPONENT_SPECS, MCUS, PASSIVE_TYPES, SPICE_MODELS, SUPPORTED_SPICE_TYPES
 from .spice import BUILTIN_SPICE_MODELS, BUILTIN_SPICE_SUBCKTS
 from .units import parse_quantity
 
@@ -128,6 +129,7 @@ def validate_ir(ir: SystemIR) -> list[Diagnostic]:
     for task in ir.firmware_tasks.values():
         if task.target not in ir.firmware_projects:
             diagnostics.append(builder.make("error", "firmware", "UNKNOWN_TASK_TARGET", f"Firmware task {task.id} targets unknown project {task.target}.", [task.id, task.target]))
+    diagnostics.extend(_validate_firmware_source(ir, builder))
 
     for test in ir.tests.values():
         for net_id in test.setup:
@@ -232,6 +234,75 @@ def _validate_i2c(ir: SystemIR, iface, builder: DiagnosticBuilder) -> list[Diagn
     return diagnostics
 
 
+def _validate_firmware_source(ir: SystemIR, builder: DiagnosticBuilder) -> list[Diagnostic]:
+    """Validate an inline firmware source block (issue #36).
+
+    Three static, declared-only checks -- the source text is NEVER analyzed:
+      * ``VAL-001`` -- the ``mcu`` ref names no component;
+      * ``VAL-002`` -- the ``mcu`` ref exists but is not MCU-typed;
+      * ``VAL-003`` -- a DECLARED ``pins`` id is absent from the MCU registry's
+        pin set (its GPIO/function pins plus its power pins).
+
+    These are namespaced NEW codes (docs/diagnostics_spec.md): the ``VAL-`` prefix
+    is the numbering bucket for validation/semantic/electrical checks, and each is
+    registered in registry/diagnostics.json. Following the SIM-010 precedent, the
+    severity and message are read from the registry via ``severity_for`` /
+    ``render_message`` so the emitted diagnostic and the registry can never drift;
+    the emitted ``domain`` stays ``"firmware"`` (coherent with the existing
+    firmware family). Codes are passed as string literals so the registry checker's
+    AST scan (check 3) sees every emit site.
+
+    Pin checks run only for an MCU-typed component whose ``part`` is in the
+    registry; an unknown part is already reported as ``UNKNOWN_MCU_PART`` by the
+    component pass, so we do not double-report it here.
+    """
+    diagnostics: list[Diagnostic] = []
+    fw = ir.firmware_source
+    if fw is None:
+        return diagnostics
+    component = ir.components.get(fw.mcu)
+    if component is None:
+        diagnostics.append(
+            builder.make(
+                severity_for("VAL-001"),
+                "firmware",
+                "VAL-001",
+                render_message("VAL-001", mcu=fw.mcu),
+                [fw.mcu],
+            )
+        )
+        return diagnostics
+    if component.type != "mcu":
+        diagnostics.append(
+            builder.make(
+                severity_for("VAL-002"),
+                "firmware",
+                "VAL-002",
+                render_message("VAL-002", mcu=fw.mcu),
+                [fw.mcu],
+            )
+        )
+        return diagnostics
+    if not component.part or component.part not in MCUS:
+        # Part unknown -> UNKNOWN_MCU_PART already fired in the component pass; we
+        # cannot resolve the pin set, so skip the declared-pin check.
+        return diagnostics
+    registry = MCUS[component.part]
+    known_pins = set(registry["pins"]) | set(registry["power_pins"])
+    for pin in fw.pins:
+        if pin not in known_pins:
+            diagnostics.append(
+                builder.make(
+                    severity_for("VAL-003"),
+                    "firmware",
+                    "VAL-003",
+                    render_message("VAL-003", pin=pin, mcu=fw.mcu),
+                    [fw.mcu, pin],
+                )
+            )
+    return diagnostics
+
+
 def _validate_mcu(component, builder: DiagnosticBuilder) -> list[Diagnostic]:
     diagnostics: list[Diagnostic] = []
     if not component.part or component.part not in MCUS:
@@ -302,6 +373,11 @@ def _validate_spice_models(component, builder: DiagnosticBuilder) -> list[Diagno
         model
         and component.type in _MODELLED_SPICE_TYPES
         and model.strip().upper() not in BUILTIN_SPICE_MODELS
+        # A part backed by a real imported ``.model`` card (registry.SPICE_MODELS,
+        # issue #60) is DEFINED: spice.compile_spice emits its card, so ngspice
+        # can run it. A model name in NEITHER set (e.g. FOOBAR999) still errors --
+        # discrimination preserved.
+        and model.strip().upper() not in SPICE_MODELS
     ):
         diagnostics.append(
             builder.make(

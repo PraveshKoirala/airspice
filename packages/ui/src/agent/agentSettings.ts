@@ -10,6 +10,35 @@
  */
 
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import { DEFAULT_TOKEN_BUDGET, MODEL_CATALOG, type NetworkProviderId } from "agent";
+
+const DEFAULT_PROVIDER: NetworkProviderId = "openai";
+const DEFAULT_MODEL = MODEL_CATALOG[DEFAULT_PROVIDER].defaultModel;
+// Model ids a previous build persisted as the openai-lane default; they upgrade
+// to the current catalog default (the local proxy's tool-calling model).
+// `claude-sonnet-4-6` is included because it was a former default that the local
+// proxy rate-limits for ~1.5h at a time — a persisted copy would 429 on the
+// user's first prompt. Re-selecting it explicitly in Settings still works.
+const STALE_DEFAULTS = new Set([
+  "gemini-3.5-flash-high",
+  "gpt-4o-mini",
+  "claude-sonnet-4-6",
+]);
+
+function migratePersistedSettings(persisted: unknown): unknown {
+  if (typeof persisted !== "object" || persisted === null) return persisted;
+  const state = persisted as Record<string, unknown>;
+  if (
+    state.agentProvider === DEFAULT_PROVIDER &&
+    (STALE_DEFAULTS.has(state.agentModel as string) ||
+      STALE_DEFAULTS.has(state.freeTextModel as string) ||
+      !state.agentModel)
+  ) {
+    return { ...state, agentModel: DEFAULT_MODEL, freeTextModel: "" };
+  }
+  return state;
+}
 
 export interface AgentSettingsState {
   /** Auto-apply staged proposals (still through the full gate). Default OFF. */
@@ -19,12 +48,38 @@ export interface AgentSettingsState {
   malformedCount: number;
   incMalformed: () => void;
   resetMalformed: () => void;
+  agentProvider: NetworkProviderId | 'mock';
+  setAgentProvider: (provider: NetworkProviderId | 'mock') => void;
+  agentModel: string;
+  setAgentModel: (model: string) => void;
+  freeTextModel: string;
+  setFreeTextModel: (model: string) => void;
+  /** Per-turn token budget handed to chat + repair sessions. */
+  tokenBudget: number;
+  setTokenBudget: (budget: number) => void;
 }
 
-export const useAgentSettings = create<AgentSettingsState>((set) => ({
-  autoApply: false,
-  setAutoApply: (on) => set({ autoApply: on }),
-  malformedCount: 0,
-  incMalformed: () => set((s) => ({ malformedCount: s.malformedCount + 1 })),
-  resetMalformed: () => set({ malformedCount: 0 }),
-}));
+export const useAgentSettings = create<AgentSettingsState>()(
+  persist(
+    (set) => ({
+      autoApply: false,
+      setAutoApply: (on) => set({ autoApply: on }),
+      malformedCount: 0,
+      incMalformed: () => set((s) => ({ malformedCount: s.malformedCount + 1 })),
+      resetMalformed: () => set({ malformedCount: 0 }),
+      agentProvider: DEFAULT_PROVIDER,
+      setAgentProvider: (provider) => set({ agentProvider: provider }),
+      agentModel: DEFAULT_MODEL,
+      setAgentModel: (model) => set({ agentModel: model }),
+      freeTextModel: '',
+      setFreeTextModel: (model) => set({ freeTextModel: model }),
+      tokenBudget: DEFAULT_TOKEN_BUDGET,
+      setTokenBudget: (budget) => set({ tokenBudget: budget }),
+    }),
+    {
+      name: 'airspice.agent.settings',
+      version: 2,
+      migrate: migratePersistedSettings,
+    }
+  )
+);

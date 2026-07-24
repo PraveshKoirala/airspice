@@ -12,7 +12,7 @@ import { defineConfig, devices } from "@playwright/test";
  * headers: the single-threaded WASM build needs none (epic #12 binding decision 2).
  */
 export default defineConfig({
-  testDir: "./tests/browser",
+  testDir: "./tests",
   testMatch: /.*\.spec\.ts/,
   // WASM cold-start + several transients can be slow; give runs headroom.
   timeout: 180_000,
@@ -21,14 +21,14 @@ export default defineConfig({
   workers: 1,
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
-    baseURL: "http://127.0.0.1:5179",
+    baseURL: "http://127.0.0.1:5180",
     trace: "on-first-retry",
   },
   webServer: {
     command:
-      "npx vite --config tests/browser/vite.config.ts --host 127.0.0.1 --port 5179 --strictPort",
-    url: "http://127.0.0.1:5179",
-    reuseExistingServer: !process.env.CI,
+      "npx vite --host 127.0.0.1 --port 5180 --strictPort",
+    url: "http://127.0.0.1:5180",
+    reuseExistingServer: true,
     timeout: 180_000,
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],

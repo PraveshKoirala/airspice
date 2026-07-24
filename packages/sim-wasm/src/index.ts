@@ -6,8 +6,8 @@
  * (engine.worker.ts) and never reach consumers (issue guardrail).
  */
 
-export { SimClient, defaultWorkerFactory } from "./client";
-export type { WorkerFactory } from "./client";
+export { SimClient, defaultWorkerFactory } from "./client.js";
+export type { WorkerFactory } from "./client.js";
 
 export type {
   ProbeSpec,
@@ -22,14 +22,28 @@ export type {
   WorkerInbound,
   WorkerOutbound,
   SimControl,
-} from "./protocol";
+} from "./protocol.js";
 
-export { classifyStderr, hasError, UNCLASSIFIED_CODE } from "./diagnostics";
-export { toWaveTables, finalValue } from "./result";
-export { prepareNetlist } from "./netlist";
+export { classifyStderr, hasError, UNCLASSIFIED_CODE } from "./diagnostics.js";
+export { toWaveTables, finalValue } from "./result.js";
+export { prepareNetlist } from "./netlist.js";
 export {
   CONVERGENCE_LADDER,
   buildRungNetlist,
   runConvergenceLadder,
-} from "./ladder";
-export type { LadderRung, LadderAttempt, LadderOutcome, RungOutcome } from "./ladder";
+} from "./ladder.js";
+export type { LadderRung, LadderAttempt, LadderOutcome, RungOutcome } from "./ladder.js";
+
+export { CoSimOrchestrator, createSimClientAnalogEngine } from "./cosim.js";
+export type {
+  PinBinding,
+  CoSimStepState,
+  CoSimOptions,
+  AnalogEngine,
+  AnalogSolveInput,
+  AnalogSolveOutput,
+  FirmwareModel,
+  FirmwareStepInput,
+  FirmwareStepOutput,
+} from "./cosim.js";
+

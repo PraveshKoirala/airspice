@@ -37,6 +37,7 @@ import {
   capString,
   summarizeStderr,
   DEFAULT_RESULT_CHAR_CAP,
+  stripMarkdown,
 } from "./truncate.js";
 
 /** A design snapshot the runtime reasons about (mirrors the UI store). */
@@ -170,9 +171,12 @@ export class ToolRuntime {
   }
 
   private validateDesign(args: Record<string, unknown>): ToolExecution {
-    const xml = typeof args["design_xml"] === "string"
+    let xml = typeof args["design_xml"] === "string"
       ? (args["design_xml"] as string)
       : this.design.xml;
+    if (typeof args["design_xml"] === "string") {
+      xml = stripMarkdown(xml);
+    }
     const diagnostics = safeValidate(this.hooks, xml);
     const errors = diagnostics.filter((d) => d.severity === "error");
     const warnings = diagnostics.filter((d) => d.severity === "warning");
@@ -196,10 +200,11 @@ export class ToolRuntime {
   // ----------------------------------------------------------------------- //
 
   private setDesign(args: Record<string, unknown>): ToolExecution {
-    const designXml = args["design_xml"];
-    if (typeof designXml !== "string") {
+    const rawXml = args["design_xml"];
+    if (typeof rawXml !== "string") {
       return this.badArgs("set_design", "design_xml (string) is required.");
     }
+    const designXml = stripMarkdown(rawXml);
     const summary = typeof args["summary"] === "string" ? (args["summary"] as string) : "";
 
     // THE GATE. normalize -> validate. A failure is fed back, never applied.
@@ -234,10 +239,11 @@ export class ToolRuntime {
   }
 
   private proposePatch(args: Record<string, unknown>): ToolExecution {
-    const patchXml = args["patch_xml"];
-    if (typeof patchXml !== "string") {
+    const rawPatch = args["patch_xml"];
+    if (typeof rawPatch !== "string") {
       return this.badArgs("propose_patch", "patch_xml (string) is required.");
     }
+    const patchXml = stripMarkdown(rawPatch);
     const summary = typeof args["summary"] === "string" ? (args["summary"] as string) : "";
 
     // Apply the patch to the CURRENT design, then run the gate on the result.
@@ -290,10 +296,11 @@ export class ToolRuntime {
   }
 
   private previewPatch(args: Record<string, unknown>): ToolExecution {
-    const patchXml = args["patch_xml"];
-    if (typeof patchXml !== "string") {
+    const rawPatch = args["patch_xml"];
+    if (typeof rawPatch !== "string") {
       return this.badArgs("preview_patch", "patch_xml (string) is required.");
     }
+    const patchXml = stripMarkdown(rawPatch);
     try {
       const preview = this.hooks.previewPatch(this.design.xml, patchXml);
       return {

@@ -1,13 +1,13 @@
 {
   "issue": "#76",
-  "note": "literal tab in attribute value: expat normalizes to space at parse time",
-  "expect": "diverge-known",
-  "classifiedKnown": "#76",
-  "diverges": true,
-  "mismatchKind": "hash",
+  "note": "literal tab in attribute value: expat normalizes it to a space at parse time. FIXED (PR #76) -- air-ts's normalizeXmlWhitespace now applies the same parse-time normalization, so both engines ACCEPT with an identical model. Guard against a reverted normalizer.",
+  "expect": "accept-agree",
+  "classifiedKnown": null,
+  "diverges": false,
+  "mismatchKind": null,
   "ts": {
     "status": "accept",
-    "modelHash": "8342c614713d1899"
+    "modelHash": "7d04ab5df1eda759"
   },
   "py": {
     "modelHash": "7d04ab5df1eda759",

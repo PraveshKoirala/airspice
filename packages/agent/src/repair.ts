@@ -20,6 +20,7 @@
  */
 
 import type { MalformedToolCall, ToolSpec } from "./types.js";
+import { stripMarkdown } from "./tools/truncate.js";
 
 export interface ParsedToolArgs {
   ok: boolean;
@@ -47,8 +48,9 @@ export function parseToolArgs(
 
   let parsed: unknown;
   try {
+    const cleaned = stripMarkdown(rawArgs);
     // An empty argument string means "no arguments" -> {}.
-    parsed = rawArgs.trim() === "" ? {} : JSON.parse(rawArgs);
+    parsed = cleaned === "" ? {} : JSON.parse(cleaned);
   } catch {
     return malformed(
       "invalid_json",

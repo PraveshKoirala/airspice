@@ -11,7 +11,7 @@
         <xs:element name="interfaces" minOccurs="0" maxOccurs="1" type="openSection"/>
         <xs:element name="analog" minOccurs="0" maxOccurs="1" type="openSection"/>
         <xs:element name="digital" minOccurs="0" maxOccurs="1" type="openSection"/>
-        <xs:element name="firmware" minOccurs="0" maxOccurs="1" type="openSection"/>
+        <xs:element name="firmware" minOccurs="0" maxOccurs="1" type="firmwareSection"/>
         <xs:element name="bridges" minOccurs="0" maxOccurs="1" type="openSection"/>
         <xs:element name="tests" minOccurs="1" maxOccurs="1" type="openSection"/>
         <xs:element name="simulation_profiles" minOccurs="1" maxOccurs="1" type="openSection"/>
@@ -31,6 +31,54 @@
     <xs:sequence>
       <xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/>
     </xs:sequence>
+    <xs:anyAttribute processContents="lax"/>
+  </xs:complexType>
+
+  <!--
+    <firmware> section (issue #36). It stays intentionally permissive (open
+    content) so the existing declarative children (<project>, <binding>, <task>)
+    keep validating unchanged. On top of that it declares the inline
+    firmware-source contract as first-class, optional attributes plus a <source>
+    child that COEXISTS with the declarative children:
+
+        <firmware mcu="U_MCU" language="micropython" entry="main" pins="4,5">
+          <source><![CDATA[
+        from machine import ADC, Pin
+        ...
+          ]]></source>
+        </firmware>
+
+    CONTRACT (both engines; see packages/core/src/air/parser.py,
+    canonicalizer.py, validation.py and their air-ts mirrors):
+      * mcu      : id of a component whose registry type is an MCU. Validated as
+                   VAL-001 (no such component) or VAL-002 (component is not
+                   MCU-typed). See docs/diagnostics_spec.md + registry/diagnostics.json.
+      * language : runtime language tag ("micropython" today).
+      * entry    : entry-point symbol the runtime invokes.
+      * pins     : an explicit DECLARED-PINS manifest, a comma-separated list of
+                   the MCU pin ids the firmware uses (e.g. "GPIO4,GPIO5"). Each is
+                   checked against the MCU registry pin set (VAL-003).
+                   The source text is NEVER statically analyzed to discover pins;
+                   this manifest is the sole input to that check.
+      * source   : the raw program text, carried in a CDATA section and preserved
+                   BYTE-EXACT (no reindent, no trim, no newline change beyond the
+                   XML parser line-ending rule). The canonicalizer re-emits it in
+                   CDATA, split-escaping any literal CDATA-end marker as
+                   "]]]]><![CDATA[>" so the exact bytes (tabs, trailing spaces,
+                   blank lines, unicode) round-trip through
+                   parse then canonicalize then parse.
+
+    Backward compatible: a <firmware> without these attributes and without a
+    <source> child is unchanged, so no pre-#36 golden fixture moves.
+  -->
+  <xs:complexType name="firmwareSection" mixed="true">
+    <xs:sequence>
+      <xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/>
+    </xs:sequence>
+    <xs:attribute name="mcu" type="xs:string" use="optional"/>
+    <xs:attribute name="language" type="xs:string" use="optional"/>
+    <xs:attribute name="entry" type="xs:string" use="optional"/>
+    <xs:attribute name="pins" type="xs:string" use="optional"/>
     <xs:anyAttribute processContents="lax"/>
   </xs:complexType>
 

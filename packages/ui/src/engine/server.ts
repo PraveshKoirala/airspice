@@ -1,7 +1,7 @@
 /**
  * Server engine (issue #10): the existing FastAPI backend, reached over axios.
- * This is the DEFAULT until M2 (`VITE_ENGINE` unset or "server"), preserving the
- * pre-#10 behaviour exactly -- `toGraph` hits `POST /graph`, `validate` hits
+ * This is the explicit oracle/development mode (`VITE_ENGINE=server`):
+ * `toGraph` hits `POST /graph`, `validate` hits
  * `POST /validate-xml`, both with the same `{ xml }` body the UI already sent.
  *
  * Keeping the server path behind the SAME facade interface as the local engine

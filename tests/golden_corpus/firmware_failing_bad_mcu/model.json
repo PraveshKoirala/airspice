@@ -1,0 +1,147 @@
+{
+  "analog": [],
+  "bridges": [],
+  "components": {
+    "R_SOIL_BOTTOM": {
+      "id": "R_SOIL_BOTTOM",
+      "part": null,
+      "pins": {
+        "1": {
+          "function": null,
+          "name": "1",
+          "net": "soil_sense"
+        },
+        "2": {
+          "function": null,
+          "name": "2",
+          "net": "gnd"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "resistor",
+      "value": "10k"
+    },
+    "R_SOIL_TOP": {
+      "id": "R_SOIL_TOP",
+      "part": null,
+      "pins": {
+        "1": {
+          "function": null,
+          "name": "1",
+          "net": "3v3"
+        },
+        "2": {
+          "function": null,
+          "name": "2",
+          "net": "soil_sense"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "resistor",
+      "value": "10k"
+    },
+    "U_MCU": {
+      "id": "U_MCU",
+      "part": "ESP32-C3",
+      "pins": {
+        "3V3": {
+          "function": null,
+          "name": "3V3",
+          "net": "3v3"
+        },
+        "GND": {
+          "function": null,
+          "name": "GND",
+          "net": "gnd"
+        },
+        "GPIO4": {
+          "function": "ADC1_CH4",
+          "name": "GPIO4",
+          "net": "soil_sense"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "mcu",
+      "value": null
+    }
+  },
+  "exports": [],
+  "firmware_bindings": {},
+  "firmware_projects": {},
+  "firmware_source": {
+    "entry": "main",
+    "language": "micropython",
+    "mcu": "U_NOPE",
+    "pins": [
+      "GPIO4"
+    ],
+    "source": "\nfrom machine import ADC, Pin\nadc = ADC(Pin(4))\n\ndef main():\n    print(adc.read_u16())\n"
+  },
+  "firmware_tasks": {},
+  "interfaces": {},
+  "ir_version": "0.1",
+  "metadata": {
+    "author": "AI",
+    "created_at": "2026-07-24T00:00:00Z",
+    "description": "Otherwise-valid design; the firmware source names an mcu component that does not exist, so it must fail with FIRMWARE_MCU_UNDEFINED (issue #36).",
+    "title": "Firmware source with an undefined mcu ref"
+  },
+  "name": "firmware_failing_bad_mcu",
+  "nets": {
+    "3v3": {
+      "id": "3v3",
+      "nominal_voltage": "3.3V",
+      "role": "power"
+    },
+    "gnd": {
+      "id": "gnd",
+      "nominal_voltage": null,
+      "role": "ground"
+    },
+    "soil_sense": {
+      "id": "soil_sense",
+      "nominal_voltage": null,
+      "role": "analog_signal"
+    }
+  },
+  "power_domains": {},
+  "requirements": [],
+  "simulation_profiles": {
+    "firmware_profile": {
+      "backends": [
+        "renode"
+      ],
+      "default": true,
+      "id": "firmware_profile",
+      "included_subsystems": [],
+      "properties": {},
+      "tests": [
+        "soil_divider_nominal"
+      ]
+    }
+  },
+  "tests": {
+    "soil_divider_nominal": {
+      "assertions": [
+        {
+          "max": "1.7V",
+          "min": "1.6V",
+          "net": "soil_sense",
+          "op": "assert_voltage"
+        }
+      ],
+      "description": "",
+      "duration": "10ms",
+      "id": "soil_divider_nominal",
+      "setup": {
+        "3v3": "3.3V"
+      }
+    }
+  }
+}

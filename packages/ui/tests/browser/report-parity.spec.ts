@@ -50,7 +50,7 @@ for (const c of CASES) {
 }
 
 test.beforeEach(async ({ page }) => {
-  await page.goto("/");
+  await page.goto('/tests/browser/harness/index.html');
   await page.waitForFunction(() => (window as unknown as { __air?: unknown }).__air !== undefined);
 });
 

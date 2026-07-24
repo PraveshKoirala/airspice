@@ -33,6 +33,7 @@ import {
   SUPPORTED_SPICE_TYPES,
   BUILTIN_SPICE_MODELS,
   BUILTIN_SPICE_SUBCKTS,
+  SPICE_MODELS,
   type McuSpec,
 } from "../registry/index.js";
 import { type Diagnostic, DiagnosticBuilder } from "./diagnostics.js";
@@ -325,6 +326,7 @@ export function validateIr(ir: SystemIR): Diagnostic[] {
       );
     }
   }
+  for (const d of validateFirmwareSource(ir, builder)) diagnostics.push(d);
 
   for (const test of ir.tests.values()) {
     for (const netId of test.setup.keys()) {
@@ -581,6 +583,80 @@ function isDict(value: unknown): value is Record<string, string> {
 }
 
 // --------------------------------------------------------------------------- //
+// _validate_firmware_source (issue #36)                                       //
+// --------------------------------------------------------------------------- //
+
+/**
+ * Port of validation._validate_firmware_source. Three static, declared-only
+ * checks over the inline firmware source; the program text is NEVER analyzed.
+ *
+ * PARITY: same namespaced codes (VAL-001 / VAL-002 / VAL-003, docs/
+ * diagnostics_spec.md), domain ("firmware"), messages, severity, related_elements,
+ * and emission order as the oracle. The Python side reads the message + severity
+ * from registry/diagnostics.json via the loader; air-ts reproduces the SAME strings
+ * inline -- exactly how the existing namespaced codes (SEC-00x in xml.ts) achieve
+ * parity, since the registry is data with no per-engine message variants. The
+ * message text below is byte-identical to each code's registry `message_template`
+ * rendered with these params. Runs a single builder shared with validateIr, so the
+ * diagnostic ids continue the validate_ir sequence exactly as in Python. The pin
+ * set is the union of the MCU registry's `pins` and `power_pins` keys; the pin
+ * check is skipped for an unknown `part` (UNKNOWN_MCU_PART already fired).
+ */
+function validateFirmwareSource(ir: SystemIR, builder: DiagnosticBuilder): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  const fw = ir.firmware_source;
+  // null (no <source>) or undefined (omitted optional on a hand-built IR) -> skip.
+  if (!fw) return diagnostics;
+  const component = ir.components.get(fw.mcu);
+  if (component === undefined) {
+    diagnostics.push(
+      builder.make(
+        "error",
+        "firmware",
+        "VAL-001",
+        `Firmware source references unknown MCU component ${fw.mcu}.`,
+        { relatedElements: [fw.mcu] },
+      ),
+    );
+    return diagnostics;
+  }
+  if (component.type !== "mcu") {
+    diagnostics.push(
+      builder.make(
+        "error",
+        "firmware",
+        "VAL-002",
+        `Firmware source mcu ${fw.mcu} is not an MCU component.`,
+        { relatedElements: [fw.mcu] },
+      ),
+    );
+    return diagnostics;
+  }
+  if (!component.part || !(component.part in MCUS)) {
+    return diagnostics;
+  }
+  const registry = MCUS[component.part] as McuSpec;
+  const knownPins = new Set<string>([
+    ...Object.keys(registry.pins),
+    ...Object.keys(registry.power_pins),
+  ]);
+  for (const pin of fw.pins) {
+    if (!knownPins.has(pin)) {
+      diagnostics.push(
+        builder.make(
+          "error",
+          "firmware",
+          "VAL-003",
+          `Firmware source declares pin ${pin} that is not on MCU ${fw.mcu}.`,
+          { relatedElements: [fw.mcu, pin] },
+        ),
+      );
+    }
+  }
+  return diagnostics;
+}
+
+// --------------------------------------------------------------------------- //
 // _validate_mcu                                                               //
 // --------------------------------------------------------------------------- //
 
@@ -667,7 +743,15 @@ function validateSpiceModels(component: Component, builder: DiagnosticBuilder): 
     );
   }
   const model = component.spice_model;
-  if (model && MODELLED_SPICE_TYPES.has(component.type) && !BUILTIN_SPICE_MODELS.has(model.trim().toUpperCase())) {
+  if (
+    model &&
+    MODELLED_SPICE_TYPES.has(component.type) &&
+    !BUILTIN_SPICE_MODELS.has(model.trim().toUpperCase()) &&
+    // A part backed by a real imported `.model` card (SPICE_MODELS, issue #60) is
+    // DEFINED: the emitter emits its card, so ngspice can run it. A model name in
+    // NEITHER set (e.g. FOOBAR999) still errors -- discrimination preserved.
+    !Object.prototype.hasOwnProperty.call(SPICE_MODELS, model.trim().toUpperCase())
+  ) {
     const sortedModels = sortedStrings(BUILTIN_SPICE_MODELS);
     const joined = sortedModels.join(", ");
     diagnostics.push(

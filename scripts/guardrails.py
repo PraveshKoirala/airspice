@@ -8,7 +8,10 @@ platforms (it is expected to run on ubuntu CI and locally on Windows, pure
 stdlib, no third-party deps).
 
 Rules implemented (issue #42, #56, #69):
-  R1 fixture-port-separation  AGENTS.md rule (fixture/port separation, ADR 0009)
+  R1 fixture-port-separation  AGENTS.md rule (fixture/port separation, ADR 0009;
+                              on push events -- which cannot carry the
+                              oracle-first label -- R1 reports informationally
+                              instead of failing, issue #71)
   R2 test-weakening           AGENTS.md rule 2
   R3 wall-clock-ban           AGENTS.md rules 9 / 22
   R4 fixture-special-casing   AGENTS.md rule 13
@@ -667,12 +670,31 @@ class Report:
 def run_all_rules(change: Change, tree_root: Optional[Path]) -> Report:
     corpus_names = discover_corpus_names(tree_root)
     violations: list[Violation] = []
-    violations += rule_fixture_port_separation(change)
     violations += rule_test_weakening(change)
     violations += rule_wallclock_ban(change, tree_root)
     r4, corpus_present = rule_fixture_special_casing(change, corpus_names)
     violations += r4
     violations += rule_secret_hygiene(change)
+
+    # R1, like R6 below, has a remedy that only a PR can carry: the
+    # `oracle-first` LABEL. On a push event there is no PR, so no label can ever
+    # be attached, and a firing R1 would be unwaivable -- painting main red on
+    # the merge push of every legitimately-labelled oracle-first PR that spanned
+    # the golden corpus AND a port package (issue #71). This is the same
+    # double-jeopardy that scoped R6 to PR context in issue #69, so R1 is scoped
+    # IDENTICALLY, reusing the exact same fail-closed pr_context plumbing: on
+    # push (pr_context False) R1 reports INFORMATIONALLY -- printed, in the job
+    # summary, but not failing; in PR context it ENFORCES exactly as before
+    # (corpus+port without the oracle-first label = failure). Detection logic
+    # (rule_fixture_port_separation) is untouched; only the disposition changes.
+    # Fail-closed: pr_context defaults True, so local runs and PR simulations
+    # enforce R1 fully unless the run is explicitly identified as a push event.
+    informational: list[Violation] = []
+    r1 = rule_fixture_port_separation(change)
+    if change.pr_context:
+        violations += r1
+    else:
+        informational += r1
 
     # R6 is the one rule whose ONLY remedy is the override label + PR-body
     # section. On a push event there is no PR: no label can ever be attached,
@@ -687,12 +709,11 @@ def run_all_rules(change: Change, tree_root: Optional[Path]) -> Report:
     # R6: every other rule enforces identically on push (a weakening token or
     # secret pushed to main still fails). Direct-push abuse of this window is
     # the domain of branch protection (PR required, no force-push), not R6.
-    informational: list[Violation] = []
     r6 = rule_guardrails_self_protection(change)
     if change.pr_context:
         violations += r6
     else:
-        informational = r6
+        informational += r6
 
     override_active = False
     justification = ""
@@ -1091,6 +1112,78 @@ def run_self_tests() -> int:
     ch = _change_from_diff(diff_c)
     st.check("R1 clean (corpus only) passes",
              rule_fixture_port_separation(ch) == [])
+
+    # ---- R1 push-event scoping (issue #71) ------------------------------- #
+    # R1's only PR-side remedy is the `oracle-first` LABEL, which a push event
+    # cannot carry -- so a firing R1 on push was unwaivable and painted main red
+    # on the merge push of every legitimately-labelled oracle-first PR that
+    # spanned corpus + a port package. Mirroring the R6 fix (issue #69), R1 is
+    # now routed through the SAME fail-closed pr_context plumbing: it ENFORCES
+    # on a PR, reports INFORMATIONALLY on a push. Detection is unchanged -- only
+    # the disposition differs by context. Fail-closed: PR context is the default
+    # everywhere; push must be explicitly identified.
+    r1_diff = diff_c + diff_p  # corpus + port, no oracle-first label
+    # PR context (explicit): fails -- the enforcement baseline of this pair.
+    rep = run_all_rules(_change_from_diff(r1_diff, pr_context=True), None)
+    st.check("R1 events: PR context -> corpus+port (no label) FAILS (enforced)",
+             rep.failed is True
+             and any(v.rule.startswith("R1") for v in rep.violations)
+             and rep.informational == [],
+             detail=f"failed={rep.failed} viols={[v.rule for v in rep.violations]} "
+                    f"info={rep.informational}")
+    # Push context: same diff passes; R1 lands in informational, not violations.
+    # (This assertion is RED against the pre-fix code, which enforced R1 on push.)
+    rep = run_all_rules(_change_from_diff(r1_diff, pr_context=False), None)
+    st.check("R1 events: push context -> corpus+port (no label) does NOT fail",
+             rep.failed is False,
+             detail=f"failed={rep.failed} viols={[v.rule for v in rep.violations]}")
+    st.check("R1 events: push context -> R1 reported informationally",
+             len(rep.informational) == 1
+             and rep.informational[0].rule.startswith("R1")
+             and not any(v.rule.startswith("R1") for v in rep.violations),
+             detail=f"info={rep.informational} viols={rep.violations}")
+    # PR context WITH the oracle-first label -> clean in both channels (unchanged).
+    rep = run_all_rules(
+        _change_from_diff(r1_diff, labels=["oracle-first"], pr_context=True), None)
+    st.check("R1 events: PR context WITH oracle-first label -> clean",
+             rep.failed is False
+             and not any(v.rule.startswith("R1") for v in rep.violations)
+             and not any(v.rule.startswith("R1") for v in rep.informational),
+             detail=f"failed={rep.failed} viols={rep.violations} info={rep.informational}")
+    # NO LEAK / no double-count: in push context the R1 finding is in
+    # informational and NOT in the enforced violations.
+    rep = run_all_rules(_change_from_diff(r1_diff, pr_context=False), None)
+    st.check("R1 events: no leak -- informational R1 not also an enforced finding",
+             not any(v.rule.startswith("R1") for v in rep.violations)
+             and len(rep.informational) == 1
+             and rep.informational[0].rule.startswith("R1"),
+             detail=f"viols={[v.rule for v in rep.violations]} "
+                    f"info={[v.rule for v in rep.informational]}")
+    # NO LEAK (other rules): the push downgrade applies to R1 alone. A weakening
+    # token pushed to main in the SAME diff still FAILS, and R1 stays
+    # informational (not also enforced) in that run.
+    r1_mixed = (r1_diff
+                + _diff_for(".github/workflows/x.yml",
+                            ["    continue-on-error" + ": true"]))
+    rep = run_all_rules(_change_from_diff(r1_mixed, pr_context=False), None)
+    st.check("R1 events: push context does NOT downgrade other rules (R2 fails)",
+             rep.failed is True
+             and any(v.rule.startswith("R2") for v in rep.violations)
+             and not any(v.rule.startswith("R1") for v in rep.violations)
+             and len(rep.informational) == 1
+             and rep.informational[0].rule.startswith("R1"),
+             detail=f"failed={rep.failed} viols={[v.rule for v in rep.violations]} "
+                    f"info={[v.rule for v in rep.informational]}")
+    # A clean push run stays clean (no phantom R1 informational findings): corpus
+    # touched but NO port package -> R1 does not fire in either channel.
+    rep = run_all_rules(_change_from_diff(
+        _diff_for("tests/golden_corpus/rc_lowpass/input.xml", ["<y/>"]),
+        pr_context=False), None)
+    st.check("R1 events: corpus-only push run has no R1 findings anywhere",
+             rep.failed is False
+             and not any(v.rule.startswith("R1") for v in rep.informational)
+             and not any(v.rule.startswith("R1") for v in rep.violations),
+             detail=f"info={rep.informational} viols={rep.violations}")
 
     # ---- R2 test-weakening ---------------------------------------------- #
     # Fixture strings are concatenation-split: the assembled runtime value

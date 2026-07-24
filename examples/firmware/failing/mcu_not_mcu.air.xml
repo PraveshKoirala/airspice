@@ -1,0 +1,54 @@
+<system name="firmware_failing_mcu_not_mcu" ir_version="0.1">
+  <metadata>
+    <title>Firmware source whose mcu ref is not MCU-typed</title>
+    <description>Otherwise-valid design; the firmware source names a resistor as its mcu, so it must fail with FIRMWARE_MCU_NOT_MCU (issue #36).</description>
+    <author>AI</author>
+    <created_at>2026-07-24T00:00:00Z</created_at>
+  </metadata>
+  <nets>
+    <net id="gnd" role="ground"/>
+    <net id="3v3" role="power" nominal_voltage="3.3V"/>
+    <net id="soil_sense" role="analog_signal"/>
+  </nets>
+  <components>
+    <component id="R_SOIL_TOP" type="resistor">
+      <value>10k</value>
+      <pin name="1" net="3v3"/>
+      <pin name="2" net="soil_sense"/>
+    </component>
+    <component id="R_SOIL_BOTTOM" type="resistor">
+      <value>10k</value>
+      <pin name="1" net="soil_sense"/>
+      <pin name="2" net="gnd"/>
+    </component>
+    <component id="U_MCU" type="mcu" part="ESP32-C3">
+      <pin name="3V3" net="3v3"/>
+      <pin name="GND" net="gnd"/>
+      <pin name="GPIO4" net="soil_sense" function="ADC1_CH4"/>
+    </component>
+  </components>
+  <firmware mcu="R_SOIL_TOP" language="micropython" entry="main" pins="GPIO4">
+    <source><![CDATA[
+from machine import ADC, Pin
+adc = ADC(Pin(4))
+
+def main():
+    print(adc.read_u16())
+]]></source>
+  </firmware>
+  <tests>
+    <test id="soil_divider_nominal">
+      <setup>
+        <set_voltage net="3v3" value="3.3V"/>
+      </setup>
+      <run duration="10ms"/>
+      <assert_voltage net="soil_sense" min="1.6V" max="1.7V"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="firmware_profile" default="true">
+      <backend type="renode"/>
+      <run test="soil_divider_nominal"/>
+    </profile>
+  </simulation_profiles>
+</system>

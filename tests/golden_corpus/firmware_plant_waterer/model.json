@@ -1,0 +1,184 @@
+{
+  "analog": [],
+  "bridges": [],
+  "components": {
+    "C_SOIL": {
+      "id": "C_SOIL",
+      "part": null,
+      "pins": {
+        "1": {
+          "function": null,
+          "name": "1",
+          "net": "soil_sense"
+        },
+        "2": {
+          "function": null,
+          "name": "2",
+          "net": "gnd"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "capacitor",
+      "value": "100nF"
+    },
+    "R_SOIL_BOTTOM": {
+      "id": "R_SOIL_BOTTOM",
+      "part": null,
+      "pins": {
+        "1": {
+          "function": null,
+          "name": "1",
+          "net": "soil_sense"
+        },
+        "2": {
+          "function": null,
+          "name": "2",
+          "net": "gnd"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "resistor",
+      "value": "10k"
+    },
+    "R_SOIL_TOP": {
+      "id": "R_SOIL_TOP",
+      "part": null,
+      "pins": {
+        "1": {
+          "function": null,
+          "name": "1",
+          "net": "3v3"
+        },
+        "2": {
+          "function": null,
+          "name": "2",
+          "net": "soil_sense"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "resistor",
+      "value": "10k"
+    },
+    "U_MCU": {
+      "id": "U_MCU",
+      "part": "ESP32-C3",
+      "pins": {
+        "3V3": {
+          "function": null,
+          "name": "3V3",
+          "net": "3v3"
+        },
+        "GND": {
+          "function": null,
+          "name": "GND",
+          "net": "gnd"
+        },
+        "GPIO4": {
+          "function": "ADC1_CH4",
+          "name": "GPIO4",
+          "net": "soil_sense"
+        },
+        "GPIO5": {
+          "function": "GPIO_OUT",
+          "name": "GPIO5",
+          "net": "pump_ctrl"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "mcu",
+      "value": null
+    }
+  },
+  "exports": [
+    {
+      "enabled": true,
+      "target": "firmware"
+    }
+  ],
+  "firmware_bindings": {},
+  "firmware_projects": {},
+  "firmware_source": {
+    "entry": "main",
+    "language": "micropython",
+    "mcu": "U_MCU",
+    "pins": [
+      "GPIO4",
+      "GPIO5"
+    ],
+    "source": "\nfrom machine import ADC, Pin\nimport time\n\nadc = ADC(Pin(4))\npump = Pin(5, Pin.OUT)\n\ndef main():\n    while True:\n        mv = adc.read_u16() * 3300 // 65535\n        if mv < 1200:\n            pump.value(1)\n        else:\n            pump.value(0)\n        time.sleep_ms(100)\n"
+  },
+  "firmware_tasks": {},
+  "interfaces": {},
+  "ir_version": "0.1",
+  "metadata": {
+    "author": "AI",
+    "created_at": "2026-07-24T00:00:00Z",
+    "description": "ESP32-C3 reads a soil-moisture divider on ADC and drives a pump GPIO. Carries inline MicroPython firmware source (issue #36).",
+    "title": "Plant Waterer"
+  },
+  "name": "firmware_plant_waterer",
+  "nets": {
+    "3v3": {
+      "id": "3v3",
+      "nominal_voltage": "3.3V",
+      "role": "power"
+    },
+    "gnd": {
+      "id": "gnd",
+      "nominal_voltage": null,
+      "role": "ground"
+    },
+    "pump_ctrl": {
+      "id": "pump_ctrl",
+      "nominal_voltage": null,
+      "role": "digital_signal"
+    },
+    "soil_sense": {
+      "id": "soil_sense",
+      "nominal_voltage": null,
+      "role": "analog_signal"
+    }
+  },
+  "power_domains": {},
+  "requirements": [],
+  "simulation_profiles": {
+    "firmware_profile": {
+      "backends": [
+        "renode"
+      ],
+      "default": true,
+      "id": "firmware_profile",
+      "included_subsystems": [],
+      "properties": {},
+      "tests": [
+        "soil_divider_nominal"
+      ]
+    }
+  },
+  "tests": {
+    "soil_divider_nominal": {
+      "assertions": [
+        {
+          "max": "1.7V",
+          "min": "1.6V",
+          "net": "soil_sense",
+          "op": "assert_voltage"
+        }
+      ],
+      "description": "Half-scale soil divider sits at ~1.65V.",
+      "duration": "10ms",
+      "id": "soil_divider_nominal",
+      "setup": {
+        "3v3": "3.3V"
+      }
+    }
+  }
+}

@@ -30,7 +30,8 @@ import type {
   ValidateKeyResult,
 } from "../types.js";
 
-const API_URL = "https://api.openai.com/v1/chat/completions";
+const DEFAULT_API_URL = "https://api.openai.com/v1/chat/completions";
+const DEFAULT_MODELS_URL = "https://api.openai.com/v1/models";
 
 interface ToolAccumulator {
   id: string;
@@ -47,12 +48,20 @@ export class OpenAIProvider implements AgentProvider {
   private readonly model: string;
   private readonly fetchImpl: typeof fetch;
   private readonly backoff: BackoffConfig;
+  private readonly baseUrl: string;
 
   constructor(opts: ProviderOptions) {
     this.key = opts.apiKey;
     this.model = opts.model ?? this.defaultModel;
-    this.fetchImpl = opts.fetchImpl ?? globalThis.fetch;
+    this.fetchImpl = opts.fetchImpl ?? globalThis.fetch.bind(globalThis);
     this.backoff = opts.retry ?? DEFAULT_BACKOFF;
+    // Base URL defaults to OpenAI standard, but can be overridden for proxies.
+    // Ensure we handle both full endpoints (like /chat/completions) or just host prefixes.
+    let base = opts.baseUrl ?? DEFAULT_API_URL;
+    if (opts.baseUrl && !opts.baseUrl.endsWith("/chat/completions")) {
+      base = base.replace(/\/+$/, "") + "/chat/completions";
+    }
+    this.baseUrl = base;
   }
 
   private headers(key = this.key): Record<string, string> {
@@ -66,7 +75,17 @@ export class OpenAIProvider implements AgentProvider {
     // GET /v1/models is the cheapest authenticated probe: 200 => key works,
     // 401 => bad key. Never echoes the key.
     try {
-      const response = await this.fetchImpl("https://api.openai.com/v1/models", {
+      // If the user provided a custom base URL that looks like a /chat/completions endpoint,
+      // try to derive the /models endpoint. Otherwise fallback to default.
+      let modelsUrl = DEFAULT_MODELS_URL;
+      if (this.baseUrl.endsWith("/chat/completions")) {
+        modelsUrl = this.baseUrl.replace("/chat/completions", "/models");
+      } else if (this.baseUrl !== DEFAULT_API_URL) {
+        // Just a guess for standard proxies. If it fails, the user will see it.
+        modelsUrl = this.baseUrl.replace(/\/+$/, "") + "/models";
+      }
+
+      const response = await this.fetchImpl(modelsUrl, {
         method: "GET",
         headers: { authorization: `Bearer ${key}` },
       });
@@ -90,7 +109,7 @@ export class OpenAIProvider implements AgentProvider {
     try {
       response = await fetchWithRetry(
         () =>
-          this.fetchImpl(API_URL, {
+          this.fetchImpl(this.baseUrl, {
             method: "POST",
             headers: this.headers(),
             body: JSON.stringify(body),

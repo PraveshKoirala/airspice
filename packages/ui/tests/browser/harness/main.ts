@@ -13,7 +13,7 @@
 
 import { simulateLocal } from "../../../src/engine/simulate";
 import { getRun } from "../../../src/engine/waveformStore";
-import { waveformCsv, serializeReportJson } from "air-ts";
+import { waveformCsv, serializeReportJson, parseXmlBytes } from "air-ts";
 
 interface RunDesignOutcome {
   profile: string;
@@ -69,6 +69,24 @@ declare global {
 }
 
 window.__air = { runDesign, _ping: () => "ok" };
+
+// Expose storage layer to test harness
+import { useProjectStore } from "../../../src/storage/projectStore";
+import { useDesignStore } from "../../../src/agent/designStore";
+import { getProject, saveProject, deleteProject, initDatabase, DB_NAME, CURRENT_VERSION } from "../../../src/storage/db";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(window as any).__storage = {
+  useProjectStore,
+  useDesignStore,
+  getProject,
+  saveProject,
+  deleteProject,
+  initDatabase,
+  DB_NAME,
+  CURRENT_VERSION,
+  parseXmlBytes,
+};
 
 const statusEl = document.getElementById("status");
 if (statusEl) statusEl.textContent = "ready";

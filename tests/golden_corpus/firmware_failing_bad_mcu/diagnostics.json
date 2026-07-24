@@ -1,0 +1,18 @@
+{
+  "diagnostics": [
+    {
+      "code": "VAL-001",
+      "domain": "firmware",
+      "expected": {},
+      "id": "diag_00001",
+      "message": "Firmware source references unknown MCU component U_NOPE.",
+      "observed": {},
+      "related_elements": [
+        "U_NOPE"
+      ],
+      "severity": "error",
+      "suggested_actions": []
+    }
+  ],
+  "success": false
+}

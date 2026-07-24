@@ -8,7 +8,7 @@ Describe a device. An agent designs the circuit, writes the firmware, simulates 
 
 This repository is being built by a swarm of implementing agents driven by GitHub issues. The full strategy lives in [docs/NORTH_STAR.md](docs/NORTH_STAR.md) and the pinned roadmap issue. **If you are an implementing agent: read [AGENTS.md](AGENTS.md) before touching anything.**
 
-What works today: the **Python reference engine** (`packages/core`) — parser, validator, SPICE/graph/firmware compilers, ngspice simulation, AI repair loop, CLI and FastAPI server — plus a server-coupled React UI (`packages/ui`). This is the *oracle*, not the product. The product — a fully client-side webapp — is what the roadmap builds, with every port verified against the oracle's frozen golden fixtures.
+What works today: the **Python reference engine** (`packages/core`) — parser, validator, SPICE/graph/firmware compilers, ngspice simulation, AI repair loop, CLI and FastAPI server — plus a local-first React UI (`packages/ui`) backed by the TypeScript engine and Worker/WASM simulation path. The Python implementation remains the *oracle*, not a required product backend; browser ports are verified against its frozen golden fixtures.
 
 ## Architecture (target)
 
@@ -43,7 +43,8 @@ python -m venv .venv && source .venv/bin/activate   # PowerShell: .venv\Scripts\
 pip install -e ".[dev]"          # engine + test deps
 cd packages/ui && npm ci && cd ../..
 npm install                       # convenience scripts (concurrently)
-npm run dev                       # API on :8000 + Vite UI together
+npm run dev:ui                    # zero-backend Vite UI (default local engine)
+npm run dev                       # optional oracle API on :8000 + UI together
 python -m pytest tests/           # full suite
 ```
 
@@ -52,6 +53,13 @@ Everything works with only Python and Node installed. External tool overrides
 from [`.env.example`](.env.example)); missing tools degrade gracefully with
 actionable diagnostics rather than crashing. See
 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the details.
+
+**Agent defaults (dev):** on first open the UI seeds the AI Assistant with an
+OpenAI-compatible local proxy — base URL `http://localhost:8317/v1`, key
+`test-key-123`, model `claude-sonnet-4-6` (see
+`packages/ui/src/agent/proxyDefaults.ts`) — so chat works with zero
+configuration when that proxy is running. Saving your own key/base URL in
+Settings overrides the seed and is never overwritten.
 
 ## Roadmap
 

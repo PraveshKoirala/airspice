@@ -398,26 +398,29 @@ test("cross-source undo/redo: byte-exact XML restoration on undo x4 -> redo x4",
   assert.equal(oD.ok, true, oD.message || "");
   const step4 = oD.xml;
 
-  // History as the store would record it (before, after per commit).
+  function buildReplaceRootPatch(xml) {
+    const cleanXml = xml.replace(/^<\?xml[^>]*\?>\s*/, "");
+    return `<patch><replace path=".">${cleanXml}</replace></patch>`;
+  }
+
+  // History as the store would record it (undo/redo patches per commit).
   const stack = [
-    { before: step0, after: step1 },
-    { before: step1, after: step2 },
-    { before: step2, after: step3 },
-    { before: step3, after: step4 },
+    { undo: buildReplaceRootPatch(step0), redo: buildReplaceRootPatch(step1) },
+    { undo: buildReplaceRootPatch(step1), redo: buildReplaceRootPatch(step2) },
+    { undo: buildReplaceRootPatch(step2), redo: buildReplaceRootPatch(step3) },
+    { undo: buildReplaceRootPatch(step3), redo: buildReplaceRootPatch(step4) },
   ];
 
   // Undo x4 -> byte-exact restoration to step0.
   let cur = step4;
   for (let i = stack.length - 1; i >= 0; i--) {
-    assert.equal(cur, stack[i].after, `pre-undo state at step ${i + 1} must match recorded after`);
-    cur = stack[i].before;
+    cur = applyPatch(cur, stack[i].undo);
   }
   assert.equal(cur, step0, "after four undos, XML must be byte-exact step0");
 
   // Redo x4 -> restore step4 byte-for-byte.
   for (let i = 0; i < stack.length; i++) {
-    assert.equal(cur, stack[i].before);
-    cur = stack[i].after;
+    cur = applyPatch(cur, stack[i].redo);
   }
   assert.equal(cur, step4, "after four redos, XML must be byte-exact step4");
 });

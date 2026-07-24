@@ -8,6 +8,12 @@ tests/golden_corpus/** text eol=lf
 # language stats and mark them as generated so review tooling collapses them.
 tests/golden_corpus/** linguist-generated=true
 
+# Issue #60 backed-model fixtures: the 2N2222 switch design + its byte-exact
+# oracle netlist reference (`bjt_2n2222_switch.expected.cir`) are byte-compared
+# by BOTH the Python and air-ts suites, so a Windows checkout must never rewrite
+# a \n to \r\n and break the diff. Force LF like the corpus/fuzz fixtures.
+tests/spice_models/**  text eol=lf
+
 # Guarantee LF line endings for files executed on Linux CI, so the bash `run:`
 # blocks in workflows and the Python checker never carry a stray CR (\r) that
 # would break shell execution or comparisons on ubuntu-latest.
@@ -18,6 +24,12 @@ tests/golden_corpus/** linguist-generated=true
 
 # PowerShell scripts run on Windows; keep CRLF for them.
 *.ps1   text eol=crlf
+
+# Firmware-source corpus designs (issue #36) carry inline program text inside a
+# <source> CDATA block that MUST round-trip BYTE-EXACT through both engines. A
+# Windows checkout that rewrote \n to \r\n would change the CDATA bytes and the
+# frozen goldens. Force LF so the source content is identical on every platform.
+examples/firmware/**       text eol=lf
 
 # The differential fuzzer (issue #43) archives byte-sensitive fixtures: shrunk
 # reproducers whose recorded model hashes / rejection codes depend on exact

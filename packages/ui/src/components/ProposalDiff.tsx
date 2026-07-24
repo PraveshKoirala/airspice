@@ -12,8 +12,25 @@
  */
 
 import React from "react";
-import { DiffEditor } from "@monaco-editor/react";
+import { DiffEditor, type DiffBeforeMount } from "@monaco-editor/react";
 import { Check, X, GitBranch, AlertTriangle } from "lucide-react";
+
+const handleBeforeMount: DiffBeforeMount = (monaco) => {
+  monaco.editor.defineTheme('premium-dark', {
+    base: 'vs-dark',
+    inherit: true,
+    rules: [
+      { token: 'keyword', foreground: 'c678dd' },
+      { token: 'string', foreground: '98c379' },
+      { token: 'number', foreground: 'd19a66' }
+    ],
+    colors: {
+      'editor.background': '#162131',
+      'diffEditor.insertedTextBackground': '#14b8a620',
+      'diffEditor.removedTextBackground': '#fb718520'
+    }
+  });
+};
 import type { UiProposal } from "../agent/useAgentSession";
 
 interface ProposalDiffProps {
@@ -60,11 +77,12 @@ const ProposalDiff: React.FC<ProposalDiffProps> = ({
 
       {note && <p className="proposal-note">{note}</p>}
 
-      <div className="proposal-diff">
+      <div className="proposal-diff" style={{ border: '1px solid var(--border)', borderRadius: '6px', overflow: 'hidden', boxShadow: '0 4px 12px var(--shadow)' }}>
         <DiffEditor
           height="240px"
           language="xml"
-          theme={theme === "dark" ? "vs-dark" : "light"}
+          theme={theme === "dark" ? "premium-dark" : "light"}
+          beforeMount={handleBeforeMount}
           original={original}
           modified={proposal.validated.xml}
           options={{

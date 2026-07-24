@@ -1,0 +1,213 @@
+{
+  "edges": [
+    {
+      "data": {
+        "net": "soil_sense",
+        "pin": "1"
+      },
+      "id": "R_SOIL_BOTTOM:1->soil_sense",
+      "label": "1",
+      "source": "R_SOIL_BOTTOM",
+      "sourceHandle": "pin:1",
+      "target": "net:soil_sense",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "2"
+      },
+      "id": "R_SOIL_BOTTOM:2->gnd",
+      "label": "2",
+      "source": "R_SOIL_BOTTOM",
+      "sourceHandle": "pin:2",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "3v3",
+        "pin": "1"
+      },
+      "id": "R_SOIL_TOP:1->3v3",
+      "label": "1",
+      "source": "R_SOIL_TOP",
+      "sourceHandle": "pin:1",
+      "target": "net:3v3",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "soil_sense",
+        "pin": "2"
+      },
+      "id": "R_SOIL_TOP:2->soil_sense",
+      "label": "2",
+      "source": "R_SOIL_TOP",
+      "sourceHandle": "pin:2",
+      "target": "net:soil_sense",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "3v3",
+        "pin": "3V3"
+      },
+      "id": "U_MCU:3V3->3v3",
+      "label": "3V3",
+      "source": "U_MCU",
+      "sourceHandle": "pin:3V3",
+      "target": "net:3v3",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "GND"
+      },
+      "id": "U_MCU:GND->gnd",
+      "label": "GND",
+      "source": "U_MCU",
+      "sourceHandle": "pin:GND",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "soil_sense",
+        "pin": "GPIO4"
+      },
+      "id": "U_MCU:GPIO4->soil_sense",
+      "label": "GPIO4",
+      "source": "U_MCU",
+      "sourceHandle": "pin:GPIO4",
+      "target": "net:soil_sense",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "pump_ctrl",
+        "pin": "GPIO5"
+      },
+      "id": "U_MCU:GPIO5->pump_ctrl",
+      "label": "GPIO5",
+      "source": "U_MCU",
+      "sourceHandle": "pin:GPIO5",
+      "target": "net:pump_ctrl",
+      "targetHandle": "net"
+    }
+  ],
+  "nodes": [
+    {
+      "data": {
+        "label": "R_SOIL_BOTTOM",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "1",
+            "net": "soil_sense"
+          },
+          {
+            "function": "",
+            "name": "2",
+            "net": "gnd"
+          }
+        ],
+        "spice_model": "",
+        "type": "resistor",
+        "value": "10k"
+      },
+      "id": "R_SOIL_BOTTOM",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "R_SOIL_TOP",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "1",
+            "net": "3v3"
+          },
+          {
+            "function": "",
+            "name": "2",
+            "net": "soil_sense"
+          }
+        ],
+        "spice_model": "",
+        "type": "resistor",
+        "value": "10k"
+      },
+      "id": "R_SOIL_TOP",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "U_MCU",
+        "part": "ESP32-C3",
+        "pins": [
+          {
+            "function": "",
+            "name": "3V3",
+            "net": "3v3"
+          },
+          {
+            "function": "",
+            "name": "GND",
+            "net": "gnd"
+          },
+          {
+            "function": "ADC1_CH4",
+            "name": "GPIO4",
+            "net": "soil_sense"
+          },
+          {
+            "function": "GPIO_OUT",
+            "name": "GPIO5",
+            "net": "pump_ctrl"
+          }
+        ],
+        "spice_model": "",
+        "type": "mcu",
+        "value": ""
+      },
+      "id": "U_MCU",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "3v3",
+        "role": "power"
+      },
+      "id": "net:3v3",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "gnd",
+        "role": "ground"
+      },
+      "id": "net:gnd",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "pump_ctrl",
+        "role": "digital_signal"
+      },
+      "id": "net:pump_ctrl",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "soil_sense",
+        "role": "analog_signal"
+      },
+      "id": "net:soil_sense",
+      "type": "net"
+    }
+  ]
+}

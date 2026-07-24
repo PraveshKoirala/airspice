@@ -1,0 +1,11 @@
+<system name="overloaded_3v3_rail" ir_version="0.1">
+  <metadata><title>Overloaded 3V3 Rail</title></metadata>
+  <nets><net id="gnd" role="ground"/><net id="bat" role="power" nominal_voltage="3.7V"/><net id="3v3" role="power" nominal_voltage="3.3V"/></nets>
+  <components>
+    <component id="U_REG" type="ldo" part="generic_ldo_3v3"><pin name="in" net="bat"/><pin name="out" net="3v3"/><pin name="gnd" net="gnd"/><property name="vout" value="3.3V"/><property name="iout_max" value="250mA"/><property name="v_dropout" value="200mV"/><property name="iq" value="10uA"/></component>
+    <component id="LOAD_WIFI" type="generic_load"><value>700mA</value><pin name="p" net="3v3"/><pin name="n" net="gnd"/></component>
+  </components>
+  <tests><test id="rail_current"><setup><set_voltage net="bat" value="3.7V"/></setup><run duration="1ms"/><assert_voltage net="3v3" min="3.0V" max="3.6V"/></test></tests>
+  <simulation_profiles><profile id="analog_only"><backend type="ngspice"/><run test="rail_current"/></profile></simulation_profiles>
+</system>
+

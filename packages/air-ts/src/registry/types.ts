@@ -26,6 +26,19 @@ export interface PeripheralSpec {
   [key: string]: unknown;
 }
 
+/**
+ * A part-level SPICE model library entry (registry/imported/*.json, issue #60):
+ * the real, byte-stable `.model` card text captured from a SPICE library, plus
+ * its provenance. Backs a part in validation and is emitted verbatim by the
+ * SPICE compiler. Mirrors the `{card, source}` shape registry.py stores.
+ */
+export interface SpiceModelEntry {
+  /** The canonical `.model NAME TYPE(...)` card, emitted verbatim (single line). */
+  card: string;
+  /** Where the card came from (source library + manufacturer). */
+  source: string;
+}
+
 /** An MCU spec entry (registry/mcu/*.json or a Python built-in). */
 export interface McuSpec {
   part?: string;

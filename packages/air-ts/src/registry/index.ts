@@ -10,9 +10,9 @@
  * collision, the builtin answers when a file is absent. No fs / network I/O.
  */
 
-import type { ComponentSpec, McuSpec } from "./types.js";
+import type { ComponentSpec, McuSpec, SpiceModelEntry } from "./types.js";
 import { BUILTIN_COMPONENTS, BUILTIN_MCUS, PASSIVE_TYPES, SUPPORTED_SPICE_TYPES } from "./builtins.js";
-import { GENERATED_COMPONENT_SPECS, GENERATED_MCUS } from "./data.generated.js";
+import { GENERATED_COMPONENT_SPECS, GENERATED_MCUS, GENERATED_SPICE_MODELS } from "./data.generated.js";
 
 /** Merged MCU registry (built-ins overridden by on-disk registry files). */
 export const MCUS: Record<string, McuSpec> = { ...BUILTIN_MCUS, ...GENERATED_MCUS };
@@ -23,8 +23,17 @@ export const COMPONENT_SPECS: Record<string, ComponentSpec> = {
   ...GENERATED_COMPONENT_SPECS,
 };
 
+/**
+ * Part-level SPICE model library (issue #60): real ``.model`` cards imported
+ * into registry/imported/*.json, keyed by UPPERCASE model name. Mirror of
+ * registry.py `SPICE_MODELS`. Consulted by the SPICE emitter (to EMIT the card)
+ * and the validator (to BACK the part). There are no built-in fallbacks -- the
+ * whole library is the compiled-in generated data.
+ */
+export const SPICE_MODELS: Record<string, SpiceModelEntry> = GENERATED_SPICE_MODELS;
+
 export { PASSIVE_TYPES, SUPPORTED_SPICE_TYPES };
-export type { ComponentSpec, McuSpec, PeripheralSpec } from "./types.js";
+export type { ComponentSpec, McuSpec, PeripheralSpec, SpiceModelEntry } from "./types.js";
 
 /**
  * SPICE builtins ported from `spice.py` (BUILTIN_SPICE_MODELS / _SUBCKTS). Kept

@@ -80,6 +80,25 @@ export function useRepairSession() {
     setStatus("");
   }, []);
 
+  /**
+   * Keyless short-circuit (issue #28): when NO provider is configured at all, the
+   * repair panel calls this instead of `start`. It produces a graceful
+   * provider_error OUTCOME immediately — no provider is constructed, no network
+   * call is made, nothing throws — so the user can always click Run and get an
+   * actionable "add a key" pointer rather than a dead/disabled button.
+   */
+  const signalNoProvider = useCallback((message: string) => {
+    setTimeline([]);
+    setStatus("");
+    setOutcome({
+      reason: "provider_error",
+      message,
+      fixed: false,
+      iterations: 0,
+      totalTokens: 0,
+    });
+  }, []);
+
   const start = useCallback(
     async (config: RepairSessionConfig) => {
       if (running) return;
@@ -87,6 +106,18 @@ export function useRepairSession() {
       setRunning(true);
       const controller = new AbortController();
       abortRef.current = controller;
+      const failBeforeRun = (message: string) => {
+        setOutcome({
+          reason: "provider_error",
+          message,
+          fixed: false,
+          iterations: 0,
+          totalTokens: 0,
+        });
+        setStatus("");
+        setRunning(false);
+        abortRef.current = null;
+      };
 
       // Build the provider: mock replays a fixture; a network provider needs a
       // key from the local vault (never leaves the browser, #17).
@@ -97,18 +128,18 @@ export function useRepairSession() {
         } else {
           const key = vault.get(config.provider);
           if (!key) {
-            setStatus(`No ${config.provider} API key stored. Add one in Settings.`);
-            setRunning(false);
+            failBeforeRun(`No ${config.provider} API key stored. Add one in Settings.`);
             return;
           }
+          const baseUrl = vault.getBaseUrl(config.provider);
           provider = createProvider(config.provider, {
             apiKey: key,
             ...(config.model ? { model: config.model } : {}),
+            ...(baseUrl ? { baseUrl } : {}),
           });
         }
       } catch (err) {
-        setStatus(`Could not start repair: ${(err as Error).message}`);
-        setRunning(false);
+        failBeforeRun(`Could not start repair: ${(err as Error).message}`);
         return;
       }
 
@@ -172,7 +203,14 @@ export function useRepairSession() {
           onEvent,
         });
       } catch (err) {
-        setStatus(`Repair run failed: ${(err as Error).message}`);
+        setOutcome({
+          reason: "error",
+          message: `Repair run failed: ${(err as Error).message}`,
+          fixed: false,
+          iterations: 0,
+          totalTokens: 0,
+        });
+        setStatus("");
       } finally {
         setRunning(false);
         abortRef.current = null;
@@ -181,7 +219,7 @@ export function useRepairSession() {
     [running, reset, applyValidated],
   );
 
-  return { timeline, outcome, running, status, start, stop, reset };
+  return { timeline, outcome, running, status, start, stop, reset, signalNoProvider };
 }
 
 export type { RepairIteration };

@@ -101,9 +101,37 @@ function buildMcus() {
   return mcus;
 }
 
+/**
+ * Part-level SPICE model library: real ``.model`` cards imported into
+ * registry/imported/*.json (issue #60). Mirrors registry.py `load_spice_models`:
+ * key each entry that carries a captured `spice_card` by its UPPERCASED model
+ * name, storing the card text + provenance verbatim. Minimal name+type entries
+ * (no `spice_card`) and `spice_subckt`/`part` stubs are excluded, so those parts
+ * stay UNBACKED exactly as on the Python side (discrimination preserved). Sorted
+ * by model name for a deterministic, byte-stable object literal. The card text is
+ * copied verbatim, so the air-ts emitter and the Python oracle emit identical
+ * ``.model`` bytes for the same design.
+ */
+function buildSpiceModels() {
+  const files = readRegistryDir("imported");
+  const entries = [];
+  for (const { data } of files) {
+    const name = data.spice_model;
+    const card = data.spice_card;
+    if (name && card) {
+      entries.push([String(name).toUpperCase(), { card, source: data.source ?? "" }]);
+    }
+  }
+  entries.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  const models = {};
+  for (const [k, v] of entries) models[k] = v;
+  return models;
+}
+
 function render() {
   const componentSpecs = buildComponentSpecs();
   const mcus = buildMcus();
+  const spiceModels = buildSpiceModels();
   const banner = [
     "/**",
     " * GENERATED FILE - do not edit by hand.",
@@ -119,12 +147,13 @@ function render() {
     " * registry.py's dict(_BUILTIN_...) + per-key file override.",
     " */",
     "",
-    'import type { ComponentSpec, McuSpec } from "./types.js";',
+    'import type { ComponentSpec, McuSpec, SpiceModelEntry } from "./types.js";',
     "",
   ].join("\n");
 
   const specsJson = JSON.stringify(componentSpecs, null, 2);
   const mcusJson = JSON.stringify(mcus, null, 2);
+  const spiceModelsJson = JSON.stringify(spiceModels, null, 2);
 
   return (
     banner +
@@ -135,6 +164,11 @@ function render() {
     "/** MCU specs loaded from registry/mcu/*.json (keyed by part). */\n" +
     "export const GENERATED_MCUS: Record<string, McuSpec> =\n" +
     mcusJson +
+    ";\n\n" +
+    "/** Part-level SPICE .model cards from registry/imported/*.json (keyed by\n" +
+    " * UPPERCASE model name; only entries carrying a captured card). */\n" +
+    "export const GENERATED_SPICE_MODELS: Record<string, SpiceModelEntry> =\n" +
+    spiceModelsJson +
     ";\n"
   );
 }

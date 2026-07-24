@@ -1,0 +1,39 @@
+{
+  "name": "mpy-wasm",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Real MicroPython WASM firmware runtime with a deterministic virtual clock (issue #37). Executes a design's firmware Python (setup()/loop()) through the actual MicroPython WebAssembly port, exposing JS-backed machine.Pin/machine.ADC/time bridges and a FirmwareModel-compatible step() so #38's CoSimOrchestrator can drive firmware ⇄ analog lockstep. No stub interpreter; real Python decides the GPIO.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./worker": {
+      "import": "./src/runtime.worker.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b && tsc -p tsconfig.test.json",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@micropython/micropython-webassembly-pyscript": "1.28.0-6"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "typescript": "~5.6.3",
+    "vite": "^8.0.12",
+    "vitest": "^3.2.4"
+  }
+}

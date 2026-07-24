@@ -1,0 +1,178 @@
+{
+  "analog": [],
+  "bridges": [],
+  "components": {
+    "C_BAT_SENSE": {
+      "id": "C_BAT_SENSE",
+      "part": null,
+      "pins": {
+        "1": {
+          "function": null,
+          "name": "1",
+          "net": "bat_sense"
+        },
+        "2": {
+          "function": null,
+          "name": "2",
+          "net": "gnd"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "capacitor",
+      "value": "100nF"
+    },
+    "R_BAT_BOTTOM": {
+      "id": "R_BAT_BOTTOM",
+      "part": null,
+      "pins": {
+        "1": {
+          "function": null,
+          "name": "1",
+          "net": "bat_sense"
+        },
+        "2": {
+          "function": null,
+          "name": "2",
+          "net": "gnd"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "resistor",
+      "value": "330k"
+    },
+    "R_BAT_TOP": {
+      "id": "R_BAT_TOP",
+      "part": null,
+      "pins": {
+        "1": {
+          "function": null,
+          "name": "1",
+          "net": "bat"
+        },
+        "2": {
+          "function": null,
+          "name": "2",
+          "net": "bat_sense"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "resistor",
+      "value": "1M"
+    },
+    "U_MCU": {
+      "id": "U_MCU",
+      "part": "ESP32-C3",
+      "pins": {
+        "3V3": {
+          "function": null,
+          "name": "3V3",
+          "net": "3v3"
+        },
+        "GND": {
+          "function": null,
+          "name": "GND",
+          "net": "gnd"
+        },
+        "GPIO4": {
+          "function": "ADC1_CH4",
+          "name": "GPIO4",
+          "net": "bat_sense"
+        }
+      },
+      "properties": {},
+      "spice_model": null,
+      "spice_subckt": null,
+      "type": "mcu",
+      "value": null
+    }
+  },
+  "exports": [
+    {
+      "enabled": true,
+      "target": "firmware"
+    }
+  ],
+  "firmware_bindings": {},
+  "firmware_projects": {},
+  "firmware_source": {
+    "entry": "main",
+    "language": "micropython",
+    "mcu": "U_MCU",
+    "pins": [
+      "GPIO4"
+    ],
+    "source": "\nfrom machine import ADC, Pin\nimport time\n\n# guard: the CDATA-end marker ']]>' must survive canonicalization verbatim\nadc = ADC(Pin(4))\n\ndef main():\n    while True:\n        raw = adc.read_u16()\n        mv = raw * 3300 // 65535\n        print('battery_mv', mv)\n        time.sleep_ms(1000)\n"
+  },
+  "firmware_tasks": {},
+  "interfaces": {},
+  "ir_version": "0.1",
+  "metadata": {
+    "author": "AI",
+    "created_at": "2026-07-24T00:00:00Z",
+    "description": "ESP32-C3 samples a battery divider on ADC and prints the millivolts. Firmware source deliberately contains a literal CDATA-end marker to lock byte-exact round-tripping (issue #36).",
+    "title": "Battery Monitor"
+  },
+  "name": "firmware_battery_monitor",
+  "nets": {
+    "3v3": {
+      "id": "3v3",
+      "nominal_voltage": "3.3V",
+      "role": "power"
+    },
+    "bat": {
+      "id": "bat",
+      "nominal_voltage": "3.7V",
+      "role": "power"
+    },
+    "bat_sense": {
+      "id": "bat_sense",
+      "nominal_voltage": null,
+      "role": "analog_signal"
+    },
+    "gnd": {
+      "id": "gnd",
+      "nominal_voltage": null,
+      "role": "ground"
+    }
+  },
+  "power_domains": {},
+  "requirements": [],
+  "simulation_profiles": {
+    "firmware_profile": {
+      "backends": [
+        "renode"
+      ],
+      "default": true,
+      "id": "firmware_profile",
+      "included_subsystems": [],
+      "properties": {},
+      "tests": [
+        "battery_divider_nominal"
+      ]
+    }
+  },
+  "tests": {
+    "battery_divider_nominal": {
+      "assertions": [
+        {
+          "max": "1.0V",
+          "min": "0.85V",
+          "net": "bat_sense",
+          "op": "assert_voltage"
+        }
+      ],
+      "description": "1M/330k divider from 3.7V lands near 0.92V.",
+      "duration": "10ms",
+      "id": "battery_divider_nominal",
+      "setup": {
+        "bat": "3.7V"
+      }
+    }
+  }
+}

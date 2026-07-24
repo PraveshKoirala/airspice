@@ -26,9 +26,9 @@ import type { SystemIR } from "air-ts";
 import { parse } from "air-ts";
 import { useDesignStore } from "../agent/designStore";
 import { useSchematicUI } from "./interaction";
+import { commitPatch } from "./gate";
 import type { GuiHint, SchematicIR } from "./types";
 import {
-  runGate,
   saveHintOp,
   saveHintPatch,
   replaceValuePatch,
@@ -40,7 +40,6 @@ const Inspector: React.FC<{ ir?: SchematicIR | null }> = ({ ir }) => {
   const selection = useSchematicUI((s) => s.selection);
   const clear = useSchematicUI((s) => s.clear);
   const xml = useDesignStore((s) => s.xml);
-  const setUserXml = useDesignStore((s) => s.setUserXml);
 
   // Parse the current design once per xml change; the inspector needs the
   // typed IR to render pin/net details. Failures are surfaced as an empty
@@ -90,13 +89,12 @@ const Inspector: React.FC<{ ir?: SchematicIR | null }> = ({ ir }) => {
   const commit = (patchXml: string, note: string) => {
     setEditError(null);
     const t0 = performance.now();
-    const outcome = runGate(xml, patchXml);
+    const outcome = commitPatch(patchXml, "inspector", note);
     if (!outcome.ok) {
       setEditError(outcome.message);
       setStatus(null);
       return;
     }
-    setUserXml(outcome.xml);
     const dt = Math.round(performance.now() - t0);
     setStatus(`${note} (${dt}ms)`);
   };

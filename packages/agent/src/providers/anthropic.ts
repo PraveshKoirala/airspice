@@ -29,7 +29,7 @@ import type {
   ValidateKeyResult,
 } from "../types.js";
 
-const API_URL = "https://api.anthropic.com/v1/messages";
+const DEFAULT_API_URL = "https://api.anthropic.com/v1/messages";
 const API_VERSION = "2023-06-01";
 
 export class AnthropicProvider implements AgentProvider {
@@ -41,18 +41,24 @@ export class AnthropicProvider implements AgentProvider {
   private readonly model: string;
   private readonly fetchImpl: typeof fetch;
   private readonly backoff: BackoffConfig;
+  private readonly baseUrl: string;
 
   constructor(opts: ProviderOptions) {
     this.key = opts.apiKey;
     this.model = opts.model ?? this.defaultModel;
-    this.fetchImpl = opts.fetchImpl ?? globalThis.fetch;
+    this.fetchImpl = opts.fetchImpl ?? globalThis.fetch.bind(globalThis);
     this.backoff = opts.retry ?? DEFAULT_BACKOFF;
+    let base = opts.baseUrl ?? DEFAULT_API_URL;
+    if (opts.baseUrl && !opts.baseUrl.endsWith("/messages")) {
+      base = base.replace(/\/+$/, "") + "/messages";
+    }
+    this.baseUrl = base;
   }
 
-  private headers(): Record<string, string> {
+  private headers(key = this.key): Record<string, string> {
     return {
       "content-type": "application/json",
-      "x-api-key": this.key,
+      "x-api-key": key,
       "anthropic-version": API_VERSION,
       // Documented CORS opt-in for direct browser calls (ADR 0008). No relay.
       "anthropic-dangerous-direct-browser-access": "true",
@@ -64,14 +70,9 @@ export class AnthropicProvider implements AgentProvider {
     // proves it does not. Any other status is reported as an inconclusive error
     // (never leaking the key).
     try {
-      const response = await this.fetchImpl(API_URL, {
+      const response = await this.fetchImpl(this.baseUrl, {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-api-key": key,
-          "anthropic-version": API_VERSION,
-          "anthropic-dangerous-direct-browser-access": "true",
-        },
+        headers: this.headers(key),
         body: JSON.stringify({
           model: this.model,
           max_tokens: 1,
@@ -101,7 +102,7 @@ export class AnthropicProvider implements AgentProvider {
     try {
       response = await fetchWithRetry(
         () =>
-          this.fetchImpl(API_URL, {
+          this.fetchImpl(this.baseUrl, {
             method: "POST",
             headers: this.headers(),
             body: JSON.stringify(body),

@@ -15,6 +15,7 @@ import type { SystemIR } from "./model.js";
 import { validateAll, serializeDiagnostics as serializeDiagnosticsList } from "./validate/index.js";
 import type { Diagnostic } from "./validate/index.js";
 import { buildGraphData, serializeGraph as serializeGraphIr, type GraphData } from "./emit/graph.js";
+import { emitSchematicSvg } from "./emit/svg.js";
 
 /**
  * Parse AIR XML into the typed SystemIR model.
@@ -93,6 +94,18 @@ export function toGraphJson(xmlText: string): string {
   return serializeGraphIr(ir);
 }
 
+/**
+ * Parse AIR XML and render its schematic-graph to a standalone, deterministic
+ * SVG string (issue #40). Headless replacement for the UI's ELK-placed canvas,
+ * for consumers with no DOM (the MCP `render_schematic` tool). Same design in →
+ * same SVG bytes out.
+ */
+export function toSchematicSvg(xmlText: string): string {
+  const root = parseXml(xmlText);
+  const ir = parseTree(root);
+  return emitSchematicSvg(ir);
+}
+
 export { parseXml };
 export { serializeModel };
 export { canonicalizeTree };
@@ -101,6 +114,10 @@ export { canonicalizeTree };
 // its byte-exact serializer for parity.
 export { buildGraphData, serializeGraph, inferNetRole } from "./emit/graph.js";
 export type { GraphData } from "./emit/graph.js";
+
+// Headless schematic SVG renderer (issue #40): deterministic, dependency-free
+// SVG of the schematic-graph, for consumers with no DOM/ELK (the MCP server).
+export { emitSchematicSvg } from "./emit/svg.js";
 
 // Validation surface (issue #8): the diagnostics contract the agent layer trusts.
 export {
@@ -143,6 +160,24 @@ export {
   BUILTIN_MODEL_CARDS,
 } from "./emit/spice.js";
 export type { SpiceArtifacts, CompileSpiceOptions } from "./emit/spice.js";
+
+// Firmware codegen (port of firmware.py, minus the filesystem): deterministic
+// PlatformIO/Arduino C++ (or MicroPython) source rendered from the design's
+// declarative <firmware> tasks. Consumed by the UI's Firmware tab.
+export {
+  emitFirmware,
+  emitMainCpp,
+  emitMainPy,
+  emitPinmapHeader,
+  firmwarePlatformioSettings,
+  resolveBindings,
+  periodToMs,
+} from "./emit/firmware.js";
+export type {
+  FirmwareFile,
+  PlatformioSettings,
+  ResolvedBinding,
+} from "./emit/firmware.js";
 
 // Simulation report pipeline (issue #14): PURE functions turning the WASM
 // engine's WaveTables + the design IR + the test's assertion specs into a report
@@ -223,3 +258,15 @@ export {
   PatchError,
 } from "./patch/index.js";
 export type { PatchOperation } from "./patch/index.js";
+
+// KiCad 8 Schematic Exporter & SPICE Netlist Importer (Milestone M7)
+export { emitKicadSchematic, exportKicad } from "./emit/kicad.js";
+export type { KicadExportResult } from "./emit/kicad.js";
+export { importSpiceNetlist, parseSpiceNetlistToAirXml } from "./import/spice.js";
+export type {
+  SpiceImportResult,
+  SpiceImportOptions,
+  ParsedSpiceComponent,
+  DroppedLine,
+} from "./import/spice.js";
+

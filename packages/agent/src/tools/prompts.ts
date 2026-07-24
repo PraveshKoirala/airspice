@@ -131,6 +131,11 @@ let _contractCache: string | null = null;
 
 // PORT: prompts.py air_contract() — the full authoritative contract, verbatim
 // (with the registry-derived component/MCU rules spliced in, as in Python).
+// AMENDMENT (browser firmware story): the FIRMWARE block was expanded from the
+// one-line example into a schema cheatsheet covering every construct the
+// validation gate accepts (project/binding/task referential rules, the five
+// task ops, ADC vref constraint) so "add an MCU that reads X and logs it"
+// produces valid <firmware> XML. The rest of the contract text is untouched.
 export function airContract(): string {
   if (_contractCache !== null) return _contractCache;
   _contractCache = `AIR XML AUTHORING CONTRACT (v0.1) - follow EXACTLY; the validator enforces all of this.
@@ -168,17 +173,34 @@ TESTS: <tests> of <test id="..."> with <setup> (<set_voltage net="..." value="..
 <set_current component="..." value="..."/>, <load_step component="..." from="..." to="..." at="..." rise="..."/>),
 <run duration="..."/>, and assertions <assert_voltage net="..." min="..." max="..."/> or
 <assert_current component="..." min="..." max="..."/>. Asserted nets/components MUST exist.
+  - SUPPLY OVERRIDES (critical for multi-condition tests): a test <set_voltage net="X"/>
+    drives net X ONLY if NO voltage_source component already drives X. If a
+    voltage_source is on X, the fixed component source WINS and the test override is
+    SILENTLY IGNORED (two parallel sources would abort the solver). So to sweep a
+    supply across tests (e.g. nominal vs low-battery), do NOT put a voltage_source on
+    that rail — declare it as a bare power net and energize it entirely from each
+    test's <set_voltage>. If you DO declare a fixed voltage_source, every test must
+    assert values consistent with that ONE declared voltage; never add a test that
+    assumes a different supply than the source you placed.
 
 SIMULATION PROFILES: <simulation_profiles> of <profile id="..." default="true">.
   - Each profile MUST contain at least one <backend type="ngspice"/> (or "renode").
   - <run test="..."/> entries MUST reference existing test ids.
   - <include subsystem="..."/> entries MUST reference existing analog subsystems.
 
-FIRMWARE (optional): <firmware><project id="..." target="<mcu id>" framework="arduino" language="cpp">
-<board>...</board></project><binding id="..."><signal name="..."/><component ref="<mcu id>"/>
-<peripheral>ADC1</peripheral><channel>ADC1_CH0</channel><net>...</net></binding>
-<task id="..." target="<project id>"><period>60s</period><read_adc binding="..." into="raw"/>
-<convert expr="..." into="mv"/><log value="mv"/></task></firmware>.
+FIRMWARE (optional; add when asked to program/code the MCU): <firmware> holds three element kinds.
+  <project id="fw_main" target="U_MCU" framework="platformio" language="cpp"><board>esp32-c3-devkitm-1</board></project>
+    - \`target\` MUST be the id of an mcu component; \`language\` is "cpp" (Arduino C++) or "micropython".
+  <binding id="vbat_adc"><signal name="battery_voltage"/><component ref="U_MCU"/>
+  <peripheral>ADC1</peripheral><channel>ADC1_CH4</channel><net>battery_sense</net></binding>
+    - <component ref> and <net> MUST exist; <channel> must match the MCU pin's \`function\`
+      (e.g. <pin name="GPIO4" net="battery_sense" function="ADC1_CH4"/>); keep the bound net at or
+      below the ADC vref (use a divider) or validation fails with ADC_INPUT_EXCEEDS_VREF.
+  <task id="read_battery" target="fw_main"><period>1s</period>[steps]</task>
+    - \`target\` MUST be a declared project id; <period> like "250ms" or "60s". Steps run in order:
+      <read_adc binding="vbat_adc" into="raw"/>, <convert expr="battery_raw_to_mv(raw)" into="mv"/>,
+      <write_gpio pin="GPIO2" value="high"/> (or "low"), <delay duration="100ms"/>, <log value="mv"/>.
+  The UI's Firmware tab renders deterministic source generated from these tasks.
 
 COMMON MISTAKES TO AVOID: using \`name\` instead of \`id\` on nets/components/tests/profiles;
 putting the kind in \`part\` instead of \`type\`; wrapping pins in <pins>; omitting <backend>
@@ -214,6 +236,12 @@ export function chatSystemInstruction(): string {
     "1. NEW design: open with 'Building circuit...', a 1-2 sentence summary, then stage it via 'set_design'.\n" +
     "2. MODIFY existing: open with 'Editing circuit...', a short change summary, then stage via 'propose_patch' (or 'set_design' for a full rewrite).\n" +
     "3. QUESTION: answer conversationally; stage XML only if asked or clearly relevant.\n\n" +
+    "HONESTY ABOUT STAGING: never tell the user a design/patch is staged, ready, or waiting " +
+    "for 'Apply' unless your MOST RECENT 'set_design' or 'propose_patch' call's tool result " +
+    "literally contains `staged: true`. If validation keeps failing and you are running low on " +
+    "turns, say so plainly and list exactly what is still broken (or ask a clarifying question) " +
+    "instead of describing a success you have not confirmed — a false 'click Apply' wastes the " +
+    "user's time on a design that does not exist.\n\n" +
     airContract()
   );
 }

@@ -213,6 +213,39 @@
       "grandfathered": true
     },
     {
+      "code": "VAL-001",
+      "namespace": "firmware",
+      "owner": "validation",
+      "severity": "error",
+      "message_template": "Firmware source references unknown MCU component {mcu}.",
+      "parameters": ["mcu"],
+      "remediation": "Point the <firmware mcu=\"...\"> attribute at an existing <component> id, or add the referenced MCU component to the design.",
+      "source": "packages/core/src/air/validation.py:_validate_firmware_source",
+      "grandfathered": false
+    },
+    {
+      "code": "VAL-002",
+      "namespace": "firmware",
+      "owner": "validation",
+      "severity": "error",
+      "message_template": "Firmware source mcu {mcu} is not an MCU component.",
+      "parameters": ["mcu"],
+      "remediation": "Point the <firmware mcu=\"...\"> attribute at a component whose type is \"mcu\" (not a passive or other part).",
+      "source": "packages/core/src/air/validation.py:_validate_firmware_source",
+      "grandfathered": false
+    },
+    {
+      "code": "VAL-003",
+      "namespace": "firmware",
+      "owner": "validation",
+      "severity": "error",
+      "message_template": "Firmware source declares pin {pin} that is not on MCU {mcu}.",
+      "parameters": ["pin", "mcu"],
+      "remediation": "Remove the pin from the firmware pins manifest, or declare a pin id that exists on the target MCU's registry definition.",
+      "source": "packages/core/src/air/validation.py:_validate_firmware_source",
+      "grandfathered": false
+    },
+    {
       "code": "TEST_SETUP_UNKNOWN_COMPONENT",
       "namespace": "test",
       "owner": "validation",

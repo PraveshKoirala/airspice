@@ -29,10 +29,10 @@ import type {
   SimLadderOutcome,
   WorkerInbound,
   WorkerOutbound,
-} from "./protocol";
-import { classifyStderr } from "./diagnostics";
-import { toWaveTables } from "./result";
-import { CONVERGENCE_LADDER, buildRungNetlist, type LadderRung } from "./ladder";
+} from "./protocol.js";
+import { classifyStderr } from "./diagnostics.js";
+import { toWaveTables } from "./result.js";
+import { CONVERGENCE_LADDER, buildRungNetlist, type LadderRung } from "./ladder.js";
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
 

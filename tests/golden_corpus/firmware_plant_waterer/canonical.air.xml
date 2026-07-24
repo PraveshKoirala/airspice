@@ -1,0 +1,75 @@
+<?xml version="1.0" ?>
+<system ir_version="0.1" name="firmware_plant_waterer">
+  <metadata>
+    <title>Plant Waterer</title>
+    <description>ESP32-C3 reads a soil-moisture divider on ADC and drives a pump GPIO. Carries inline MicroPython firmware source (issue #36).</description>
+    <author>AI</author>
+    <created_at>2026-07-24T00:00:00Z</created_at>
+  </metadata>
+  <nets>
+    <net id="3v3" nominal_voltage="3.3V" role="power"/>
+    <net id="gnd" role="ground"/>
+    <net id="pump_ctrl" role="digital_signal"/>
+    <net id="soil_sense" role="analog_signal"/>
+  </nets>
+  <components>
+    <component id="C_SOIL" type="capacitor">
+      <value>100nF</value>
+      <pin name="1" net="soil_sense"/>
+      <pin name="2" net="gnd"/>
+    </component>
+    <component id="R_SOIL_BOTTOM" type="resistor">
+      <value>10k</value>
+      <pin name="1" net="soil_sense"/>
+      <pin name="2" net="gnd"/>
+    </component>
+    <component id="R_SOIL_TOP" type="resistor">
+      <value>10k</value>
+      <pin name="1" net="3v3"/>
+      <pin name="2" net="soil_sense"/>
+    </component>
+    <component id="U_MCU" part="ESP32-C3" type="mcu">
+      <pin name="3V3" net="3v3"/>
+      <pin name="GND" net="gnd"/>
+      <pin function="ADC1_CH4" name="GPIO4" net="soil_sense"/>
+      <pin function="GPIO_OUT" name="GPIO5" net="pump_ctrl"/>
+    </component>
+  </components>
+  <firmware entry="main" language="micropython" mcu="U_MCU" pins="GPIO4,GPIO5">
+    <source><![CDATA[
+from machine import ADC, Pin
+import time
+
+adc = ADC(Pin(4))
+pump = Pin(5, Pin.OUT)
+
+def main():
+    while True:
+        mv = adc.read_u16() * 3300 // 65535
+        if mv < 1200:
+            pump.value(1)
+        else:
+            pump.value(0)
+        time.sleep_ms(100)
+]]></source>
+  </firmware>
+  <tests>
+    <test id="soil_divider_nominal">
+      <description>Half-scale soil divider sits at ~1.65V.</description>
+      <setup>
+        <set_voltage net="3v3" value="3.3V"/>
+      </setup>
+      <run duration="10ms"/>
+      <assert_voltage max="1.7V" min="1.6V" net="soil_sense"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile default="true" id="firmware_profile">
+      <backend type="renode"/>
+      <run test="soil_divider_nominal"/>
+    </profile>
+  </simulation_profiles>
+  <exports>
+    <export enabled="true" target="firmware"/>
+  </exports>
+</system>

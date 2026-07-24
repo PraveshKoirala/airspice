@@ -82,8 +82,8 @@ describe("SPICE parity: corpus inventory is pinned (fixtures cannot silently van
   // tripwire, not a hard-coded fixture list (guardrails R4). If the corpus
   // legitimately grows via an oracle change, bump these numbers in the same
   // oracle-first PR.
-  it("exactly 5 designs have a netlist and 4 have a probes descriptor", () => {
-    expect(withNetlist.length).toBe(5);
+  it("exactly 8 designs have a netlist and 4 have a probes descriptor", () => {
+    expect(withNetlist.length).toBe(8);
     expect(withProbes.length).toBe(4);
   });
 

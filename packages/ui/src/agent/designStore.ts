@@ -57,3 +57,15 @@ export function designSnapshot(): { xml: string; version: number } {
   const { xml, version } = useDesignStore.getState();
   return { xml, version };
 }
+
+// Dev/test hook: lets Playwright (and the screenshot harness) load a design
+// without driving Monaco. Routes through setUserXml — the human edit path —
+// so version bumps and staleness detection behave exactly like a paste.
+if (import.meta.env.DEV) {
+  (globalThis as Record<string, unknown>).__airSetXml = (xml: string) =>
+    useDesignStore.getState().setUserXml(xml);
+  // Inverse getter so the QA harness can capture the exact design the agent
+  // produced (for triage) without mounting Monaco.
+  (globalThis as Record<string, unknown>).__airGetXml = () =>
+    useDesignStore.getState().xml;
+}

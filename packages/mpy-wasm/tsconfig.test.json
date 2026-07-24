@@ -1,0 +1,25 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    /* rootDir is the monorepo `packages/` dir (one level up), NOT this package.
+       The co-sim integration test imports sim-wasm by a deep relative SOURCE
+       path (../../../sim-wasm/src/cosim.js), which pulls sim-wasm's .ts source
+       tree into THIS type-check program. With a per-package rootDir those files
+       sit outside it and tsc raises TS6059. Widening rootDir to the shared
+       `packages/` ancestor lets the program span the sibling package so the
+       cross-package FirmwareModel drop-in is genuinely type-checked. Safe
+       because this is a noEmit, non-composite type-check-only project (mirrors
+       sim-wasm's own tsconfig.test relaxation, one directory broader). The
+       repo-canonical alternative is a BARE-specifier import (`from "sim-wasm"`
+       -> built dist/*.d.ts, exempt from rootDir) + a project reference, as
+       packages/agent does for air-ts; that would require the test's import path
+       to change. */
+    "rootDir": "..",
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "types": ["vitest/importMeta", "node"]
+  },
+  "include": ["src/**/*.ts", "tests/**/*.ts"]
+}

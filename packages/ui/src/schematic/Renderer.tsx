@@ -46,7 +46,7 @@ import React, {
 } from "react";
 import type { Edge, Node } from "reactflow";
 import type { GuiHint, NetShape, SchematicIR } from "./types";
-import { buildSchematic, GRID, median, segmentPath } from "./layout";
+import { buildSchematic, componentBox, GRID, median, segmentPath } from "./layout";
 import { ComponentSvg } from "./symbols";
 import {
   DRAG_GRID,
@@ -54,24 +54,20 @@ import {
   useSchematicUI,
   type Selection,
 } from "./interaction";
+import "./schematic.css";
 
 const POWER_Y = 92;
-const GROUND_Y = 620;
-const SIGNAL_COLOR = "#0f766e";
-const POWER_COLOR = "#b45309";
-const GROUND_COLOR = "#475569";
 
-function netStroke(role: NetShape["role"]): string {
-  if (role === "power") return POWER_COLOR;
-  if (role === "ground") return GROUND_COLOR;
-  return SIGNAL_COLOR;
-}
+/** Vertical drop from a ground pin to its ground-symbol glyph. */
+const GROUND_DROP = 22;
 
-function netLabelPoint(net: NetShape, minX: number) {
-  if (net.role === "ground") return { x: minX + 8, y: (net.laneY || GROUND_Y) + 20 };
-  if (net.role === "power") return { x: minX + 8, y: (net.laneY || POWER_Y) - 10 };
-  const trunkY = net.trunkY || median(net.points.map((point) => point.y));
-  return { x: net.labelX ?? minX + 132, y: trunkY - 24 };
+/** IEEE-style ground glyph: three shortening horizontal bars. */
+function groundGlyphPath(x: number, y: number): string {
+  return [
+    `M${x - 13} ${y} H${x + 13}`,
+    `M${x - 8} ${y + 5.5} H${x + 8}`,
+    `M${x - 3.5} ${y + 11} H${x + 3.5}`,
+  ].join(" ");
 }
 
 /**
@@ -93,66 +89,6 @@ function NetWires({
   selected?: boolean;
   onSelect?: () => void;
 }) {
-  if (net.points.length === 0) return null;
-  const stroke = netStroke(net.role);
-  type StubMeta = { d: string; kind: "trunk" | "stub"; comp?: string; px?: number; py?: number };
-  const paths: StubMeta[] = [];
-  const junctions: { x: number; y: number }[] = [];
-  const xs = net.points.map((point) => point.x);
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const signalTrunkY = net.trunkY || median(net.points.map((point) => point.y));
-
-  // Dot only at interior T-junctions (stub x strictly between rail endpoints).
-  const addJunction = (x: number, y: number) => {
-    if (x > minX && x < maxX) junctions.push({ x, y });
-  };
-
-  if (net.role === "power") {
-    const railY = net.laneY || POWER_Y;
-    paths.push({ d: segmentPath([{ x: minX, y: railY }, { x: maxX, y: railY }]), kind: "trunk" });
-    net.points.forEach((point) => {
-      paths.push({
-        d: segmentPath([{ x: point.x, y: railY }, point]),
-        kind: "stub",
-        comp: point.component,
-        px: point.x,
-        py: point.y,
-      });
-      addJunction(point.x, railY);
-    });
-  } else if (net.role === "ground") {
-    const railY = net.laneY || GROUND_Y;
-    paths.push({ d: segmentPath([{ x: minX, y: railY }, { x: maxX, y: railY }]), kind: "trunk" });
-    net.points.forEach((point) => {
-      paths.push({
-        d: segmentPath([point, { x: point.x, y: railY }]),
-        kind: "stub",
-        comp: point.component,
-        px: point.x,
-        py: point.y,
-      });
-      addJunction(point.x, railY);
-    });
-  } else if (net.points.length === 1) {
-    // single isolated net -- no wire drawn
-  } else {
-    const trunkY = signalTrunkY;
-    paths.push({ d: segmentPath([{ x: minX, y: trunkY }, { x: maxX, y: trunkY }]), kind: "trunk" });
-    net.points.forEach((point) => {
-      paths.push({
-        d: segmentPath([point, { x: point.x, y: trunkY }]),
-        kind: "stub",
-        comp: point.component,
-        px: point.x,
-        py: point.y,
-      });
-      addJunction(point.x, trunkY);
-    });
-  }
-
-  const uniqueJunctions = [...new Map(junctions.map((p) => [`${p.x}:${p.y}`, p])).values()];
-
   const groupProps: React.SVGProps<SVGGElement> = {
     className: `schematic-net-wire ${net.role}${selected ? " selected" : ""}`,
   };
@@ -163,35 +99,162 @@ function NetWires({
     };
     groupProps.style = { cursor: "pointer" };
   }
+
+  if (net.points.length === 0) return null;
+
+  // ---- Ground nets: no bottom rail. Each pin gets a short stub down to a
+  //      ground-symbol glyph, the way a hand-drawn schematic reads. The
+  //      whole stub+glyph lives in one <g data-kind="gstub"> so the drag
+  //      layer can translate it with its owning component.
+  if (net.role === "ground") {
+    return (
+      <g {...groupProps} data-net-id={net.id}>
+        {net.points.map((point) => {
+          const glyphTop = point.y + GROUND_DROP;
+          return (
+            <g
+              key={`${net.id}:${point.component}:${point.pin}`}
+              className="ground-stub"
+              data-net={net.id}
+              data-kind="gstub"
+              data-comp={point.component}
+            >
+              <path
+                className="wire-stroke"
+                d={`M${point.x} ${point.y} L${point.x} ${glyphTop}`}
+                data-net={net.id}
+              />
+              <path className="ground-glyph" d={groundGlyphPath(point.x, glyphTop)} data-net={net.id} />
+              {onSelect && (
+                <path
+                  className="wire-hitbox"
+                  d={`M${point.x} ${point.y} L${point.x} ${glyphTop + 12}`}
+                  data-net={net.id}
+                  stroke="transparent"
+                  strokeWidth={16}
+                  fill="none"
+                  pointerEvents="stroke"
+                />
+              )}
+              <text className="schematic-gnd-label" x={point.x} y={glyphTop + 26}>
+                {net.label}
+              </text>
+            </g>
+          );
+        })}
+      </g>
+    );
+  }
+
+  type StubMeta = {
+    d: string;
+    kind: "trunk" | "stub";
+    comp?: string;
+    px?: number;
+    py?: number;
+    fixedY?: number;
+  };
+  const paths: StubMeta[] = [];
+  const xs = net.points.map((point) => point.x);
+  const ys = net.points.map((point) => point.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const signalTrunkY = net.trunkY || median(ys);
+
+  // Junction-dot rule: a dot marks any point where three or more wire ends
+  // meet. Every stub lands one end on the trunk at its x; the trunk itself
+  // contributes two ends at an interior point (it passes through), one at
+  // its endpoints, and none when it is degenerate (all pins share an x).
+  const landings: number[] = [];
+  const addJunction = (x: number) => {
+    landings.push(x);
+  };
+
+  // Degenerate (zero-length) segments keep their <path> element -- the drag
+  // layer needs the stamped data-pin-* coords -- but render no geometry.
+  const seg = (a: { x: number; y: number }, b: { x: number; y: number }): string =>
+    a.x === b.x && a.y === b.y ? "" : segmentPath([a, b]);
+
+  const trunkLineY = net.role === "power" ? net.laneY || POWER_Y : signalTrunkY;
+
+  if (net.role === "power") {
+    paths.push({ d: seg({ x: minX, y: trunkLineY }, { x: maxX, y: trunkLineY }), kind: "trunk", fixedY: trunkLineY });
+    net.points.forEach((point) => {
+      paths.push({
+        d: seg({ x: point.x, y: trunkLineY }, point),
+        kind: "stub",
+        comp: point.component,
+        px: point.x,
+        py: point.y,
+      });
+      addJunction(point.x);
+    });
+  } else if (net.points.length === 1) {
+    // single isolated net -- no wire drawn
+  } else {
+    paths.push({ d: seg({ x: minX, y: trunkLineY }, { x: maxX, y: trunkLineY }), kind: "trunk" });
+    net.points.forEach((point) => {
+      paths.push({
+        d: seg(point, { x: point.x, y: trunkLineY }),
+        kind: "stub",
+        comp: point.component,
+        px: point.x,
+        py: point.y,
+      });
+      addJunction(point.x);
+    });
+  }
+
+  const landingCounts = new Map<number, number>();
+  landings.forEach((x) => landingCounts.set(x, (landingCounts.get(x) || 0) + 1));
+  const uniqueJunctions: { x: number; y: number }[] = [];
+  landingCounts.forEach((stubEnds, x) => {
+    const trunkEnds = minX === maxX ? 0 : x > minX && x < maxX ? 2 : 1;
+    if (stubEnds + trunkEnds >= 3) uniqueJunctions.push({ x, y: trunkLineY });
+  });
+
+  const labelPos =
+    net.role === "power"
+      ? { x: minX, y: trunkLineY - 9 }
+      : minX === maxX
+      ? // Degenerate (vertical) trunk: hang the label just right of the wire.
+        { x: minX + 12, y: (Math.min(...ys) + Math.max(...ys)) / 2 + 4 }
+      : { x: net.labelX ?? minX + 132, y: signalTrunkY - 9 };
+
   return (
     <g {...groupProps} data-net-id={net.id}>
-      {paths.map((seg, index) => (
+      {paths.map((segMeta, index) => (
         <React.Fragment key={`${net.id}:${index}`}>
-          <path
-            className="wire-underlay"
-            d={seg.d}
-            data-net={net.id}
-            data-kind={seg.kind}
-            data-underlay={1}
-            {...(seg.comp !== undefined ? { "data-comp": seg.comp } : {})}
-            {...(seg.px !== undefined ? { "data-pin-x": seg.px } : {})}
-            {...(seg.py !== undefined ? { "data-pin-y": seg.py } : {})}
-          />
+          {segMeta.d && (
+            <path
+              className="wire-underlay"
+              d={segMeta.d}
+              data-underlay={1}
+              data-net={net.id}
+              data-kind={segMeta.kind}
+              {...(segMeta.comp !== undefined ? { "data-comp": segMeta.comp } : {})}
+              {...(segMeta.px !== undefined ? { "data-pin-x": segMeta.px } : {})}
+              {...(segMeta.py !== undefined ? { "data-pin-y": segMeta.py } : {})}
+              {...(segMeta.fixedY !== undefined ? { "data-fixed-y": segMeta.fixedY } : {})}
+              pointerEvents="none"
+            />
+          )}
           <path
             className="wire-stroke"
-            d={seg.d}
-            stroke={stroke}
+            d={segMeta.d}
             data-net={net.id}
-            data-kind={seg.kind}
-            {...(seg.comp !== undefined ? { "data-comp": seg.comp } : {})}
-            {...(seg.px !== undefined ? { "data-pin-x": seg.px } : {})}
-            {...(seg.py !== undefined ? { "data-pin-y": seg.py } : {})}
+            data-kind={segMeta.kind}
+            {...(segMeta.comp !== undefined ? { "data-comp": segMeta.comp } : {})}
+            {...(segMeta.px !== undefined ? { "data-pin-x": segMeta.px } : {})}
+            {...(segMeta.py !== undefined ? { "data-pin-y": segMeta.py } : {})}
+            {...(segMeta.fixedY !== undefined ? { "data-fixed-y": segMeta.fixedY } : {})}
           />
           {/* Wider transparent hitbox so click-to-select tolerates thin wires. */}
-          {onSelect && (
+          {onSelect && segMeta.d && (
             <path
               className="wire-hitbox"
-              d={seg.d}
+              d={segMeta.d}
+              data-net={net.id}
               stroke="transparent"
               strokeWidth={12}
               fill="none"
@@ -201,11 +264,13 @@ function NetWires({
         </React.Fragment>
       ))}
       {uniqueJunctions.map((p) => (
-        <circle className="schematic-junction" key={`${net.id}:${p.x}:${p.y}`} cx={p.x} cy={p.y} r="5" />
+        <circle className="schematic-junction" key={`${net.id}:${p.x}:${p.y}`} cx={p.x} cy={p.y} r="4" />
       ))}
-      <text className={`schematic-net-label ${net.role}`} x={netLabelPoint(net, minX).x} y={netLabelPoint(net, minX).y}>
-        {net.label}
-      </text>
+      {net.points.length > 1 && (
+        <text className={`schematic-net-label ${net.role}`} x={labelPos.x} y={labelPos.y}>
+          {net.label}
+        </text>
+      )}
     </g>
   );
 }
@@ -327,6 +392,20 @@ const Renderer: React.FC<RendererProps> = ({
   const onCursorRef = useRef<RendererProps["onCursor"]>(onCursor);
   useEffect(() => {
     schematicRef.current = schematic;
+  }, [schematic]);
+  // Whenever a freshly laid-out schematic renders, clear any residual
+  // drag-preview transforms (component groups and ground-stub groups get
+  // `style.transform` set imperatively during a drag; React doesn't own
+  // that property, so it must be reset by hand).
+  useEffect(() => {
+    if (!schematic) return;
+    const svg = svgRef.current;
+    if (!svg) return;
+    svg
+      .querySelectorAll<SVGGElement>('g[data-component-id], g[data-kind="gstub"]')
+      .forEach((g) => {
+        if (g.style.transform) g.style.transform = "";
+      });
   }, [schematic]);
   useEffect(() => {
     onCommitMoveRef.current = onCommitMove;
@@ -464,6 +543,66 @@ const Renderer: React.FC<RendererProps> = ({
   const netHighlighted = (id: string) => highlightedNets.has(id);
 
   // ------------------------------------------------------------------
+  // Fit-to-content viewBox. The old renderer used `0 0 width height`
+  // from the layout, which letterboxed the drawing into a thin band.
+  // Instead we compute the tight bounding box of everything drawn
+  // (symbol bodies, side labels, rails, ground glyphs) plus padding, so
+  // the schematic fills the pane at the largest crisp scale.
+  // ------------------------------------------------------------------
+  const viewBox = useMemo(() => {
+    const fallback = { x: 0, y: 0, w: 960, h: 540 };
+    if (!schematic || schematic.components.length === 0) return fallback;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    const include = (x: number, y: number) => {
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    };
+    schematic.components.forEach((c) => {
+      const box = componentBox(c.type, c.orientation, c.pins);
+      const sideLabelled =
+        ["resistor", "capacitor", "diode", "generic_load"].includes(c.type) && c.orientation === "vertical";
+      const extraLeft = sideLabelled && c.labelSide !== "right" ? 110 : 0;
+      const extraRight = sideLabelled && c.labelSide === "right" ? 110 : 0;
+      include(c.x - box.width / 2 - extraLeft, c.y - box.height / 2 - 26);
+      include(c.x + box.width / 2 + extraRight, c.y + box.height / 2 + 26);
+    });
+    schematic.nets.forEach((net) => {
+      net.points.forEach((p) => include(p.x, p.y));
+      if (net.role === "power" && net.points.length > 0) {
+        include(net.points[0].x, (net.laneY || POWER_Y) - 26);
+      }
+      if (net.role === "ground") {
+        net.points.forEach((p) => include(p.x, p.y + GROUND_DROP + 32));
+      }
+    });
+    if (!Number.isFinite(minX)) return fallback;
+    const PAD = 40;
+    minX -= PAD;
+    minY -= PAD + 26; // extra headroom under the floating titlebar
+    maxX += PAD;
+    maxY += PAD;
+    // Don't over-zoom tiny designs: enforce a minimum world size.
+    const MIN_W = 520;
+    const MIN_H = 380;
+    let w = maxX - minX;
+    let h = maxY - minY;
+    if (w < MIN_W) {
+      minX -= (MIN_W - w) / 2;
+      w = MIN_W;
+    }
+    if (h < MIN_H) {
+      minY -= (MIN_H - h) / 2;
+      h = MIN_H;
+    }
+    return { x: minX, y: minY, w, h };
+  }, [schematic]);
+
+  // ------------------------------------------------------------------
   // Drag state (transform-layer preview; ZERO React re-renders per frame)
   // ------------------------------------------------------------------
   //
@@ -476,6 +615,14 @@ const Renderer: React.FC<RendererProps> = ({
   interface DragState {
     kind: "component";
     ids: Set<string>;
+    /** The component the press started on + its selection state / shift key,
+     *  so a zero-movement drop can complete the click-select contract
+     *  (plain click selects just it; shift-click toggles it off). The click
+     *  event itself is unreliable here: pointer capture retargets it to the
+     *  <svg>, where it would read as a background click. */
+    pressedId: string;
+    pressWasSelected: boolean;
+    pressShift: boolean;
     startX: number;
     startY: number;
     pendingDx: number;
@@ -519,6 +666,13 @@ const Renderer: React.FC<RendererProps> = ({
   }
   const dragRef = useRef<DragState | MarqueeState | WireState | null>(null);
 
+  // Pointer capture retargets the synthetic click that follows every
+  // press/drag to the <svg> element, which `backgroundClick` would treat
+  // as "clicked the background -> clear the selection". Any pointer
+  // interaction that must NOT clear (component press, pin press, marquee
+  // release) arms this flag; backgroundClick consumes it once.
+  const suppressBackgroundClickRef = useRef(false);
+
   const svgClientToUser = (event: PointerEvent | React.PointerEvent): { x: number; y: number } => {
     const svg = svgRef.current;
     if (!svg) return { x: 0, y: 0 };
@@ -534,8 +688,8 @@ const Renderer: React.FC<RendererProps> = ({
     const offX = (rect.width - drawnW) / 2;
     const offY = (rect.height - drawnH) / 2;
     return {
-      x: (event.clientX - rect.left - offX) / scale,
-      y: (event.clientY - rect.top - offY) / scale,
+      x: viewBox.x + (event.clientX - rect.left - offX) / scale,
+      y: viewBox.y + (event.clientY - rect.top - offY) / scale,
     };
   };
 
@@ -606,6 +760,16 @@ const Renderer: React.FC<RendererProps> = ({
     //    by (dx, dy). Trunks are redrawn as a straight horizontal line
     //    at the median of the (now offset) pin ys of the net's pins.
     state.netsTouched.forEach((netId) => {
+      // Ground stubs (stub + glyph in one group) simply translate with
+      // their owning component -- no trunk to recompute.
+      const gstubs = svg.querySelectorAll<SVGGElement>(
+        `g[data-net="${cssEscape(netId)}"][data-kind="gstub"]`,
+      );
+      gstubs.forEach((g) => {
+        const comp = g.getAttribute("data-comp") || "";
+        if (state.ids.has(comp)) g.style.transform = `translate(${dx}px, ${dy}px)`;
+      });
+
       // Collect all pin-ys for this net across the CURRENT rendered
       // schematic. For each pin, if its owning component is being
       // dragged, offset it by (dx, dy); otherwise use the stored pin
@@ -613,6 +777,7 @@ const Renderer: React.FC<RendererProps> = ({
       const stubs = svg.querySelectorAll<SVGPathElement>(
         `path[data-net="${cssEscape(netId)}"][data-kind="stub"]`,
       );
+      if (stubs.length === 0) return;
       const stubMeta: Array<{ el: SVGPathElement; px: number; py: number; moving: boolean }> = [];
       stubs.forEach((el) => {
         const px = Number(el.getAttribute("data-pin-x")) || 0;
@@ -650,8 +815,12 @@ const Renderer: React.FC<RendererProps> = ({
       const trunks = svg.querySelectorAll<SVGPathElement>(
         `path[data-net="${cssEscape(netId)}"][data-kind="trunk"]`,
       );
+      // Power rails carry data-fixed-y: the rail stays put during a drag
+      // and only the stubs stretch. Signal trunks follow the pin median.
+      const fixedYAttr = trunks.length > 0 ? trunks[0].getAttribute("data-fixed-y") : null;
+      const railY = fixedYAttr ? Number(fixedYAttr) : trunkYNow;
       trunks.forEach((el) => {
-        el.setAttribute("d", `M${minX} ${trunkYNow} L${maxX} ${trunkYNow}`);
+        el.setAttribute("d", `M${minX} ${railY} L${maxX} ${railY}`);
       });
 
       // Stubs: rewrite each to a straight line from its pin end (offset if
@@ -660,7 +829,7 @@ const Renderer: React.FC<RendererProps> = ({
       stubMeta.forEach((m) => {
         const px = m.moving ? m.px + dx : m.px;
         const py = m.moving ? m.py + dy : m.py;
-        m.el.setAttribute("d", `M${px} ${py} L${px} ${trunkYNow}`);
+        m.el.setAttribute("d", `M${px} ${py} L${px} ${railY}`);
       });
     });
   }, []);
@@ -682,10 +851,12 @@ const Renderer: React.FC<RendererProps> = ({
     (id: string, event: React.PointerEvent<SVGGElement>) => {
       if (!interactive) return;
       if (event.button !== 0) return;
+      suppressBackgroundClickRef.current = true;
       // Determine the selection set that will move. If the pointer-down
       // component is NOT already in the selection, replace the selection
       // with just this component before the drag starts.
       const current = useSchematicUI.getState().selectedComponents;
+      const pressWasSelected = current.has(id);
       let movingIds = new Set(current);
       if (!current.has(id)) {
         if (event.shiftKey) {
@@ -720,6 +891,9 @@ const Renderer: React.FC<RendererProps> = ({
       dragRef.current = {
         kind: "component",
         ids: movingIds,
+        pressedId: id,
+        pressWasSelected,
+        pressShift: event.shiftKey,
         startX: start.x,
         startY: start.y,
         pendingDx: 0,
@@ -743,6 +917,7 @@ const Renderer: React.FC<RendererProps> = ({
     (compId: string, pinName: string, event: React.PointerEvent<SVGCircleElement>) => {
       if (!interactive) return;
       if (event.button !== 0) return;
+      suppressBackgroundClickRef.current = true;
       event.stopPropagation();
       event.preventDefault();
       const svg = svgRef.current;
@@ -792,6 +967,8 @@ const Renderer: React.FC<RendererProps> = ({
         target.tagName === "svg" ||
         target.getAttribute("data-role") === "canvas-bg";
       if (!isBackground) return;
+      // A genuine background press: the click that follows may clear.
+      suppressBackgroundClickRef.current = false;
       const svg = svgRef.current;
       if (!svg) return;
       try {
@@ -937,6 +1114,9 @@ const Renderer: React.FC<RendererProps> = ({
           if (isClick) {
             if (!state.shift) clear();
           } else {
+            // A real marquee: the synthetic click that follows must not
+            // clear the selection we are about to make.
+            suppressBackgroundClickRef.current = true;
             const inside = ir.components
               .filter((c) => c.x >= x0 && c.x <= x1 && c.y >= y0 && c.y <= y1)
               .map((c) => c.id);
@@ -968,6 +1148,15 @@ const Renderer: React.FC<RendererProps> = ({
         // Force a re-render to restore React-owned wire `d` values that our
         // pointer-move handler mutated in-place.
         setSchematic((s) => (s ? { ...s } : s));
+        // Complete the click-select contract here: the component's own
+        // onClick never fires because pointer capture retargets the click
+        // to the <svg>. A plain click selects just this component; a
+        // shift-click on an already-selected one toggles it off.
+        if (state.pressShift) {
+          if (state.pressWasSelected) toggleComponent(state.pressedId);
+        } else {
+          selectComponent(state.pressedId);
+        }
         return;
       }
       const commit = onCommitMoveRef.current;
@@ -996,7 +1185,7 @@ const Renderer: React.FC<RendererProps> = ({
       // via the parent's `hints` prop update; that fresh state will
       // overwrite our DOM mutations naturally.
     },
-    [clear, endDrag, replaceComponentSelection, rollbackDom],
+    [clear, endDrag, replaceComponentSelection, rollbackDom, selectComponent, toggleComponent],
   );
 
   const onSvgPointerCancel = useCallback((event: React.PointerEvent<SVGSVGElement>) => {
@@ -1032,9 +1221,15 @@ const Renderer: React.FC<RendererProps> = ({
 
   const backgroundClick = interactive
     ? (event: React.MouseEvent<SVGSVGElement>) => {
-        // If a drag was just released the pointerup handler above already
-        // ran; this click either follows a genuine background click or a
-        // marquee release that intentionally left the selection alone.
+        // Pointer capture makes the click that follows ANY press/drag
+        // target the <svg>, so "the click landed on the background" is not
+        // enough to know the user actually clicked the background. Presses
+        // that started on a component/pin (and real marquee releases) arm
+        // the suppression flag; consume it here instead of clearing.
+        if (suppressBackgroundClickRef.current) {
+          suppressBackgroundClickRef.current = false;
+          return;
+        }
         const target = event.target as Element | null;
         if (!target) return;
         const isBackground =
@@ -1050,8 +1245,7 @@ const Renderer: React.FC<RendererProps> = ({
     <div className="schematic-canvas svg-schematic-canvas">
       <div className="schematic-titlebar">
         <div>
-          <span className="eyebrow">Schematic Canvas</span>
-          <strong>Auto-routed electrical drawing</strong>
+          <strong>Schematic</strong>
         </div>
         <div className="schematic-legend" aria-label="schematic legend">
           <span className="legend power">Power</span>
@@ -1063,7 +1257,7 @@ const Renderer: React.FC<RendererProps> = ({
         <svg
           ref={svgRef}
           className="native-schematic"
-          viewBox={`0 0 ${schematic.width} ${schematic.height}`}
+          viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`}
           role="img"
           aria-label="AIR schematic"
           onClick={backgroundClick}
@@ -1075,15 +1269,40 @@ const Renderer: React.FC<RendererProps> = ({
         >
           <defs>
             <pattern id="schematic-grid" width={GRID} height={GRID} patternUnits="userSpaceOnUse">
-              <path d={`M${GRID} 0H0V${GRID}`} fill="none" stroke="#e4e9f1" strokeWidth="1" />
+              <path className="sch-grid-minor" d={`M${GRID} 0H0V${GRID}`} fill="none" />
+            </pattern>
+            <pattern
+              id="schematic-grid-major"
+              width={GRID * 5}
+              height={GRID * 5}
+              patternUnits="userSpaceOnUse"
+            >
+              <path className="sch-grid-major" d={`M${GRID * 5} 0H0V${GRID * 5}`} fill="none" />
             </pattern>
           </defs>
-          <rect
-            width="100%"
-            height="100%"
-            fill="url(#schematic-grid)"
-            data-role="canvas-bg"
-          />
+          {/* The grid rect bleeds far past the viewBox so the letterbox
+              areas (aspect-ratio mismatch between pane and drawing) show
+              the same seamless grid instead of a dead band. */}
+          {(() => {
+            const bleed = 2 * Math.max(viewBox.w, viewBox.h);
+            const gx = viewBox.x - bleed;
+            const gy = viewBox.y - bleed;
+            const gw = viewBox.w + bleed * 2;
+            const gh = viewBox.h + bleed * 2;
+            return (
+              <>
+                <rect x={gx} y={gy} width={gw} height={gh} fill="url(#schematic-grid)" data-role="canvas-bg" />
+                <rect
+                  x={gx}
+                  y={gy}
+                  width={gw}
+                  height={gh}
+                  fill="url(#schematic-grid-major)"
+                  pointerEvents="none"
+                />
+              </>
+            );
+          })()}
           <g className="wire-layer">
             {schematic.nets.map((net) => {
               const highlighted = netHighlighted(net.id);

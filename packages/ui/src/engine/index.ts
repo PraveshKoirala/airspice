@@ -7,11 +7,9 @@
  * it is chosen ONCE, at build time, by the `VITE_ENGINE` env:
  *
  *   VITE_ENGINE=local   -> air-ts in a Web Worker (zero backend, computed in
- *                          the browser). The browser-first demo of the TS
- *                          engine, selectable in dev via `VITE_ENGINE=local`.
- *   VITE_ENGINE=server  -> the existing FastAPI backend over axios. This is the
- *                          DEFAULT (unset === "server") until M2, so nothing
- *                          changes for existing users until we flip it.
+ *                          the browser). This is the zero-backend DEFAULT.
+ *   VITE_ENGINE=server  -> the optional FastAPI reference backend over axios,
+ *                          selected explicitly for oracle/development work.
  *
  * Build-time tree-shaking (issue #86): the `./adapter` import below is a
  * SEAM. `vite.config.ts` `resolve.alias` swaps it for `./adapter.local` or
@@ -36,10 +34,10 @@ export { NotImplementedError } from './types';
 export { getWaveform, getRun } from './waveformStore';
 export type { RetainedWaveform, RunWaveforms } from './waveformStore';
 
-/** Resolve the configured engine mode, defaulting to "server". */
+/** Resolve the configured engine mode, defaulting to the zero-backend local engine. */
 export function resolveEngineMode(): EngineMode {
   const raw = (import.meta.env.VITE_ENGINE ?? '').toString().trim().toLowerCase();
-  return raw === 'local' ? 'local' : 'server';
+  return raw === 'server' ? 'server' : 'local';
 }
 
 let singleton: AirEngine | null = null;

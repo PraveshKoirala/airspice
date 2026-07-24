@@ -19,11 +19,13 @@ export interface ModelCatalogEntry {
   models: readonly string[];
 }
 
-// PROVENANCE: gemini-3.5-flash and gpt-4o-mini mirror prompts.py's
-// DEFAULT_GEMINI_MODEL / DEFAULT_OPENAI_MODEL. claude-sonnet-5 is from issue #17.
-// The house-agent lane (issue #20) owns its own model tier (the Worker enforces
-// it), so `house` is intentionally excluded from this catalog too — the
-// SettingsPanel BYOK picker only iterates the network providers below.
+// PROVENANCE: the openai lane defaults to the local OpenAI-compatible proxy's
+// strongest tool-calling model (the proxy at localhost:8317 serves the ids
+// below alongside stock OpenAI ids, which remain as free-text options).
+// claude-sonnet-5 is from issue #17. The house-agent lane (issue #20) owns its
+// own model tier (the Worker enforces it), so `house` is intentionally excluded
+// from this catalog too — the SettingsPanel BYOK picker only iterates the
+// network providers below.
 export const MODEL_CATALOG: Record<Exclude<ProviderId, "mock" | "house">, ModelCatalogEntry> = {
   anthropic: {
     defaultModel: "claude-sonnet-5",
@@ -34,8 +36,22 @@ export const MODEL_CATALOG: Record<Exclude<ProviderId, "mock" | "house">, ModelC
     models: ["gemini-3.5-flash", "gemini-3.5-pro", "gemini-2.5-flash"],
   },
   openai: {
-    defaultModel: "gpt-4o-mini",
-    models: ["gpt-4o-mini", "gpt-4o", "gpt-4.1", "o4-mini"],
+    // Gemini pro leads the list: the local proxy's Claude/gpt-oss tiers
+    // rate-limit hard under sustained use (429 model_cooldown), while the
+    // Gemini tiers stay available. Any entry here is selectable in Settings.
+    defaultModel: "gemini-3.1-pro-low",
+    models: [
+      "gemini-3.1-pro-low",
+      "gemini-pro-agent",
+      "gemini-3-flash",
+      "claude-sonnet-4-6",
+      "claude-opus-4-6-thinking",
+      "gpt-oss-120b-medium",
+      "gpt-4o-mini",
+      "gpt-4o",
+      "gpt-4.1",
+      "o4-mini",
+    ],
   },
 };
 

@@ -1,0 +1,45 @@
+<system name="voltage_divider" ir_version="0.1">
+  <metadata>
+    <title>5V Halving Voltage Divider</title>
+    <description>A simple resistor divider that halves a 5V input to 2.5V using two 10k resistors.</description>
+    <author>AIR Architect</author>
+    <created_at>2024-05-18T10:00:00Z</created_at>
+  </metadata>
+  <nets>
+    <net id="v_in" role="power" nominal_voltage="5V"/>
+    <net id="v_mid" role="analog_signal" nominal_voltage="2.5V"/>
+    <net id="gnd" role="ground"/>
+  </nets>
+  <components>
+    <component id="V1" type="voltage_source">
+      <value>5V</value>
+      <pin name="p" net="v_in"/>
+      <pin name="n" net="gnd"/>
+    </component>
+    <component id="R1" type="resistor">
+      <value>10k</value>
+      <pin name="1" net="v_in"/>
+      <pin name="2" net="v_mid"/>
+    </component>
+    <component id="R2" type="resistor">
+      <value>10k</value>
+      <pin name="1" net="v_mid"/>
+      <pin name="2" net="gnd"/>
+    </component>
+  </components>
+  <tests>
+    <test id="check_midpoint_voltage">
+      <setup>
+        <set_voltage net="v_in" value="5V"/>
+      </setup>
+      <run duration="1ms"/>
+      <assert_voltage net="v_mid" min="2.49V" max="2.51V"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="basic_sim" default="true">
+      <backend type="ngspice"/>
+      <run test="check_midpoint_voltage"/>
+    </profile>
+  </simulation_profiles>
+</system>

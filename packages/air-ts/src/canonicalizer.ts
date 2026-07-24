@@ -22,7 +22,7 @@
  * to stay byte-identical to CPython's minidom.
  */
 
-import { type XmlElement, type XmlNode } from "./xml.js";
+import { type XmlElement, type XmlNode, elementText } from "./xml.js";
 import { cloneElement } from "./normalizer.js";
 
 const SECTION_ORDER = [
@@ -59,6 +59,43 @@ const ID_SORTED_SECTIONS = new Set<string>([
 // AFTER the last <pin> child (or, if the component has no <pin>, after
 // <value>; failing that, at the front). Mirrors the Python canonicalizer's
 // `_order_component_children` in packages/core/src/air/canonicalizer.py.
+
+// Firmware inline source (issue #36): a <firmware>/<source> program must survive
+// canonicalization BYTE-EXACT and be re-emitted as CDATA. The minidom-style
+// pretty pipeline (block layout + blank-line strip) would reindent the text and
+// DROP blank lines inside the program, corrupting it. PARITY with
+// canonicalizer.py: before serializing we swap each source element's text for a
+// unique one-line MARKER (emitted inline as <source>MARKER</source>, surviving
+// the blank-line strip); AFTER the strip+join we substitute the marker for the
+// raw source wrapped in CDATA, split-escaping any literal "]]>" as
+// "]]]]><![CDATA[>" so it round-trips. The marker never reaches the output, so
+// determinism holds and the final bytes are identical to the Python oracle's.
+const CDATA_OPEN = "<![CDATA[";
+const CDATA_CLOSE = "]]>";
+
+/** Split-escape a literal "]]>" so `source` is safe inside one CDATA run. */
+function escapeCdata(source: string): string {
+  return source.split(CDATA_CLOSE).join("]]]]><![CDATA[>");
+}
+
+/** A random marker token, mirroring canonicalizer.py's uuid-based marker. */
+function makeSourceMarker(): string {
+  let hex = "";
+  while (hex.length < 32) hex += Math.floor(Math.random() * 0x100000000).toString(16).padStart(8, "0");
+  return "AIRSPICEFWSRC" + hex.slice(0, 32);
+}
+
+/** Collect every <source> child of every <firmware> element (any depth). */
+function collectFirmwareSources(el: XmlElement, out: Set<XmlElement>): void {
+  if (el.tag === "firmware") {
+    for (const child of el.children) {
+      if (child.kind === "element" && child.tag === "source") out.add(child);
+    }
+  }
+  for (const child of el.children) {
+    if (child.kind === "element") collectFirmwareSources(child, out);
+  }
+}
 
 /** Canonicalize a raw element tree to the byte-exact canonical XML string. */
 export function canonicalizeTree(rawRoot: XmlElement): string {
@@ -104,7 +141,11 @@ export function canonicalizeTree(rawRoot: XmlElement): string {
     }
   }
 
-  return serializeMinidomStyle(root);
+  // Collect firmware source elements so the serializer emits them as byte-exact
+  // CDATA instead of reindented, blank-line-stripped escaped text (issue #36).
+  const firmwareSources = new Set<XmlElement>();
+  collectFirmwareSources(root, firmwareSources);
+  return serializeMinidomStyle(root, firmwareSources);
 }
 
 function orderComponentChildren(component: XmlElement): void {
@@ -169,10 +210,16 @@ function sortAttributes(el: XmlElement): void {
  * After ET.tostring re-parses through minidom, an element with empty text has
  * no text child and self-closes; whitespace-only text is preserved inline.
  */
-export function serializeMinidomStyle(root: XmlElement): string {
+export function serializeMinidomStyle(
+  root: XmlElement,
+  firmwareSources: Set<XmlElement> = new Set(),
+): string {
   const lines: string[] = [];
   lines.push('<?xml version="1.0" ?>');
-  writeElement(root, 0, lines);
+  // Marker->CDATA substitutions for firmware source blocks (issue #36), applied
+  // AFTER the blank-line strip so blank lines inside the program survive.
+  const sourceSubs = new Map<string, string>();
+  writeElement(root, 0, lines, firmwareSources, sourceSubs);
   // Drop blank lines (Python: `pretty.splitlines()` keeps lines whose strip()
   // is truthy), join, add \n. The split must run over the FULL pretty string,
   // not the pushed chunks: a text run containing embedded newlines (from &#10;
@@ -186,12 +233,37 @@ export function serializeMinidomStyle(root: XmlElement): string {
     .join("\n")
     .split("\n")
     .filter((line) => line.trim() !== "");
-  return kept.join("\n") + "\n";
+  let result = kept.join("\n") + "\n";
+  // Re-inject byte-exact firmware source (issue #36). The marker line was
+  // <source>MARKER</source>; it becomes <source><![CDATA[...]]></source>.
+  for (const [marker, cdata] of sourceSubs) {
+    result = result.replace(marker, cdata);
+  }
+  return result;
 }
 
-function writeElement(el: XmlElement, depth: number, lines: string[]): void {
+function writeElement(
+  el: XmlElement,
+  depth: number,
+  lines: string[],
+  firmwareSources: Set<XmlElement>,
+  sourceSubs: Map<string, string>,
+): void {
   const indent = "  ".repeat(depth);
   const open = openTag(el);
+
+  // Firmware source block (issue #36): emit a one-line MARKER inline; the raw
+  // program text, wrapped in CDATA (with "]]>" split-escaped), is substituted
+  // back AFTER the blank-line strip so its blank lines / tabs / trailing spaces
+  // survive byte-exact. Mirrors canonicalizer.py's markerize step. elementText
+  // concatenates the source's text runs exactly like ElementTree `.text`.
+  if (firmwareSources.has(el)) {
+    const raw = elementText(el);
+    const marker = makeSourceMarker();
+    sourceSubs.set(marker, CDATA_OPEN + escapeCdata(raw) + CDATA_CLOSE);
+    lines.push(`${indent}<${open}>${marker}</${el.tag}>`);
+    return;
+  }
 
   const childNodes = el.children;
   const elementChildren = childNodes.filter(
@@ -225,7 +297,7 @@ function writeElement(el: XmlElement, depth: number, lines: string[]): void {
   lines.push(`${indent}<${open}>`);
   for (const child of childNodes) {
     if (child.kind === "element") {
-      writeElement(child, depth + 1, lines);
+      writeElement(child, depth + 1, lines, firmwareSources, sourceSubs);
     } else {
       // A text run between element children. minidom would indent it; blank
       // lines are stripped afterwards, so pure-whitespace runs produce nothing.
@@ -309,10 +381,15 @@ function escapeText(s: string): string {
  * normalize (it serializes the in-memory tree directly, no expat re-parse), so
  * serialize.ts stays as is and matches ITS oracle stage.
  *
- * (Literal tabs/newlines in the ORIGINAL input's attributes are normalized to
- * spaces by expat at parse time; FXP does not reproduce that -- the pre-#43
- * parse-time edge, out of corpus scope. This function handles the chars that
- * reach the tree via char refs, which both parsers preserve into the tree.)
+ * PARITY (#76): a LITERAL tab/newline/CR in the ORIGINAL input's attributes is
+ * normalized to a space by expat at parse time -- and air-ts now reproduces that
+ * BEFORE this function runs, via xml.ts's normalizeXmlWhitespace (issue #76). So
+ * by the time an attribute value reaches escapeAttr, any literal whitespace is
+ * already normalized. This function therefore handles only the chars that reach
+ * the tree via CHARACTER REFERENCES (&#9;/&#10;/&#13;), which expat -- and thus
+ * both parsers -- preserve verbatim into the tree; the line-ending normalization
+ * below matches the minidom re-parse that the oracle canonicalizer performs on
+ * those char-ref-injected CRs.
  */
 function escapeAttr(s: string): string {
   return s

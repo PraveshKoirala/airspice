@@ -1,0 +1,1002 @@
+[
+  {
+    "id": "mcu-001-esp32c3-vbat_monitor",
+    "title": "ESP32-C3 vbat monitor",
+    "category": "mcu",
+    "mcu": "ESP32-C3",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a 6V battery voltage monitor built around a ESP32-C3 (RISC-V). Regulate 6V down to the 3.3V logic rail with an LDO, and use a resistor divider to scale the raw 6V battery down to well under the MCU's 3.3V ADC reference. Probe the divider midpoint. Write firmware that reads the battery voltage on an ADC pin every 1 seconds, converts the raw count to millivolts, and logs it."
+  },
+  {
+    "id": "mcu-002-esp32wroom32-vbat_monitor",
+    "title": "ESP32-WROOM-32 vbat monitor",
+    "category": "mcu",
+    "mcu": "ESP32-WROOM-32",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a 6V battery voltage monitor built around a ESP32-WROOM-32. Regulate 6V down to the 3.3V logic rail with an LDO, and use a resistor divider to scale the raw 6V battery down to well under the MCU's 3.3V ADC reference. Probe the divider midpoint. Write firmware that reads the battery voltage on an ADC pin every 1 seconds, converts the raw count to millivolts, and logs it."
+  },
+  {
+    "id": "mcu-003-atmega328p-vbat_monitor",
+    "title": "ATmega328P vbat monitor",
+    "category": "mcu",
+    "mcu": "ATmega328P",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a 6V battery voltage monitor built around a ATmega328P (Arduino Uno). Regulate 6V down to the 5V logic rail with an LDO, and use a resistor divider to scale the raw 6V battery down to well under the MCU's 5V ADC reference. Probe the divider midpoint. Write firmware that reads the battery voltage on an ADC pin every 1 seconds, converts the raw count to millivolts, and logs it."
+  },
+  {
+    "id": "mcu-004-stm32f103-vbat_monitor",
+    "title": "STM32F103 vbat monitor",
+    "category": "mcu",
+    "mcu": "STM32F103",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a 6V battery voltage monitor built around a STM32F103 (Blue Pill). Regulate 6V down to the 3.3V logic rail with an LDO, and use a resistor divider to scale the raw 6V battery down to well under the MCU's 3.3V ADC reference. Probe the divider midpoint. Write firmware that reads the battery voltage on an ADC pin every 1 seconds, converts the raw count to millivolts, and logs it."
+  },
+  {
+    "id": "mcu-005-esp32c3-thermistor",
+    "title": "ESP32-C3 thermistor",
+    "category": "mcu",
+    "mcu": "ESP32-C3",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Build an NTC thermistor temperature sensor node using a ESP32-C3 (RISC-V) on a 3.3V rail. Put the 10k NTC thermistor (model it as a resistor) in a divider with a 10k fixed resistor between 3.3V and ground so the sense node stays under 3.3V, and probe the sense node. Firmware should sample the thermistor voltage on an ADC channel every 2 seconds, convert to a temperature estimate, and log the value."
+  },
+  {
+    "id": "mcu-006-esp32wroom32-thermistor",
+    "title": "ESP32-WROOM-32 thermistor",
+    "category": "mcu",
+    "mcu": "ESP32-WROOM-32",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Build an NTC thermistor temperature sensor node using a ESP32-WROOM-32 on a 3.3V rail. Put the 10k NTC thermistor (model it as a resistor) in a divider with a 10k fixed resistor between 3.3V and ground so the sense node stays under 3.3V, and probe the sense node. Firmware should sample the thermistor voltage on an ADC channel every 2 seconds, convert to a temperature estimate, and log the value."
+  },
+  {
+    "id": "mcu-007-atmega328p-thermistor",
+    "title": "ATmega328P thermistor",
+    "category": "mcu",
+    "mcu": "ATmega328P",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Build an NTC thermistor temperature sensor node using a ATmega328P (Arduino Uno) on a 5V rail. Put the 10k NTC thermistor (model it as a resistor) in a divider with a 10k fixed resistor between 5V and ground so the sense node stays under 5V, and probe the sense node. Firmware should sample the thermistor voltage on an ADC channel every 2 seconds, convert to a temperature estimate, and log the value."
+  },
+  {
+    "id": "mcu-008-stm32f103-thermistor",
+    "title": "STM32F103 thermistor",
+    "category": "mcu",
+    "mcu": "STM32F103",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Build an NTC thermistor temperature sensor node using a STM32F103 (Blue Pill) on a 3.3V rail. Put the 10k NTC thermistor (model it as a resistor) in a divider with a 10k fixed resistor between 3.3V and ground so the sense node stays under 3.3V, and probe the sense node. Firmware should sample the thermistor voltage on an ADC channel every 2 seconds, convert to a temperature estimate, and log the value."
+  },
+  {
+    "id": "mcu-009-esp32c3-photocell",
+    "title": "ESP32-C3 photocell",
+    "category": "mcu",
+    "mcu": "ESP32-C3",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Create an ambient-light sensor using a ESP32-C3 (RISC-V). Model a photoresistor (LDR) as a resistor in a divider with a fixed resistor from 3.3V to ground, keeping the sense node below the 3.3V ADC reference, and probe it. The firmware reads the light level on an ADC pin every 1 seconds and logs a brightness value."
+  },
+  {
+    "id": "mcu-010-esp32wroom32-photocell",
+    "title": "ESP32-WROOM-32 photocell",
+    "category": "mcu",
+    "mcu": "ESP32-WROOM-32",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Create an ambient-light sensor using a ESP32-WROOM-32. Model a photoresistor (LDR) as a resistor in a divider with a fixed resistor from 3.3V to ground, keeping the sense node below the 3.3V ADC reference, and probe it. The firmware reads the light level on an ADC pin every 1 seconds and logs a brightness value."
+  },
+  {
+    "id": "mcu-011-atmega328p-photocell",
+    "title": "ATmega328P photocell",
+    "category": "mcu",
+    "mcu": "ATmega328P",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Create an ambient-light sensor using a ATmega328P (Arduino Uno). Model a photoresistor (LDR) as a resistor in a divider with a fixed resistor from 5V to ground, keeping the sense node below the 5V ADC reference, and probe it. The firmware reads the light level on an ADC pin every 1 seconds and logs a brightness value."
+  },
+  {
+    "id": "mcu-012-stm32f103-photocell",
+    "title": "STM32F103 photocell",
+    "category": "mcu",
+    "mcu": "STM32F103",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Create an ambient-light sensor using a STM32F103 (Blue Pill). Model a photoresistor (LDR) as a resistor in a divider with a fixed resistor from 3.3V to ground, keeping the sense node below the 3.3V ADC reference, and probe it. The firmware reads the light level on an ADC pin every 1 seconds and logs a brightness value."
+  },
+  {
+    "id": "mcu-013-esp32c3-potentiometer",
+    "title": "ESP32-C3 potentiometer",
+    "category": "mcu",
+    "mcu": "ESP32-C3",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a rotary knob input for a ESP32-C3 (RISC-V). Model a potentiometer as a two-resistor divider from 3.3V to ground (wiper at the midpoint, kept under 3.3V) and probe the wiper. Firmware samples the wiper on an ADC channel every 1 seconds and logs the position."
+  },
+  {
+    "id": "mcu-014-esp32wroom32-potentiometer",
+    "title": "ESP32-WROOM-32 potentiometer",
+    "category": "mcu",
+    "mcu": "ESP32-WROOM-32",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a rotary knob input for a ESP32-WROOM-32. Model a potentiometer as a two-resistor divider from 3.3V to ground (wiper at the midpoint, kept under 3.3V) and probe the wiper. Firmware samples the wiper on an ADC channel every 1 seconds and logs the position."
+  },
+  {
+    "id": "mcu-015-atmega328p-potentiometer",
+    "title": "ATmega328P potentiometer",
+    "category": "mcu",
+    "mcu": "ATmega328P",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a rotary knob input for a ATmega328P (Arduino Uno). Model a potentiometer as a two-resistor divider from 5V to ground (wiper at the midpoint, kept under 5V) and probe the wiper. Firmware samples the wiper on an ADC channel every 1 seconds and logs the position."
+  },
+  {
+    "id": "mcu-016-stm32f103-potentiometer",
+    "title": "STM32F103 potentiometer",
+    "category": "mcu",
+    "mcu": "STM32F103",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a rotary knob input for a STM32F103 (Blue Pill). Model a potentiometer as a two-resistor divider from 3.3V to ground (wiper at the midpoint, kept under 3.3V) and probe the wiper. Firmware samples the wiper on an ADC channel every 1 seconds and logs the position."
+  },
+  {
+    "id": "mcu-017-esp32c3-dual_adc",
+    "title": "ESP32-C3 dual adc",
+    "category": "mcu",
+    "mcu": "ESP32-C3",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Build a dual-channel analog acquisition board on a ESP32-C3 (RISC-V) at 3.3V. Provide two independent resistor dividers from 3.3V to ground, each producing a distinct midpoint voltage under 3.3V, and probe both. Firmware reads both ADC channels every 1 seconds, converts each to millivolts, and logs both readings."
+  },
+  {
+    "id": "mcu-018-esp32wroom32-dual_adc",
+    "title": "ESP32-WROOM-32 dual adc",
+    "category": "mcu",
+    "mcu": "ESP32-WROOM-32",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Build a dual-channel analog acquisition board on a ESP32-WROOM-32 at 3.3V. Provide two independent resistor dividers from 3.3V to ground, each producing a distinct midpoint voltage under 3.3V, and probe both. Firmware reads both ADC channels every 1 seconds, converts each to millivolts, and logs both readings."
+  },
+  {
+    "id": "mcu-019-atmega328p-dual_adc",
+    "title": "ATmega328P dual adc",
+    "category": "mcu",
+    "mcu": "ATmega328P",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Build a dual-channel analog acquisition board on a ATmega328P (Arduino Uno) at 5V. Provide two independent resistor dividers from 5V to ground, each producing a distinct midpoint voltage under 5V, and probe both. Firmware reads both ADC channels every 1 seconds, converts each to millivolts, and logs both readings."
+  },
+  {
+    "id": "mcu-020-stm32f103-dual_adc",
+    "title": "STM32F103 dual adc",
+    "category": "mcu",
+    "mcu": "STM32F103",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Build a dual-channel analog acquisition board on a STM32F103 (Blue Pill) at 3.3V. Provide two independent resistor dividers from 3.3V to ground, each producing a distinct midpoint voltage under 3.3V, and probe both. Firmware reads both ADC channels every 1 seconds, converts each to millivolts, and logs both readings."
+  },
+  {
+    "id": "mcu-021-esp32c3-rail_selfmonitor",
+    "title": "ESP32-C3 rail selfmonitor",
+    "category": "mcu",
+    "mcu": "ESP32-C3",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a power-supply supervisor: a 9V input feeds an LDO producing the 3.3V rail for a ESP32-C3 (RISC-V), with input and output bypass capacitors. A resistor divider scales the 9V input down under 3.3V into an ADC pin so the MCU can watch its own input voltage; probe that divider. Firmware reads the input-rail ADC every 5 seconds, converts to millivolts, and logs it."
+  },
+  {
+    "id": "mcu-022-esp32wroom32-rail_selfmonitor",
+    "title": "ESP32-WROOM-32 rail selfmonitor",
+    "category": "mcu",
+    "mcu": "ESP32-WROOM-32",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a power-supply supervisor: a 9V input feeds an LDO producing the 3.3V rail for a ESP32-WROOM-32, with input and output bypass capacitors. A resistor divider scales the 9V input down under 3.3V into an ADC pin so the MCU can watch its own input voltage; probe that divider. Firmware reads the input-rail ADC every 5 seconds, converts to millivolts, and logs it."
+  },
+  {
+    "id": "mcu-023-atmega328p-rail_selfmonitor",
+    "title": "ATmega328P rail selfmonitor",
+    "category": "mcu",
+    "mcu": "ATmega328P",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a power-supply supervisor: a 9V input feeds an LDO producing the 5V rail for a ATmega328P (Arduino Uno), with input and output bypass capacitors. A resistor divider scales the 9V input down under 5V into an ADC pin so the MCU can watch its own input voltage; probe that divider. Firmware reads the input-rail ADC every 5 seconds, converts to millivolts, and logs it."
+  },
+  {
+    "id": "mcu-024-stm32f103-rail_selfmonitor",
+    "title": "STM32F103 rail selfmonitor",
+    "category": "mcu",
+    "mcu": "STM32F103",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a power-supply supervisor: a 9V input feeds an LDO producing the 3.3V rail for a STM32F103 (Blue Pill), with input and output bypass capacitors. A resistor divider scales the 9V input down under 3.3V into an ADC pin so the MCU can watch its own input voltage; probe that divider. Firmware reads the input-rail ADC every 5 seconds, converts to millivolts, and logs it."
+  },
+  {
+    "id": "mcu-025-esp32c3-led_blinker",
+    "title": "ESP32-C3 led blinker",
+    "category": "mcu",
+    "mcu": "ESP32-C3",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": false,
+    "prompt": "Make a status-LED blinker on a ESP32-C3 (RISC-V) running from 3.3V. Drive an LED through a current-limiting resistor from a GPIO output pin to ground. The firmware should toggle the GPIO high for 250ms then low for 250ms in a loop to blink the LED."
+  },
+  {
+    "id": "mcu-026-esp32wroom32-led_blinker",
+    "title": "ESP32-WROOM-32 led blinker",
+    "category": "mcu",
+    "mcu": "ESP32-WROOM-32",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": false,
+    "prompt": "Make a status-LED blinker on a ESP32-WROOM-32 running from 3.3V. Drive an LED through a current-limiting resistor from a GPIO output pin to ground. The firmware should toggle the GPIO high for 250ms then low for 250ms in a loop to blink the LED."
+  },
+  {
+    "id": "mcu-027-atmega328p-led_blinker",
+    "title": "ATmega328P led blinker",
+    "category": "mcu",
+    "mcu": "ATmega328P",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": false,
+    "prompt": "Make a status-LED blinker on a ATmega328P (Arduino Uno) running from 5V. Drive an LED through a current-limiting resistor from a GPIO output pin to ground. The firmware should toggle the GPIO high for 250ms then low for 250ms in a loop to blink the LED."
+  },
+  {
+    "id": "mcu-028-stm32f103-led_blinker",
+    "title": "STM32F103 led blinker",
+    "category": "mcu",
+    "mcu": "STM32F103",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": false,
+    "prompt": "Make a status-LED blinker on a STM32F103 (Blue Pill) running from 3.3V. Drive an LED through a current-limiting resistor from a GPIO output pin to ground. The firmware should toggle the GPIO high for 250ms then low for 250ms in a loop to blink the LED."
+  },
+  {
+    "id": "mcu-029-esp32c3-mosfet_load",
+    "title": "ESP32-C3 mosfet load",
+    "category": "mcu",
+    "mcu": "ESP32-C3",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": false,
+    "prompt": "Design a high-side... actually low-side load switch driven by a ESP32-C3 (RISC-V) on 3.3V. A GPIO output drives the gate of an N-channel MOSFET through a gate resistor; the MOSFET switches a resistive load (model it as a generic load) connected to a 3.3V rail. Firmware turns the load on for 500ms and off for 500ms repeatedly by toggling the GPIO."
+  },
+  {
+    "id": "mcu-030-esp32wroom32-mosfet_load",
+    "title": "ESP32-WROOM-32 mosfet load",
+    "category": "mcu",
+    "mcu": "ESP32-WROOM-32",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": false,
+    "prompt": "Design a high-side... actually low-side load switch driven by a ESP32-WROOM-32 on 3.3V. A GPIO output drives the gate of an N-channel MOSFET through a gate resistor; the MOSFET switches a resistive load (model it as a generic load) connected to a 3.3V rail. Firmware turns the load on for 500ms and off for 500ms repeatedly by toggling the GPIO."
+  },
+  {
+    "id": "mcu-031-atmega328p-mosfet_load",
+    "title": "ATmega328P mosfet load",
+    "category": "mcu",
+    "mcu": "ATmega328P",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": false,
+    "prompt": "Design a high-side... actually low-side load switch driven by a ATmega328P (Arduino Uno) on 5V. A GPIO output drives the gate of an N-channel MOSFET through a gate resistor; the MOSFET switches a resistive load (model it as a generic load) connected to a 5V rail. Firmware turns the load on for 500ms and off for 500ms repeatedly by toggling the GPIO."
+  },
+  {
+    "id": "mcu-032-stm32f103-mosfet_load",
+    "title": "STM32F103 mosfet load",
+    "category": "mcu",
+    "mcu": "STM32F103",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": false,
+    "prompt": "Design a high-side... actually low-side load switch driven by a STM32F103 (Blue Pill) on 3.3V. A GPIO output drives the gate of an N-channel MOSFET through a gate resistor; the MOSFET switches a resistive load (model it as a generic load) connected to a 3.3V rail. Firmware turns the load on for 500ms and off for 500ms repeatedly by toggling the GPIO."
+  },
+  {
+    "id": "mcu-033-esp32c3-i2c_node",
+    "title": "ESP32-C3 i2c node",
+    "category": "mcu",
+    "mcu": "ESP32-C3",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Build an I2C sensor node around a ESP32-C3 (RISC-V). Bring out the I2C SDA and SCL lines with 4.7k pull-up resistors to the 3.3V rail, and add a resistor divider from 3.3V to ground (under 3.3V) into an ADC pin as an auxiliary analog input; probe the divider. Firmware samples the aux ADC every 1 seconds and logs it."
+  },
+  {
+    "id": "mcu-034-esp32wroom32-i2c_node",
+    "title": "ESP32-WROOM-32 i2c node",
+    "category": "mcu",
+    "mcu": "ESP32-WROOM-32",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Build an I2C sensor node around a ESP32-WROOM-32. Bring out the I2C SDA and SCL lines with 4.7k pull-up resistors to the 3.3V rail, and add a resistor divider from 3.3V to ground (under 3.3V) into an ADC pin as an auxiliary analog input; probe the divider. Firmware samples the aux ADC every 1 seconds and logs it."
+  },
+  {
+    "id": "mcu-035-atmega328p-i2c_node",
+    "title": "ATmega328P i2c node",
+    "category": "mcu",
+    "mcu": "ATmega328P",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Build an I2C sensor node around a ATmega328P (Arduino Uno). Bring out the I2C SDA and SCL lines with 4.7k pull-up resistors to the 5V rail, and add a resistor divider from 5V to ground (under 5V) into an ADC pin as an auxiliary analog input; probe the divider. Firmware samples the aux ADC every 1 seconds and logs it."
+  },
+  {
+    "id": "mcu-036-stm32f103-i2c_node",
+    "title": "STM32F103 i2c node",
+    "category": "mcu",
+    "mcu": "STM32F103",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Build an I2C sensor node around a STM32F103 (Blue Pill). Bring out the I2C SDA and SCL lines with 4.7k pull-up resistors to the 3.3V rail, and add a resistor divider from 3.3V to ground (under 3.3V) into an ADC pin as an auxiliary analog input; probe the divider. Firmware samples the aux ADC every 1 seconds and logs it."
+  },
+  {
+    "id": "mcu-037-esp32c3-heartbeat_plus_sense",
+    "title": "ESP32-C3 heartbeat plus sense",
+    "category": "mcu",
+    "mcu": "ESP32-C3",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a sensor node with a heartbeat LED on a ESP32-C3 (RISC-V) at 3.3V. Include a resistor divider from 3.3V to ground (kept under 3.3V) into an ADC pin and probe it, plus an LED with series resistor on a GPIO output. Firmware reads the ADC every 2 seconds, logs the value, and toggles the heartbeat LED each cycle."
+  },
+  {
+    "id": "mcu-038-esp32wroom32-heartbeat_plus_sense",
+    "title": "ESP32-WROOM-32 heartbeat plus sense",
+    "category": "mcu",
+    "mcu": "ESP32-WROOM-32",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a sensor node with a heartbeat LED on a ESP32-WROOM-32 at 3.3V. Include a resistor divider from 3.3V to ground (kept under 3.3V) into an ADC pin and probe it, plus an LED with series resistor on a GPIO output. Firmware reads the ADC every 2 seconds, logs the value, and toggles the heartbeat LED each cycle."
+  },
+  {
+    "id": "mcu-039-atmega328p-heartbeat_plus_sense",
+    "title": "ATmega328P heartbeat plus sense",
+    "category": "mcu",
+    "mcu": "ATmega328P",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a sensor node with a heartbeat LED on a ATmega328P (Arduino Uno) at 5V. Include a resistor divider from 5V to ground (kept under 5V) into an ADC pin and probe it, plus an LED with series resistor on a GPIO output. Firmware reads the ADC every 2 seconds, logs the value, and toggles the heartbeat LED each cycle."
+  },
+  {
+    "id": "mcu-040-stm32f103-heartbeat_plus_sense",
+    "title": "STM32F103 heartbeat plus sense",
+    "category": "mcu",
+    "mcu": "STM32F103",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a sensor node with a heartbeat LED on a STM32F103 (Blue Pill) at 3.3V. Include a resistor divider from 3.3V to ground (kept under 3.3V) into an ADC pin and probe it, plus an LED with series resistor on a GPIO output. Firmware reads the ADC every 2 seconds, logs the value, and toggles the heartbeat LED each cycle."
+  },
+  {
+    "id": "mcu-041-esp32c3-vbat_monitor",
+    "title": "ESP32-C3 vbat monitor",
+    "category": "mcu",
+    "mcu": "ESP32-C3",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a 9V battery voltage monitor built around a ESP32-C3 (RISC-V). Regulate 9V down to the 3.3V logic rail with an LDO, and use a resistor divider to scale the raw 9V battery down to well under the MCU's 3.3V ADC reference. Probe the divider midpoint. Write firmware that reads the battery voltage on an ADC pin every 2 seconds, converts the raw count to millivolts, and logs it."
+  },
+  {
+    "id": "mcu-042-esp32wroom32-vbat_monitor",
+    "title": "ESP32-WROOM-32 vbat monitor",
+    "category": "mcu",
+    "mcu": "ESP32-WROOM-32",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a 9V battery voltage monitor built around a ESP32-WROOM-32. Regulate 9V down to the 3.3V logic rail with an LDO, and use a resistor divider to scale the raw 9V battery down to well under the MCU's 3.3V ADC reference. Probe the divider midpoint. Write firmware that reads the battery voltage on an ADC pin every 2 seconds, converts the raw count to millivolts, and logs it."
+  },
+  {
+    "id": "mcu-043-atmega328p-vbat_monitor",
+    "title": "ATmega328P vbat monitor",
+    "category": "mcu",
+    "mcu": "ATmega328P",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a 9V battery voltage monitor built around a ATmega328P (Arduino Uno). Regulate 9V down to the 5V logic rail with an LDO, and use a resistor divider to scale the raw 9V battery down to well under the MCU's 5V ADC reference. Probe the divider midpoint. Write firmware that reads the battery voltage on an ADC pin every 2 seconds, converts the raw count to millivolts, and logs it."
+  },
+  {
+    "id": "mcu-044-stm32f103-vbat_monitor",
+    "title": "STM32F103 vbat monitor",
+    "category": "mcu",
+    "mcu": "STM32F103",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a 9V battery voltage monitor built around a STM32F103 (Blue Pill). Regulate 9V down to the 3.3V logic rail with an LDO, and use a resistor divider to scale the raw 9V battery down to well under the MCU's 3.3V ADC reference. Probe the divider midpoint. Write firmware that reads the battery voltage on an ADC pin every 2 seconds, converts the raw count to millivolts, and logs it."
+  },
+  {
+    "id": "mcu-045-esp32c3-thermistor",
+    "title": "ESP32-C3 thermistor",
+    "category": "mcu",
+    "mcu": "ESP32-C3",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Build an NTC thermistor temperature sensor node using a ESP32-C3 (RISC-V) on a 3.3V rail. Put the 4.7k NTC thermistor (model it as a resistor) in a divider with a 4.7k fixed resistor between 3.3V and ground so the sense node stays under 3.3V, and probe the sense node. Firmware should sample the thermistor voltage on an ADC channel every 3 seconds, convert to a temperature estimate, and log the value."
+  },
+  {
+    "id": "mcu-046-esp32wroom32-thermistor",
+    "title": "ESP32-WROOM-32 thermistor",
+    "category": "mcu",
+    "mcu": "ESP32-WROOM-32",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Build an NTC thermistor temperature sensor node using a ESP32-WROOM-32 on a 3.3V rail. Put the 4.7k NTC thermistor (model it as a resistor) in a divider with a 4.7k fixed resistor between 3.3V and ground so the sense node stays under 3.3V, and probe the sense node. Firmware should sample the thermistor voltage on an ADC channel every 3 seconds, convert to a temperature estimate, and log the value."
+  },
+  {
+    "id": "mcu-047-atmega328p-thermistor",
+    "title": "ATmega328P thermistor",
+    "category": "mcu",
+    "mcu": "ATmega328P",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Build an NTC thermistor temperature sensor node using a ATmega328P (Arduino Uno) on a 5V rail. Put the 4.7k NTC thermistor (model it as a resistor) in a divider with a 4.7k fixed resistor between 5V and ground so the sense node stays under 5V, and probe the sense node. Firmware should sample the thermistor voltage on an ADC channel every 3 seconds, convert to a temperature estimate, and log the value."
+  },
+  {
+    "id": "mcu-048-stm32f103-thermistor",
+    "title": "STM32F103 thermistor",
+    "category": "mcu",
+    "mcu": "STM32F103",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Build an NTC thermistor temperature sensor node using a STM32F103 (Blue Pill) on a 3.3V rail. Put the 4.7k NTC thermistor (model it as a resistor) in a divider with a 4.7k fixed resistor between 3.3V and ground so the sense node stays under 3.3V, and probe the sense node. Firmware should sample the thermistor voltage on an ADC channel every 3 seconds, convert to a temperature estimate, and log the value."
+  },
+  {
+    "id": "mcu-049-esp32c3-photocell",
+    "title": "ESP32-C3 photocell",
+    "category": "mcu",
+    "mcu": "ESP32-C3",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Create an ambient-light sensor using a ESP32-C3 (RISC-V). Model a photoresistor (LDR) as a resistor in a divider with a fixed resistor from 3.3V to ground, keeping the sense node below the 3.3V ADC reference, and probe it. The firmware reads the light level on an ADC pin every 2 seconds and logs a brightness value."
+  },
+  {
+    "id": "mcu-050-esp32wroom32-photocell",
+    "title": "ESP32-WROOM-32 photocell",
+    "category": "mcu",
+    "mcu": "ESP32-WROOM-32",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Create an ambient-light sensor using a ESP32-WROOM-32. Model a photoresistor (LDR) as a resistor in a divider with a fixed resistor from 3.3V to ground, keeping the sense node below the 3.3V ADC reference, and probe it. The firmware reads the light level on an ADC pin every 2 seconds and logs a brightness value."
+  },
+  {
+    "id": "mcu-051-atmega328p-photocell",
+    "title": "ATmega328P photocell",
+    "category": "mcu",
+    "mcu": "ATmega328P",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Create an ambient-light sensor using a ATmega328P (Arduino Uno). Model a photoresistor (LDR) as a resistor in a divider with a fixed resistor from 5V to ground, keeping the sense node below the 5V ADC reference, and probe it. The firmware reads the light level on an ADC pin every 2 seconds and logs a brightness value."
+  },
+  {
+    "id": "mcu-052-stm32f103-photocell",
+    "title": "STM32F103 photocell",
+    "category": "mcu",
+    "mcu": "STM32F103",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Create an ambient-light sensor using a STM32F103 (Blue Pill). Model a photoresistor (LDR) as a resistor in a divider with a fixed resistor from 3.3V to ground, keeping the sense node below the 3.3V ADC reference, and probe it. The firmware reads the light level on an ADC pin every 2 seconds and logs a brightness value."
+  },
+  {
+    "id": "mcu-053-esp32c3-potentiometer",
+    "title": "ESP32-C3 potentiometer",
+    "category": "mcu",
+    "mcu": "ESP32-C3",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a rotary knob input for a ESP32-C3 (RISC-V). Model a potentiometer as a two-resistor divider from 3.3V to ground (wiper at the midpoint, kept under 3.3V) and probe the wiper. Firmware samples the wiper on an ADC channel every 2 seconds and logs the position."
+  },
+  {
+    "id": "mcu-054-esp32wroom32-potentiometer",
+    "title": "ESP32-WROOM-32 potentiometer",
+    "category": "mcu",
+    "mcu": "ESP32-WROOM-32",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a rotary knob input for a ESP32-WROOM-32. Model a potentiometer as a two-resistor divider from 3.3V to ground (wiper at the midpoint, kept under 3.3V) and probe the wiper. Firmware samples the wiper on an ADC channel every 2 seconds and logs the position."
+  },
+  {
+    "id": "mcu-055-atmega328p-potentiometer",
+    "title": "ATmega328P potentiometer",
+    "category": "mcu",
+    "mcu": "ATmega328P",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a rotary knob input for a ATmega328P (Arduino Uno). Model a potentiometer as a two-resistor divider from 5V to ground (wiper at the midpoint, kept under 5V) and probe the wiper. Firmware samples the wiper on an ADC channel every 2 seconds and logs the position."
+  },
+  {
+    "id": "mcu-056-stm32f103-potentiometer",
+    "title": "STM32F103 potentiometer",
+    "category": "mcu",
+    "mcu": "STM32F103",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a rotary knob input for a STM32F103 (Blue Pill). Model a potentiometer as a two-resistor divider from 3.3V to ground (wiper at the midpoint, kept under 3.3V) and probe the wiper. Firmware samples the wiper on an ADC channel every 2 seconds and logs the position."
+  },
+  {
+    "id": "mcu-057-esp32c3-dual_adc",
+    "title": "ESP32-C3 dual adc",
+    "category": "mcu",
+    "mcu": "ESP32-C3",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Build a dual-channel analog acquisition board on a ESP32-C3 (RISC-V) at 3.3V. Provide two independent resistor dividers from 3.3V to ground, each producing a distinct midpoint voltage under 3.3V, and probe both. Firmware reads both ADC channels every 2 seconds, converts each to millivolts, and logs both readings."
+  },
+  {
+    "id": "mcu-058-esp32wroom32-dual_adc",
+    "title": "ESP32-WROOM-32 dual adc",
+    "category": "mcu",
+    "mcu": "ESP32-WROOM-32",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Build a dual-channel analog acquisition board on a ESP32-WROOM-32 at 3.3V. Provide two independent resistor dividers from 3.3V to ground, each producing a distinct midpoint voltage under 3.3V, and probe both. Firmware reads both ADC channels every 2 seconds, converts each to millivolts, and logs both readings."
+  },
+  {
+    "id": "mcu-059-atmega328p-dual_adc",
+    "title": "ATmega328P dual adc",
+    "category": "mcu",
+    "mcu": "ATmega328P",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Build a dual-channel analog acquisition board on a ATmega328P (Arduino Uno) at 5V. Provide two independent resistor dividers from 5V to ground, each producing a distinct midpoint voltage under 5V, and probe both. Firmware reads both ADC channels every 2 seconds, converts each to millivolts, and logs both readings."
+  },
+  {
+    "id": "mcu-060-stm32f103-dual_adc",
+    "title": "STM32F103 dual adc",
+    "category": "mcu",
+    "mcu": "STM32F103",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Build a dual-channel analog acquisition board on a STM32F103 (Blue Pill) at 3.3V. Provide two independent resistor dividers from 3.3V to ground, each producing a distinct midpoint voltage under 3.3V, and probe both. Firmware reads both ADC channels every 2 seconds, converts each to millivolts, and logs both readings."
+  },
+  {
+    "id": "mcu-061-esp32c3-rail_selfmonitor",
+    "title": "ESP32-C3 rail selfmonitor",
+    "category": "mcu",
+    "mcu": "ESP32-C3",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a power-supply supervisor: a 12V input feeds an LDO producing the 3.3V rail for a ESP32-C3 (RISC-V), with input and output bypass capacitors. A resistor divider scales the 12V input down under 3.3V into an ADC pin so the MCU can watch its own input voltage; probe that divider. Firmware reads the input-rail ADC every 10 seconds, converts to millivolts, and logs it."
+  },
+  {
+    "id": "mcu-062-esp32wroom32-rail_selfmonitor",
+    "title": "ESP32-WROOM-32 rail selfmonitor",
+    "category": "mcu",
+    "mcu": "ESP32-WROOM-32",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a power-supply supervisor: a 12V input feeds an LDO producing the 3.3V rail for a ESP32-WROOM-32, with input and output bypass capacitors. A resistor divider scales the 12V input down under 3.3V into an ADC pin so the MCU can watch its own input voltage; probe that divider. Firmware reads the input-rail ADC every 10 seconds, converts to millivolts, and logs it."
+  },
+  {
+    "id": "mcu-063-atmega328p-rail_selfmonitor",
+    "title": "ATmega328P rail selfmonitor",
+    "category": "mcu",
+    "mcu": "ATmega328P",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a power-supply supervisor: a 12V input feeds an LDO producing the 5V rail for a ATmega328P (Arduino Uno), with input and output bypass capacitors. A resistor divider scales the 12V input down under 5V into an ADC pin so the MCU can watch its own input voltage; probe that divider. Firmware reads the input-rail ADC every 10 seconds, converts to millivolts, and logs it."
+  },
+  {
+    "id": "mcu-064-stm32f103-rail_selfmonitor",
+    "title": "STM32F103 rail selfmonitor",
+    "category": "mcu",
+    "mcu": "STM32F103",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a power-supply supervisor: a 12V input feeds an LDO producing the 3.3V rail for a STM32F103 (Blue Pill), with input and output bypass capacitors. A resistor divider scales the 12V input down under 3.3V into an ADC pin so the MCU can watch its own input voltage; probe that divider. Firmware reads the input-rail ADC every 10 seconds, converts to millivolts, and logs it."
+  },
+  {
+    "id": "mcu-065-esp32c3-led_blinker",
+    "title": "ESP32-C3 led blinker",
+    "category": "mcu",
+    "mcu": "ESP32-C3",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": false,
+    "prompt": "Make a status-LED blinker on a ESP32-C3 (RISC-V) running from 3.3V. Drive an LED through a current-limiting resistor from a GPIO output pin to ground. The firmware should toggle the GPIO high for 500ms then low for 500ms in a loop to blink the LED."
+  },
+  {
+    "id": "mcu-066-esp32wroom32-led_blinker",
+    "title": "ESP32-WROOM-32 led blinker",
+    "category": "mcu",
+    "mcu": "ESP32-WROOM-32",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": false,
+    "prompt": "Make a status-LED blinker on a ESP32-WROOM-32 running from 3.3V. Drive an LED through a current-limiting resistor from a GPIO output pin to ground. The firmware should toggle the GPIO high for 500ms then low for 500ms in a loop to blink the LED."
+  },
+  {
+    "id": "mcu-067-atmega328p-led_blinker",
+    "title": "ATmega328P led blinker",
+    "category": "mcu",
+    "mcu": "ATmega328P",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": false,
+    "prompt": "Make a status-LED blinker on a ATmega328P (Arduino Uno) running from 5V. Drive an LED through a current-limiting resistor from a GPIO output pin to ground. The firmware should toggle the GPIO high for 500ms then low for 500ms in a loop to blink the LED."
+  },
+  {
+    "id": "mcu-068-stm32f103-led_blinker",
+    "title": "STM32F103 led blinker",
+    "category": "mcu",
+    "mcu": "STM32F103",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": false,
+    "prompt": "Make a status-LED blinker on a STM32F103 (Blue Pill) running from 3.3V. Drive an LED through a current-limiting resistor from a GPIO output pin to ground. The firmware should toggle the GPIO high for 500ms then low for 500ms in a loop to blink the LED."
+  },
+  {
+    "id": "mcu-069-esp32c3-mosfet_load",
+    "title": "ESP32-C3 mosfet load",
+    "category": "mcu",
+    "mcu": "ESP32-C3",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": false,
+    "prompt": "Design a high-side... actually low-side load switch driven by a ESP32-C3 (RISC-V) on 3.3V. A GPIO output drives the gate of an N-channel MOSFET through a gate resistor; the MOSFET switches a resistive load (model it as a generic load) connected to a 3.3V rail. Firmware turns the load on for 1000ms and off for 1000ms repeatedly by toggling the GPIO."
+  },
+  {
+    "id": "mcu-070-esp32wroom32-mosfet_load",
+    "title": "ESP32-WROOM-32 mosfet load",
+    "category": "mcu",
+    "mcu": "ESP32-WROOM-32",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": false,
+    "prompt": "Design a high-side... actually low-side load switch driven by a ESP32-WROOM-32 on 3.3V. A GPIO output drives the gate of an N-channel MOSFET through a gate resistor; the MOSFET switches a resistive load (model it as a generic load) connected to a 3.3V rail. Firmware turns the load on for 1000ms and off for 1000ms repeatedly by toggling the GPIO."
+  },
+  {
+    "id": "mcu-071-atmega328p-mosfet_load",
+    "title": "ATmega328P mosfet load",
+    "category": "mcu",
+    "mcu": "ATmega328P",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": false,
+    "prompt": "Design a high-side... actually low-side load switch driven by a ATmega328P (Arduino Uno) on 5V. A GPIO output drives the gate of an N-channel MOSFET through a gate resistor; the MOSFET switches a resistive load (model it as a generic load) connected to a 5V rail. Firmware turns the load on for 1000ms and off for 1000ms repeatedly by toggling the GPIO."
+  },
+  {
+    "id": "mcu-072-stm32f103-mosfet_load",
+    "title": "STM32F103 mosfet load",
+    "category": "mcu",
+    "mcu": "STM32F103",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": false,
+    "prompt": "Design a high-side... actually low-side load switch driven by a STM32F103 (Blue Pill) on 3.3V. A GPIO output drives the gate of an N-channel MOSFET through a gate resistor; the MOSFET switches a resistive load (model it as a generic load) connected to a 3.3V rail. Firmware turns the load on for 1000ms and off for 1000ms repeatedly by toggling the GPIO."
+  },
+  {
+    "id": "mcu-073-esp32c3-i2c_node",
+    "title": "ESP32-C3 i2c node",
+    "category": "mcu",
+    "mcu": "ESP32-C3",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Build an I2C sensor node around a ESP32-C3 (RISC-V). Bring out the I2C SDA and SCL lines with 4.7k pull-up resistors to the 3.3V rail, and add a resistor divider from 3.3V to ground (under 3.3V) into an ADC pin as an auxiliary analog input; probe the divider. Firmware samples the aux ADC every 2 seconds and logs it."
+  },
+  {
+    "id": "mcu-074-esp32wroom32-i2c_node",
+    "title": "ESP32-WROOM-32 i2c node",
+    "category": "mcu",
+    "mcu": "ESP32-WROOM-32",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Build an I2C sensor node around a ESP32-WROOM-32. Bring out the I2C SDA and SCL lines with 4.7k pull-up resistors to the 3.3V rail, and add a resistor divider from 3.3V to ground (under 3.3V) into an ADC pin as an auxiliary analog input; probe the divider. Firmware samples the aux ADC every 2 seconds and logs it."
+  },
+  {
+    "id": "mcu-075-atmega328p-i2c_node",
+    "title": "ATmega328P i2c node",
+    "category": "mcu",
+    "mcu": "ATmega328P",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Build an I2C sensor node around a ATmega328P (Arduino Uno). Bring out the I2C SDA and SCL lines with 4.7k pull-up resistors to the 5V rail, and add a resistor divider from 5V to ground (under 5V) into an ADC pin as an auxiliary analog input; probe the divider. Firmware samples the aux ADC every 2 seconds and logs it."
+  },
+  {
+    "id": "mcu-076-stm32f103-i2c_node",
+    "title": "STM32F103 i2c node",
+    "category": "mcu",
+    "mcu": "STM32F103",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Build an I2C sensor node around a STM32F103 (Blue Pill). Bring out the I2C SDA and SCL lines with 4.7k pull-up resistors to the 3.3V rail, and add a resistor divider from 3.3V to ground (under 3.3V) into an ADC pin as an auxiliary analog input; probe the divider. Firmware samples the aux ADC every 2 seconds and logs it."
+  },
+  {
+    "id": "mcu-077-esp32c3-heartbeat_plus_sense",
+    "title": "ESP32-C3 heartbeat plus sense",
+    "category": "mcu",
+    "mcu": "ESP32-C3",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a sensor node with a heartbeat LED on a ESP32-C3 (RISC-V) at 3.3V. Include a resistor divider from 3.3V to ground (kept under 3.3V) into an ADC pin and probe it, plus an LED with series resistor on a GPIO output. Firmware reads the ADC every 4 seconds, logs the value, and toggles the heartbeat LED each cycle."
+  },
+  {
+    "id": "mcu-078-esp32wroom32-heartbeat_plus_sense",
+    "title": "ESP32-WROOM-32 heartbeat plus sense",
+    "category": "mcu",
+    "mcu": "ESP32-WROOM-32",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a sensor node with a heartbeat LED on a ESP32-WROOM-32 at 3.3V. Include a resistor divider from 3.3V to ground (kept under 3.3V) into an ADC pin and probe it, plus an LED with series resistor on a GPIO output. Firmware reads the ADC every 4 seconds, logs the value, and toggles the heartbeat LED each cycle."
+  },
+  {
+    "id": "mcu-079-atmega328p-heartbeat_plus_sense",
+    "title": "ATmega328P heartbeat plus sense",
+    "category": "mcu",
+    "mcu": "ATmega328P",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a sensor node with a heartbeat LED on a ATmega328P (Arduino Uno) at 5V. Include a resistor divider from 5V to ground (kept under 5V) into an ADC pin and probe it, plus an LED with series resistor on a GPIO output. Firmware reads the ADC every 4 seconds, logs the value, and toggles the heartbeat LED each cycle."
+  },
+  {
+    "id": "mcu-080-stm32f103-heartbeat_plus_sense",
+    "title": "STM32F103 heartbeat plus sense",
+    "category": "mcu",
+    "mcu": "STM32F103",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a sensor node with a heartbeat LED on a STM32F103 (Blue Pill) at 3.3V. Include a resistor divider from 3.3V to ground (kept under 3.3V) into an ADC pin and probe it, plus an LED with series resistor on a GPIO output. Firmware reads the ADC every 4 seconds, logs the value, and toggles the heartbeat LED each cycle."
+  },
+  {
+    "id": "mcu-081-esp32c3-vbat_monitor",
+    "title": "ESP32-C3 vbat monitor",
+    "category": "mcu",
+    "mcu": "ESP32-C3",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a 12V battery voltage monitor built around a ESP32-C3 (RISC-V). Regulate 12V down to the 3.3V logic rail with an LDO, and use a resistor divider to scale the raw 12V battery down to well under the MCU's 3.3V ADC reference. Probe the divider midpoint. Write firmware that reads the battery voltage on an ADC pin every 5 seconds, converts the raw count to millivolts, and logs it."
+  },
+  {
+    "id": "mcu-082-esp32wroom32-vbat_monitor",
+    "title": "ESP32-WROOM-32 vbat monitor",
+    "category": "mcu",
+    "mcu": "ESP32-WROOM-32",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a 12V battery voltage monitor built around a ESP32-WROOM-32. Regulate 12V down to the 3.3V logic rail with an LDO, and use a resistor divider to scale the raw 12V battery down to well under the MCU's 3.3V ADC reference. Probe the divider midpoint. Write firmware that reads the battery voltage on an ADC pin every 5 seconds, converts the raw count to millivolts, and logs it."
+  },
+  {
+    "id": "mcu-083-atmega328p-vbat_monitor",
+    "title": "ATmega328P vbat monitor",
+    "category": "mcu",
+    "mcu": "ATmega328P",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a 12V battery voltage monitor built around a ATmega328P (Arduino Uno). Regulate 12V down to the 5V logic rail with an LDO, and use a resistor divider to scale the raw 12V battery down to well under the MCU's 5V ADC reference. Probe the divider midpoint. Write firmware that reads the battery voltage on an ADC pin every 5 seconds, converts the raw count to millivolts, and logs it."
+  },
+  {
+    "id": "mcu-084-stm32f103-vbat_monitor",
+    "title": "STM32F103 vbat monitor",
+    "category": "mcu",
+    "mcu": "STM32F103",
+    "expectStaged": true,
+    "expectFirmware": true,
+    "expectSimPass": true,
+    "prompt": "Design a 12V battery voltage monitor built around a STM32F103 (Blue Pill). Regulate 12V down to the 3.3V logic rail with an LDO, and use a resistor divider to scale the raw 12V battery down to well under the MCU's 3.3V ADC reference. Probe the divider midpoint. Write firmware that reads the battery voltage on an ADC pin every 5 seconds, converts the raw count to millivolts, and logs it."
+  },
+  {
+    "id": "analog-085-rc_lowpass",
+    "title": "analog rc lowpass",
+    "category": "analog",
+    "mcu": null,
+    "expectStaged": true,
+    "expectFirmware": false,
+    "expectSimPass": true,
+    "prompt": "Build a passive RC low-pass filter: a 5V source drives a 1k series resistor into a 10uF capacitor to ground. Probe the capacitor node and add a test that it charges toward the input within a reasonable settling time."
+  },
+  {
+    "id": "analog-086-divider",
+    "title": "analog divider",
+    "category": "analog",
+    "mcu": null,
+    "expectStaged": true,
+    "expectFirmware": false,
+    "expectSimPass": true,
+    "prompt": "Design a resistor voltage divider that steps 9V down to approximately 3.3V at the midpoint. Probe the midpoint and add a simulation test asserting it lands within 10% of 3.3V."
+  },
+  {
+    "id": "analog-087-led_rail",
+    "title": "analog led rail",
+    "category": "analog",
+    "mcu": null,
+    "expectStaged": true,
+    "expectFirmware": false,
+    "expectSimPass": false,
+    "prompt": "Create a simple indicator: a 5V rail drives an LED through a current-limiting resistor sized for about 10mA. Probe the LED anode."
+  },
+  {
+    "id": "analog-088-ldo_rail",
+    "title": "analog ldo rail",
+    "category": "analog",
+    "mcu": null,
+    "expectStaged": true,
+    "expectFirmware": false,
+    "expectSimPass": true,
+    "prompt": "Design a regulated 9V-to-3.3V power supply using an LDO with input and output bypass capacitors. Add a test that the 3.3V output rail is within 4.75% of nominal under a light resistive load."
+  },
+  {
+    "id": "analog-089-half_wave",
+    "title": "analog half wave",
+    "category": "analog",
+    "mcu": null,
+    "expectStaged": true,
+    "expectFirmware": false,
+    "expectSimPass": true,
+    "prompt": "Build a half-wave rectifier front-end: a 5V source through a diode into an RC smoothing network (a resistor to a capacitor to ground). Probe the smoothed output node."
+  },
+  {
+    "id": "analog-090-mosfet_switch",
+    "title": "analog mosfet switch",
+    "category": "analog",
+    "mcu": null,
+    "expectStaged": true,
+    "expectFirmware": false,
+    "expectSimPass": false,
+    "prompt": "Design a MOSFET low-side switch: an N-channel MOSFET switches a resistive load from a 5V rail, with a gate resistor and a pull-down on the gate. Probe the drain node."
+  },
+  {
+    "id": "analog-091-cascaded_divider",
+    "title": "analog cascaded divider",
+    "category": "analog",
+    "mcu": null,
+    "expectStaged": true,
+    "expectFirmware": false,
+    "expectSimPass": true,
+    "prompt": "Build a two-stage cascaded resistor divider from 12V: the first stage halves to ~6V, the second stage halves again to ~3V. Probe both intermediate nodes and assert the final node is near 3V."
+  },
+  {
+    "id": "analog-092-rc_lowpass",
+    "title": "analog rc lowpass",
+    "category": "analog",
+    "mcu": null,
+    "expectStaged": true,
+    "expectFirmware": false,
+    "expectSimPass": true,
+    "prompt": "Build a passive RC low-pass filter: a 3.3V source drives a 10k series resistor into a 1uF capacitor to ground. Probe the capacitor node and add a test that it charges toward the input within a reasonable settling time."
+  },
+  {
+    "id": "analog-093-divider",
+    "title": "analog divider",
+    "category": "analog",
+    "mcu": null,
+    "expectStaged": true,
+    "expectFirmware": false,
+    "expectSimPass": true,
+    "prompt": "Design a resistor voltage divider that steps 12V down to approximately 5V at the midpoint. Probe the midpoint and add a simulation test asserting it lands within 10% of 5V."
+  },
+  {
+    "id": "analog-094-led_rail",
+    "title": "analog led rail",
+    "category": "analog",
+    "mcu": null,
+    "expectStaged": true,
+    "expectFirmware": false,
+    "expectSimPass": false,
+    "prompt": "Create a simple indicator: a 3.3V rail drives an LED through a current-limiting resistor sized for about 10mA. Probe the LED anode."
+  },
+  {
+    "id": "analog-095-ldo_rail",
+    "title": "analog ldo rail",
+    "category": "analog",
+    "mcu": null,
+    "expectStaged": true,
+    "expectFirmware": false,
+    "expectSimPass": true,
+    "prompt": "Design a regulated 12V-to-3.3V power supply using an LDO with input and output bypass capacitors. Add a test that the 3.3V output rail is within 4.75% of nominal under a light resistive load."
+  },
+  {
+    "id": "analog-096-half_wave",
+    "title": "analog half wave",
+    "category": "analog",
+    "mcu": null,
+    "expectStaged": true,
+    "expectFirmware": false,
+    "expectSimPass": true,
+    "prompt": "Build a half-wave rectifier front-end: a 9V source through a diode into an RC smoothing network (a resistor to a capacitor to ground). Probe the smoothed output node."
+  },
+  {
+    "id": "analog-097-mosfet_switch",
+    "title": "analog mosfet switch",
+    "category": "analog",
+    "mcu": null,
+    "expectStaged": true,
+    "expectFirmware": false,
+    "expectSimPass": false,
+    "prompt": "Design a MOSFET low-side switch: an N-channel MOSFET switches a resistive load from a 12V rail, with a gate resistor and a pull-down on the gate. Probe the drain node."
+  },
+  {
+    "id": "analog-098-cascaded_divider",
+    "title": "analog cascaded divider",
+    "category": "analog",
+    "mcu": null,
+    "expectStaged": true,
+    "expectFirmware": false,
+    "expectSimPass": true,
+    "prompt": "Build a two-stage cascaded resistor divider from 12V: the first stage halves to ~6V, the second stage halves again to ~3V. Probe both intermediate nodes and assert the final node is near 3V."
+  },
+  {
+    "id": "analog-099-rc_lowpass",
+    "title": "analog rc lowpass",
+    "category": "analog",
+    "mcu": null,
+    "expectStaged": true,
+    "expectFirmware": false,
+    "expectSimPass": true,
+    "prompt": "Build a passive RC low-pass filter: a 12V source drives a 4.7k series resistor into a 100nF capacitor to ground. Probe the capacitor node and add a test that it charges toward the input within a reasonable settling time."
+  },
+  {
+    "id": "analog-100-divider",
+    "title": "analog divider",
+    "category": "analog",
+    "mcu": null,
+    "expectStaged": true,
+    "expectFirmware": false,
+    "expectSimPass": true,
+    "prompt": "Design a resistor voltage divider that steps 5V down to approximately 2.5V at the midpoint. Probe the midpoint and add a simulation test asserting it lands within 10% of 2.5V."
+  }
+]

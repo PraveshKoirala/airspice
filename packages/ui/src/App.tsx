@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import type { Node, Edge } from 'reactflow';
-import { Activity, FileCode, FolderTree, RadioTower } from 'lucide-react';
+import { Activity, FileCode, FolderTree, Play, MessageSquare, LayoutGrid, CircuitBoard } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Toolbar from './components/Toolbar';
 import XmlEditor from './components/Editor';
@@ -10,7 +10,13 @@ import Graph from './components/Graph';
 import Inspector from './schematic/Inspector';
 import Palette from './schematic/Palette';
 import type { GuiHint, SchematicIR } from './schematic/types';
-import { parse as parseAir } from 'air-ts';
+import { parse as parseAir, parseXmlBytes, normalize as airNormalize, validate as airValidate } from 'air-ts';
+import type { Diagnostic as AirDiagnostic } from 'air-ts';
+import {
+  buildShareUrl,
+  decodeHashToDesign,
+  SHARE_HARD_LIMIT_BYTES,
+} from './share/shareLink';
 import { saveHintsPatch } from './schematic/patches';
 import { commitPatch } from './schematic/gate';
 import type { WireSource, WireTarget } from './schematic/Renderer';
@@ -35,14 +41,21 @@ import ResultPanel from './components/ResultPanel';
 import ChatRepl from './components/ChatRepl';
 import RepairPanel from './components/RepairPanel';
 import SettingsPanel from './components/SettingsPanel';
+import FirmwarePanel from './components/FirmwarePanel';
 import Landing from './pages/Landing';
+import OnboardingTour from './onboarding/OnboardingTour';
+import { shouldAutoShowTour, markTourSeen } from './onboarding/tourState';
+import { takeWorkspaceIntent } from './onboarding/workspaceIntent';
 import type { ApiError, Diagnostic, ValidationResult } from './types/api';
 import { getEngine, ENGINE_MODE, getRun } from './engine';
 import type { SimulationReport as OracleReport, SystemIR } from 'air-ts';
 import { WaveformViewer, type WaveformTrace } from './waveform';
+import { useProjectStore } from './storage/projectStore';
+import { saveToDisk, saveAsToDisk } from './storage/fileIo';
+import { exportAllRawRecords } from './storage/db';
+import { createAutosaveController, type AutosaveController } from './storage/autosave';
 import { useDesignStore } from './agent/designStore';
 import { useAgentSettings } from './agent/agentSettings';
-import type { NetworkProviderId } from 'agent';
 import './App.css';
 
 interface LogEntry {
@@ -205,17 +218,96 @@ const DEFAULT_XML = `<?xml version="1.0" encoding="UTF-8"?>
 </system>`;
 
 function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', toggleTheme: () => void }) {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('schematic');
   const [designPath, setDesignPath] = useState(DEFAULT_DESIGN);
-  // The design XML is owned by the versioned design store (issue #18): the agent
-  // writes it ONLY via applyValidated (a gated ValidatedDesign) and the human
-  // edits it via setUserXml. Seed the store with the default design once.
-  const xml = useDesignStore((s) => s.xml);
-  const setUserXml = useDesignStore((s) => s.setUserXml);
+  // First-run tour (issue #28 D4). Shown once per fresh profile, re-launchable
+  // from the Sidebar Help affordance and the Landing "Take the tour" button.
+  const [showTour, setShowTour] = useState(false);
+  const intentConsumedRef = useRef(false);
   useEffect(() => {
-    if (useDesignStore.getState().xml === '') setUserXml(DEFAULT_XML);
-    // Seeding is a one-time init; setUserXml is stable (store setter).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Consume the one-shot entry intent from Landing (open the Repair tab for a
+    // Fix-me card, and/or force-show the tour) exactly once, then decide whether
+    // the tour auto-shows for a fresh profile. Runs once per workspace mount.
+    if (intentConsumedRef.current) return;
+    intentConsumedRef.current = true;
+    const intent = takeWorkspaceIntent();
+    if (intent.tab) setActiveTab(intent.tab);
+    if (intent.tour || shouldAutoShowTour()) setShowTour(true);
+  }, []);
+  const closeTour = () => {
+    markTourSeen();
+    setShowTour(false);
+  };
+  const xml = useDesignStore((s) => s.xml);
+  const projectsList = useProjectStore((s) => s.projectsList);
+  const projectStoreInitialized = useProjectStore((s) => s.initialized);
+  const activeProjectId = useProjectStore((s) => s.activeProjectId);
+  const selectProject = useProjectStore((s) => s.selectProject);
+  const createProject = useProjectStore((s) => s.createProject);
+  const setFileHandle = useProjectStore((s) => s.setFileHandle);
+  const conflictError = useProjectStore((s) => s.conflictError);
+  const setConflictError = useProjectStore((s) => s.setConflictError);
+  const autosaveError = useProjectStore((s) => s.autosaveError);
+  const dismissAutosaveError = useProjectStore((s) => s.dismissAutosaveError);
+
+  const activeProject = useMemo(() => {
+    return projectsList.find((p) => p.id === activeProjectId) || null;
+  }, [projectsList, activeProjectId]);
+
+  const activeProjectName = activeProject ? activeProject.name : 'ESP32 Battery Sensor';
+
+  useEffect(() => {
+    const runInit = async () => {
+      if (!projectStoreInitialized) return;
+      if (useProjectStore.getState().isDowngraded) return;
+      const currentList = useProjectStore.getState().projectsList;
+      if (currentList.length === 0) {
+        // First-run migration
+        await createProject("Untitled Project", DEFAULT_XML);
+      } else if (!useProjectStore.getState().activeProjectId) {
+        // Select the most recently updated project
+        await selectProject(currentList[0].id);
+      }
+    };
+    runInit();
+  }, [projectStoreInitialized, projectsList.length, selectProject, createProject]);
+
+  // Autosave controller (issue #26): the debounce/flush policy lives in a plain
+  // testable unit (storage/autosave.ts). Its `save` closure reads the LATEST
+  // active project + design XML at run time (never a stale captured value), so a
+  // burst of edits collapses into one write of the freshest XML, and a flush on
+  // unload persists whatever is current. Created once and kept in a ref.
+  const autosaveRef = useRef<AutosaveController | null>(null);
+  if (autosaveRef.current === null) {
+    autosaveRef.current = createAutosaveController(() => {
+      const { activeProjectId: id, saveActiveProjectXml: save } = useProjectStore.getState();
+      const currentXml = useDesignStore.getState().xml;
+      if (id && currentXml) void save(currentXml);
+    }, 1000);
+  }
+
+  // Debounced autosave: every design-XML change (re)arms the ~1s timer.
+  useEffect(() => {
+    if (!activeProjectId || !xml) return;
+    autosaveRef.current!.schedule();
+  }, [xml, activeProjectId]);
+
+  // Crash-safety flush: persist any pending edit IMMEDIATELY when the tab is
+  // hidden (visibilitychange→hidden) or being unloaded (pagehide), so a mid-edit
+  // close or hard reload recovers the last edit rather than losing it.
+  useEffect(() => {
+    const controller = autosaveRef.current!;
+    const flush = () => controller.flush();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') controller.flush();
+    };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   const [nodes, setNodes] = useState<Node[]>([]);
@@ -228,9 +320,10 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
   // BYOK agent config (issue #17/#18). Provider/model are picked in Settings; the
   // key lives only in the browser vault. Default to the mock provider so the
   // panel works with no key (deterministic demo / the CI-parity flow).
-  const [agentProvider, setAgentProvider] = useState<NetworkProviderId | 'mock'>('mock');
-  const [agentModel, setAgentModel] = useState<string | undefined>(undefined);
+  const agentProvider = useAgentSettings((s) => s.agentProvider);
+  const agentModel = useAgentSettings((s) => s.agentModel);
   const malformedCount = useAgentSettings((s) => s.malformedCount);
+  const tokenBudget = useAgentSettings((s) => s.tokenBudget);
 
   // Undo/redo keyboard binding (issue #24 D5). Ctrl+Z / Cmd+Z undoes,
   // Ctrl+Shift+Z / Ctrl+Y / Cmd+Shift+Z redoes. Registered at capture
@@ -390,6 +483,79 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
       const apiError = error as ApiError;
       addLog(`Save failed: ${apiError.response?.data?.detail || apiError.message}`, 'error');
       return null;
+    }
+  };
+
+  const handleSave = async () => {
+    if (ENGINE_MODE !== 'local') {
+      const saved = await persistDesign();
+      if (saved) addLog(`Saved design to ${saved.design}`, 'success');
+      return;
+    }
+
+    if (!activeProject) {
+      addLog('No active project to save.', 'error');
+      return;
+    }
+
+    try {
+      if (activeProject.fileHandle) {
+        await saveToDisk(xml, activeProject.fileHandle);
+        addLog(`Saved project '${activeProject.name}' to disk.`, 'success');
+      } else {
+        const handle = await saveAsToDisk(xml, activeProject.name);
+        if (handle) {
+          await setFileHandle(activeProject.id, handle);
+          addLog(`Saved project as '${handle.name}' to disk.`, 'success');
+        } else {
+          addLog(`Project exported to downloads.`, 'success');
+        }
+      }
+    } catch (e) {
+      addLog(`Failed to save to disk: ${(e as Error).message}`, 'error');
+    }
+  };
+
+  // Share (issue #27): the design IS the URL. Compress the current XML into the
+  // URL FRAGMENT so sharing needs no server/account/storage and the payload
+  // never leaves the browser as a request. On click we copy the link and toast
+  // the payload size; a very long URL warns (it breaks in some apps), and a URL
+  // past the hard cap is NOT copied (it would be unusable) — we fall back to
+  // exporting the design file instead.
+  const handleShare = async () => {
+    const currentXml = useDesignStore.getState().xml;
+    if (!currentXml.trim()) {
+      addLog('Nothing to share yet — the design is empty.', 'warning');
+      return;
+    }
+    const info = buildShareUrl(currentXml, window.location.origin);
+    const kb = (info.payloadBytes / 1024).toFixed(1);
+    if (info.overHard) {
+      addLog(
+        `This design is too large to share as a link (${kb} KB, over the ${SHARE_HARD_LIMIT_BYTES / 1024} KB cap). Exporting the design file to share instead.`,
+        'warning',
+      );
+      try {
+        const handle = await saveAsToDisk(currentXml, activeProjectName);
+        addLog(
+          handle ? `Exported '${handle.name}' — share the file instead.` : 'Exported the design to your downloads — share the file instead.',
+          'success',
+        );
+      } catch (e) {
+        addLog(`Export failed: ${(e as Error).message}`, 'error');
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(info.url);
+      addLog(`Share link copied to clipboard (${kb} KB in the URL).`, 'success');
+    } catch {
+      // Clipboard can be blocked (permissions / insecure context). Surface the
+      // URL so the user can still copy it manually.
+      addLog(`Could not copy automatically — here is the share link: ${info.url}`, 'warning');
+    }
+    if (info.overSoft) {
+      addLog('Very long URLs break in some apps — consider exporting the file instead.', 'warning');
     }
   };
 
@@ -572,6 +738,26 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
       return [];
     }
   }, [xml]);
+
+  // Blank-design detection for the empty-state-with-verbs (issue #28 D5). A count
+  // of exactly 0 components means a fresh/empty design; a parse failure mid-edit
+  // yields -1 (keep the last schematic rather than flashing the empty state).
+  const componentCount = useMemo<number>(() => {
+    if (!xml.trim()) return 0;
+    try {
+      return parseAir(xml).components.size;
+    } catch {
+      return -1;
+    }
+  }, [xml]);
+  const isBlankDesign = componentCount === 0;
+
+  // "Ask the agent" affordance: focus the chat composer (it lives in the always-
+  // mounted ChatRepl side panel).
+  const focusAgentChat = () => {
+    const el = document.getElementById('agent-chat-input');
+    if (el) (el as HTMLTextAreaElement).focus();
+  };
 
   // Issue #23 drag/nudge write path. Threaded through the ONE COMMIT PATH
   // (schematic/gate.ts) so the mutation shows up in the undo/redo stack
@@ -763,17 +949,25 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
             onPlaced={(id, entry) => addLog(`Placed ${entry.displayName} as ${id}`, 'success')}
             onError={(msg) => addLog(msg, 'error')}
           />
-          <Graph
-            nodes={nodes}
-            edges={edges}
-            hints={hints}
-            interactive
-            onLayout={setSchematicIR}
-            onCommitMove={commitMove}
-            onCommitWire={commitWire}
-            onCommitDelete={commitDelete}
-            onCursor={onCursor}
-          />
+          {isBlankDesign ? (
+            <BlankSchematicState
+              onPasteXml={() => setActiveTab('editor')}
+              onAskAgent={focusAgentChat}
+              onBrowseExamples={() => navigate('/')}
+            />
+          ) : (
+            <Graph
+              nodes={nodes}
+              edges={edges}
+              hints={hints}
+              interactive
+              onLayout={setSchematicIR}
+              onCommitMove={commitMove}
+              onCommitWire={commitWire}
+              onCommitDelete={commitDelete}
+              onCursor={onCursor}
+            />
+          )}
           <Inspector ir={schematicIR} />
         </div>
       );
@@ -786,17 +980,13 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
       return <XmlEditor xml={xml} onChange={(value) => coalesceUserXml(value || '')} theme={theme} />;
     }
     if (activeTab === 'simulation') {
-      return <SimulationPanel simulation={simulation} waveforms={waveforms} designXml={xml} theme={theme} />;
+      return <SimulationPanel simulation={simulation} waveforms={waveforms} designXml={xml} theme={theme} onRun={handleSimulate} />;
     }
     if (activeTab === 'validation') {
       return <DiagnosticsPanel validation={validation} />;
     }
     if (activeTab === 'firmware') {
-      return <InfoPanel icon={<RadioTower size={18} />} title="Firmware" items={[
-        'Generated PlatformIO firmware is available from the backend compiler.',
-        'The current ESP32 task reads ADC, converts raw counts, and logs battery_mv.',
-        'Use Compile Firmware from the API/CLI to refresh generated source.',
-      ]} />;
+      return <FirmwarePanel xml={xml} />;
     }
     if (activeTab === 'artifacts') {
       return <ArtifactsPanel artifacts={artifacts} />;
@@ -806,7 +996,9 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
         <RepairPanel
           provider={agentProvider}
           {...(agentModel ? { model: agentModel } : {})}
+          maxTokensPerTurn={tokenBudget}
           theme={theme}
+          onOpenSettings={() => setActiveTab('settings')}
         />
       );
     }
@@ -814,10 +1006,6 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
       return (
         <SettingsPanel
           malformedToolCallCount={malformedCount}
-          agentProvider={agentProvider}
-          agentModel={agentModel}
-          onAgentProviderChange={setAgentProvider}
-          onAgentModelChange={setAgentModel}
         />
       );
     }
@@ -826,24 +1014,44 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
 
   return (
     <div className="app-container">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} theme={theme} toggleTheme={toggleTheme} />
+      {showTour && <OnboardingTour onClose={closeTour} />}
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} theme={theme} toggleTheme={toggleTheme} onStartTour={() => setShowTour(true)} />
       <main className="main-content">
-        <Toolbar onValidate={handleValidate} onSimulate={handleSimulate} onRepair={handleRepair} onSave={async () => { const saved = await persistDesign(); if (saved) addLog(`Saved design to ${saved.design}`, 'success'); }} />
-        <div className="workspace-shell">
+        {conflictError && (
+          <div className="conflict-banner" role="alert">
+            <span>{conflictError}</span>
+            <div>
+              <button onClick={() => window.location.reload()} style={{ marginRight: 8 }}>Reload Page</button>
+              <button onClick={() => setConflictError(null)}>Dismiss</button>
+            </div>
+          </div>
+        )}
+        {autosaveError && (
+          <div className="autosave-banner" role="alert">
+            <span>{autosaveError}</span>
+            <div>
+              <button onClick={dismissAutosaveError}>Dismiss</button>
+            </div>
+          </div>
+        )}
+        <Toolbar onValidate={handleValidate} onSimulate={handleSimulate} onRepair={handleRepair} onSave={handleSave} onShare={handleShare} />
+        <div className={`workspace-shell${ENGINE_MODE === 'local' ? ' no-path-bar' : ''}`}>
           <div className="workspace-header">
             <div>
               <span className="eyebrow">AIR Workspace</span>
-              <h1>ESP32 Battery Sensor</h1>
+              <h1>{activeProjectName}</h1>
             </div>
             <div className="workspace-status">
               <span className={`engine-badge ${ENGINE_MODE}`} title={`Engine: ${ENGINE_MODE}`} data-testid="engine-mode">{ENGINE_MODE === 'local' ? 'Local engine' : 'Server engine'}</span>
               <div className={`run-state ${isBusy ? 'busy' : 'idle'}`}>{isBusy ? 'Running' : 'Ready'}</div>
             </div>
           </div>
-          <div className="design-path-bar">
-            <span>Design</span>
-            <input value={designPath} onChange={(event) => setDesignPath(event.target.value)} />
-          </div>
+          {ENGINE_MODE !== 'local' && (
+            <div className="design-path-bar">
+              <span>Design</span>
+              <input value={designPath} onChange={(event) => setDesignPath(event.target.value)} />
+            </div>
+          )}
           <section className="view-container">{renderPanel()}</section>
           <ResultPanel logs={logs} />
         </div>
@@ -851,13 +1059,15 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
       <ChatRepl
         provider={agentProvider}
         {...(agentModel ? { model: agentModel } : {})}
+        maxTokensPerTurn={tokenBudget}
         theme={theme}
+        onOpenSettings={() => setActiveTab('settings')}
       />
     </div>
   );
 }
 
-function SimulationPanel({ simulation, waveforms, designXml, theme }: { simulation: SimulationReport | null; waveforms: WaveformData[]; designXml: string; theme: 'dark' | 'light' }) {
+function SimulationPanel({ simulation, waveforms, designXml, theme, onRun }: { simulation: SimulationReport | null; waveforms: WaveformData[]; designXml: string; theme: 'dark' | 'light'; onRun?: () => void }) {
   // Parse the design once for assertion-band extraction. A malformed mid-edit
   // XML yields no bands; the viewer still renders the traces.
   const design = useMemo<SystemIR | null>(() => {
@@ -912,7 +1122,21 @@ function SimulationPanel({ simulation, waveforms, designXml, theme }: { simulati
   }, [waveforms]);
 
   if (!simulation) {
-    return <EmptyState icon={<Activity size={20} />} title="No simulation run yet" text="Run simulation to inspect assertions, measurements, and generated artifacts." />;
+    return (
+      <div className="empty-state sim-empty" data-testid="sim-pre-run">
+        <Activity size={20} />
+        <h2>No simulation run yet</h2>
+        <p>
+          Press Run to compile this design and simulate it right here in your browser — no backend,
+          no API key. You&apos;ll get waveforms for every probe plus a pass/fail for each assertion.
+        </p>
+        {onRun && (
+          <button className="empty-primary" onClick={onRun} data-testid="sim-run">
+            <Play size={16} /> Run simulation
+          </button>
+        )}
+      </div>
+    );
   }
   return (
     <div className="detail-panel">
@@ -1012,23 +1236,6 @@ function ArtifactsPanel({ artifacts }: { artifacts: string[] }) {
   );
 }
 
-function InfoPanel({ icon, title, items }: { icon: React.ReactNode; title: string; items: string[] }) {
-  return (
-    <div className="detail-panel">
-      <div className="panel-heading">
-        {icon}
-        <div>
-          <span className="eyebrow">Workspace</span>
-          <h2>{title}</h2>
-        </div>
-      </div>
-      <ul className="info-list">
-        {items.map((item) => <li key={item}>{item}</li>)}
-      </ul>
-    </div>
-  );
-}
-
 function EmptyState({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
   return (
     <div className="empty-state">
@@ -1039,41 +1246,302 @@ function EmptyState({ icon, title, text }: { icon: React.ReactNode; title: strin
   );
 }
 
+// Empty-state-with-verbs for a blank design (issue #28 D5): instead of a void
+// canvas, offer the three real next actions. The component palette stays mounted
+// to the left, so "place a part" is literally one click away.
+function BlankSchematicState({
+  onPasteXml,
+  onAskAgent,
+  onBrowseExamples,
+}: {
+  onPasteXml: () => void;
+  onAskAgent: () => void;
+  onBrowseExamples: () => void;
+}) {
+  return (
+    <div className="blank-schematic" data-testid="blank-schematic">
+      <CircuitBoard size={28} />
+      <h2>This design is empty</h2>
+      <p>Drag a part from the palette on the left to start wiring — or pick a faster path:</p>
+      <div className="blank-verbs">
+        <button onClick={onPasteXml} data-testid="blank-paste-xml">
+          <FileCode size={16} /> Paste or edit AIR XML
+        </button>
+        <button onClick={onAskAgent} data-testid="blank-ask-agent">
+          <MessageSquare size={16} /> Ask the agent to build it
+        </button>
+        <button onClick={onBrowseExamples} data-testid="blank-browse-examples">
+          <LayoutGrid size={16} /> Browse examples
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // Dev-only integration surface for the WASM analog engine (issue #13). Lazily
 // imported AND guarded by import.meta.env.DEV so neither SimLab nor its sim-wasm
 // dependency (and its ~20MB WASM chunk) are pulled into the production build.
 const SimLab = import.meta.env.DEV ? lazy(() => import('./pages/SimLab')) : null;
 
+function DowngradeRefusalScreen() {
+  const diskVersion = useProjectStore((s) => s.diskVersion);
+  const db = useProjectStore((s) => s.db);
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    if (!db) return;
+    setExporting(true);
+    try {
+      const records = await exportAllRawRecords(db);
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(records, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `airspice_projects_backup_v${diskVersion}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    } catch (e) {
+      alert("Failed to export projects: " + (e as Error).message);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  return (
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      height: '100vh',
+      backgroundColor: '#111827',
+      color: '#cbd5e1',
+      fontFamily: 'system-ui, sans-serif',
+      padding: 24,
+      textAlign: 'center'
+    }}>
+      <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
+      <h1 style={{ fontSize: 24, color: '#f8fafc', marginBottom: 8 }}>Database Schema Version Mismatch</h1>
+      <p style={{ maxWidth: 500, color: '#94a3b8', marginBottom: 24, lineHeight: 1.5 }}>
+        The database on disk is from a newer version of the application (v{diskVersion}). 
+        Opening it with this version could cause data corruption. Please update your application.
+      </p>
+      <button 
+        onClick={handleExport}
+        disabled={exporting}
+        style={{
+          padding: '12px 24px',
+          fontSize: 14,
+          fontWeight: 'bold',
+          color: '#fff',
+          backgroundColor: '#0ea5a4',
+          border: 'none',
+          borderRadius: 8,
+          cursor: 'pointer',
+          transition: 'background-color 0.2s'
+        }}
+      >
+        {exporting ? 'Exporting...' : 'Export Projects to JSON'}
+      </button>
+    </div>
+  );
+}
+
+// Friendly, non-technical copy for each decode failure kind (issue #27). Keyed
+// by the DecodeResult error union so it stays exhaustive as the codec evolves.
+const DECODE_ERROR_MESSAGES: Record<
+  'empty' | 'bad-version' | 'malformed' | 'corrupt' | 'too-large',
+  string
+> = {
+  empty: 'This share link has no design in it.',
+  'bad-version': 'This share link was created by a different version of AirSpice and cannot be opened.',
+  malformed: 'This share link is malformed and could not be read.',
+  corrupt: 'This share link is corrupted or incomplete.',
+  'too-large': 'The design in this share link is too large to open.',
+};
+
+/**
+ * Gate a design that arrived from an UNTRUSTED source (a share link). Mirrors
+ * the agent write path: the decoded XML is treated as untrusted BYTES and must
+ * clear the air-ts byte-security gate (SEC-* contract: DOCTYPE/entity refusal,
+ * size/depth/attr caps, UTF-8-only), then normalize + validate, before it may be
+ * loaded. Returns the CANONICAL normalized XML on success, or a friendly message
+ * on any failure. Never throws.
+ */
+function gateSharedDesign(
+  xml: string,
+): { ok: true; xml: string } | { ok: false; message: string } {
+  let normalized: string;
+  try {
+    // Byte-security gate: run the SAME SEC-* contract an imported file passes
+    // (fileIo.openFromDisk), then coerce near-miss shape to strict canonical AIR.
+    parseXmlBytes(new TextEncoder().encode(xml));
+    normalized = airNormalize(xml);
+  } catch (e) {
+    return {
+      ok: false,
+      message: `The shared design was rejected by the security gate: ${(e as Error).message}`,
+    };
+  }
+  let diagnostics: AirDiagnostic[];
+  try {
+    diagnostics = airValidate(normalized);
+  } catch (e) {
+    return { ok: false, message: `The shared design could not be validated: ${(e as Error).message}` };
+  }
+  const firstError = diagnostics.find((d) => d.severity === 'error');
+  if (firstError) {
+    return {
+      ok: false,
+      message: `The shared design is not valid: ${firstError.code} — ${firstError.message}`,
+    };
+  }
+  return { ok: true, xml: normalized };
+}
+
+/**
+ * Share-link boot (issue #27). If the URL fragment carries a `d=` share payload,
+ * decode it, run it through the untrusted-input gate, and OPEN IT AS A NEW design
+ * (createProject — which mints a fresh project id and never overwrites the user's
+ * existing work). The fragment is stripped with `history.replaceState` so a
+ * reload never re-imports and the payload leaves the address bar. Any failure
+ * lands on the normal start screen with a friendly, dismissible, non-blocking
+ * notice — never an uncaught exception.
+ */
+function ShareLoader({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate();
+  const createProject = useProjectStore((s) => s.createProject);
+  // Detect an ACTUAL `d` fragment parameter (mirrors how decodeHashToDesign
+  // parses it), not a bare "d=" substring — otherwise hashes like `#id=…`,
+  // `#end=…`, or `#feed=…` would spuriously trigger an import and strip the
+  // user's fragment.
+  const hasSharePayload =
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.hash.replace(/^#/, '')).has('d');
+  const [importing, setImporting] = useState(hasSharePayload);
+  const [notice, setNotice] = useState<string | null>(null);
+  const ranRef = useRef(false);
+
+  useEffect(() => {
+    if (ranRef.current) return;
+    ranRef.current = true;
+    if (!hasSharePayload) return;
+
+    const hash = window.location.hash;
+    // Strip the fragment: a reload must not re-import, and the (potentially
+    // large) payload should not linger in the address bar. Keep path + search.
+    const stripFragment = () =>
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+
+    const finishOnStart = (message: string) => {
+      setNotice(message);
+      stripFragment();
+      setImporting(false);
+      navigate('/', { replace: true });
+    };
+
+    const run = async () => {
+      const decoded = decodeHashToDesign(hash);
+      if (!decoded.ok) {
+        finishOnStart(DECODE_ERROR_MESSAGES[decoded.error]);
+        return;
+      }
+      const gated = gateSharedDesign(decoded.xml);
+      if (!gated.ok) {
+        finishOnStart(gated.message);
+        return;
+      }
+      try {
+        await createProject('Shared design', gated.xml);
+        stripFragment();
+        setImporting(false);
+        navigate('/project', { replace: true });
+      } catch (e) {
+        finishOnStart(`Could not open the shared design: ${(e as Error).message}`);
+      }
+    };
+    void run();
+  }, [hasSharePayload, navigate, createProject]);
+
+  if (importing) {
+    return (
+      <div className="boot-status" role="status">
+        Opening shared design…
+      </div>
+    );
+  }
+  return (
+    <>
+      {notice && (
+        <div className="share-notice" role="alert">
+          <span>{notice}</span>
+          <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss">
+            Dismiss
+          </button>
+        </div>
+      )}
+      {children}
+    </>
+  );
+}
+
 function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const initProjectStore = useProjectStore((s) => s.init);
+  const isDowngraded = useProjectStore((s) => s.isDowngraded);
+  const initialized = useProjectStore((s) => s.initialized);
+  const storageError = useProjectStore((s) => s.storageError);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
+  useEffect(() => {
+    void initProjectStore();
+  }, [initProjectStore]);
+
+  if (!initialized) {
+    return <div className="boot-status" role="status">Opening local workspace...</div>;
+  }
+
+  if (storageError) {
+    return (
+      <div className="boot-status storage-error" role="alert">
+        <h1>Local storage unavailable</h1>
+        <p>{storageError}</p>
+        <p>Allow IndexedDB for this site, then reload. No project data was sent anywhere.</p>
+      </div>
+    );
+  }
+
+  if (isDowngraded) {
+    return <DowngradeRefusalScreen />;
+  }
+
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<LandingWrapper />} />
-        <Route path="/project" element={<ProjectWorkspace theme={theme} toggleTheme={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')} />} />
-        {SimLab && (
-          <Route
-            path="/sim-lab"
-            element={
-              <Suspense fallback={<div style={{ padding: 24 }}>Loading sim-lab…</div>}>
-                <SimLab />
-              </Suspense>
-            }
-          />
-        )}
-      </Routes>
+      <ShareLoader>
+        <Routes>
+          <Route path="/" element={<LandingWrapper />} />
+          <Route path="/project" element={<ProjectWorkspace theme={theme} toggleTheme={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')} />} />
+          {SimLab && (
+            <Route
+              path="/sim-lab"
+              element={
+                <Suspense fallback={<div style={{ padding: 24 }}>Loading sim-lab…</div>}>
+                  <SimLab />
+                </Suspense>
+              }
+            />
+          )}
+        </Routes>
+      </ShareLoader>
     </BrowserRouter>
   );
 }
 
 function LandingWrapper() {
-  const navigate = useNavigate();
-  return <Landing onNewProject={() => navigate('/project')} onOpenProject={() => navigate('/project')} />;
+  return <Landing />;
 }
 
 export default App;

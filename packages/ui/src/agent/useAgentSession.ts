@@ -28,8 +28,10 @@ import {
   type MockFixture,
   type NetworkProviderId,
 } from "agent";
+import { parse as parseAir } from "air-ts";
 import { useDesignStore, designSnapshot } from "./designStore";
 import { useAgentSettings } from "./agentSettings";
+import { useProjectStore } from "../storage/projectStore";
 import { createUiEngineHooks } from "./engineHooks";
 
 /** A chat transcript entry the panel renders. */
@@ -61,6 +63,24 @@ export interface AgentSessionConfig {
 
 const vault = new KeyVault();
 
+/**
+ * When the agent delivers a design into a project still called "Untitled
+ * Project", adopt the design's own title so the workspace header, landing list,
+ * and design metadata stop disagreeing. Best-effort: a parse failure changes
+ * nothing.
+ */
+function maybeAdoptDesignTitle(xml: string): void {
+  try {
+    const store = useProjectStore.getState();
+    const active = store.projectsList.find((p) => p.id === store.activeProjectId);
+    if (!active || active.name !== "Untitled Project") return;
+    const title = parseAir(xml).metadata.title.trim();
+    if (title && title !== "Blank Design") void store.renameProject(active.id, title);
+  } catch {
+    // best-effort only
+  }
+}
+
 export function useAgentSession() {
   const [transcript, setTranscript] = useState<ChatEntry[]>([]);
   const [proposals, setProposals] = useState<UiProposal[]>([]);
@@ -82,22 +102,34 @@ export function useAgentSession() {
     (proposal: StagedProposal) => {
       const snap = designSnapshot();
       const outcome = resolveApply(proposal, snap.xml, snap.version, createUiEngineHooks());
+
+      // Side effects (the store writes) run HERE, never inside the setProposals
+      // updater — a state updater must be pure, and React may run it twice
+      // (StrictMode) or during render, which would fire `applyValidated` mid-
+      // render (the "setState while rendering" warning). Compute the pure status
+      // patch first, perform the writes, then update proposal state purely.
+      let patch: Partial<UiProposal>;
+      switch (outcome.status) {
+        case "clean":
+          applyValidated(outcome.design);
+          maybeAdoptDesignTitle(outcome.design.xml);
+          patch = { status: "applied" };
+          break;
+        case "rebased":
+          applyValidated(outcome.design);
+          maybeAdoptDesignTitle(outcome.design.xml);
+          patch = { status: "applied", note: outcome.note };
+          break;
+        case "conflict":
+          patch = { status: "conflict", note: outcome.note, conflictCurrentXml: outcome.currentXml };
+          break;
+        case "stale_gate_failed":
+          patch = { status: "conflict", note: outcome.note };
+          break;
+      }
+
       setProposals((prev) =>
-        prev.map((p) => {
-          if (p.proposal.id !== proposal.id) return p;
-          switch (outcome.status) {
-            case "clean":
-              applyValidated(outcome.design);
-              return { ...p, status: "applied" };
-            case "rebased":
-              applyValidated(outcome.design);
-              return { ...p, status: "applied", note: outcome.note };
-            case "conflict":
-              return { ...p, status: "conflict", note: outcome.note, conflictCurrentXml: outcome.currentXml };
-            case "stale_gate_failed":
-              return { ...p, status: "conflict", note: outcome.note };
-          }
-        }),
+        prev.map((p) => (p.proposal.id === proposal.id ? { ...p, ...patch } : p)),
       );
     },
     [applyValidated],
@@ -134,9 +166,15 @@ export function useAgentSession() {
             setRunning(false);
             return;
           }
-          provider = createProvider(config.provider, { apiKey: key, ...(config.model ? { model: config.model } : {}) });
+          const baseUrl = vault.getBaseUrl(config.provider);
+          provider = createProvider(config.provider, { 
+            apiKey: key, 
+            ...(config.model ? { model: config.model } : {}),
+            ...(baseUrl ? { baseUrl } : {}) 
+          });
         }
       } catch (err) {
+        console.error("Agent startup failed:", err);
         push({ role: "system", content: `Could not start the agent: ${(err as Error).message}` });
         setRunning(false);
         return;
@@ -146,12 +184,25 @@ export function useAgentSession() {
       const runtime = new ToolRuntime(snap, { hooks: createUiEngineHooks() });
 
       let assistantBuf = "";
+      let lastAssistantText = "";
       const flushAssistant = () => {
-        if (assistantBuf.trim()) push({ role: "assistant", content: assistantBuf });
+        if (assistantBuf.trim()) {
+          lastAssistantText = assistantBuf;
+          push({ role: "assistant", content: assistantBuf });
+        }
         assistantBuf = "";
       };
 
+      let turnEmittedContent = false;
+      // Tracks whether ANY set_design/propose_patch call actually staged a
+      // proposal this run — the model narrating "click Apply" is not evidence
+      // of that; only a real proposal-staged event is (see the done handler).
+      let stagedThisRun = false;
+
       const onEvent = (ev: RunnerEvent) => {
+        if (ev.type === "assistant-text" || ev.type === "tool-call") {
+          turnEmittedContent = true;
+        }
         switch (ev.type) {
           case "assistant-text":
             assistantBuf += ev.text;
@@ -164,6 +215,7 @@ export function useAgentSession() {
             runtime.setDesignSnapshot(designSnapshot());
             break;
           case "proposal-staged":
+            stagedThisRun = true;
             setProposals((prev) => [...prev, { proposal: ev.proposal, status: "staged" }]);
             if (autoApply) applyProposal(ev.proposal);
             break;
@@ -178,12 +230,25 @@ export function useAgentSession() {
             break;
           case "error":
             flushAssistant();
+            console.error("Provider stream error:", ev);
             push({ role: "system", content: `Provider error: ${ev.message}` });
             break;
           case "done":
             flushAssistant();
             if (ev.reason !== "completed") {
               push({ role: "system", content: `Run ended: ${humanReason(ev.reason)}` });
+            } else if (!stagedThisRun && /\bapply\b/i.test(lastAssistantText)) {
+              // Safety net for a model that narrates success it never achieved
+              // (see prompts.ts HONESTY ABOUT STAGING): its closing text invites
+              // an Apply click, but no set_design/propose_patch call actually
+              // staged anything this run, so there is nothing to apply.
+              push({
+                role: "system",
+                content:
+                  "Note: no design or patch was actually staged in that reply — there is " +
+                  "nothing to Apply yet. Ask the assistant to fix any validation errors " +
+                  "and try again.",
+              });
             }
             break;
         }
@@ -202,7 +267,11 @@ export function useAgentSession() {
           ...(config.model ? { modelId: config.model } : {}),
         });
         historyRef.current = messages;
+        if (!turnEmittedContent) {
+          push({ role: "system", content: "Run ended immediately with no outputs (check provider configuration or mock fixture)." });
+        }
       } catch (err) {
+        console.error("Agent run failed with exception:", err);
         push({ role: "system", content: `Agent run failed: ${(err as Error).message}` });
       } finally {
         setRunning(false);

@@ -179,10 +179,25 @@ if ($DryRun) {
 Show-Intent
 Write-Host ""
 Write-Host "Applying branch protection for real..."
-$payloadJson | & $gh api --method PUT -H "Accept: application/vnd.github+json" "/$apiPath" --input -
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "gh api call failed with exit code $LASTEXITCODE."
-    exit $LASTEXITCODE
+# PS 5.1's pipeline mangles the payload's encoding when piped to `gh ... --input -`
+# (gh sees invalid bytes and GitHub returns HTTP 400 "Problems parsing JSON").
+# Write the payload to a BOM-free UTF-8 temp file and pass it as a real file path.
+# Out-File/Set-Content are avoided deliberately: under PS 5.1 they add a UTF-8 BOM
+# and/or CRLF, which is exactly the corruption we are fixing.
+$tmp = [IO.Path]::GetTempFileName()
+try {
+    # Normalize CRLF -> LF for the wire body (whitespace only; the JSON settings are
+    # unchanged, and the -DryRun printout still uses the original $payloadJson).
+    $payloadJsonBody = $payloadJson -replace "`r", ""
+    [IO.File]::WriteAllText($tmp, $payloadJsonBody, (New-Object System.Text.UTF8Encoding($false)))
+    & $gh api --method PUT -H "Accept: application/vnd.github+json" "/$apiPath" --input $tmp
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "gh api call failed with exit code $LASTEXITCODE."
+        exit $LASTEXITCODE
+    }
+}
+finally {
+    Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
 }
 Write-Host "Applied. Reading back current protection settings:"
 & $gh api -H "Accept: application/vnd.github+json" "/$apiPath"

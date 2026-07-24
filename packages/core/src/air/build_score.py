@@ -475,6 +475,69 @@ def check_required_components(design: Design, required: list[dict]) -> tuple[boo
 _FW_RE = re.compile(r"^(\w+)\((.*)\)$")
 
 
+def _resolve_gpio_binding_net(design: Design, binding) -> str | None:
+    """Resolve a firmware ``binding`` referenced by a ``write_gpio`` op to the net
+    of the GPIO pin it names — REAL resolution against the component's DECLARED
+    pins, not a blind trust of the binding's ``<net>`` attribute.
+
+    A ``<write_gpio binding="ind_led"/>`` op is the equally-legal alternative to
+    ``<write_gpio pin="GPIO8"/>``: instead of naming a pin directly, it references
+    a ``<binding>`` that ties a signal to a pin on ``binding.component``. This
+    mirrors the SAME resolution the rest of the codebase performs — the documented
+    AIR contract (see ``prompts``) is that a binding's ``<channel>`` matches the
+    referenced MCU pin's declared ``function``, and both ``firmware._binding_pin_number``
+    and ``validation._validate_adc_binding`` resolve a binding by walking the
+    referenced component's pins.
+
+    Resolution is UNAMBIGUOUS (never first-match):
+
+    1. Look up ``binding.component``; if it does not exist -> ``None``.
+    2. Among that component's DECLARED pins, collect the candidates: pins that are
+       GPIO-capable (``function`` in ``GPIO_FUNC_TOKENS``) AND whose ``channel``
+       matches the binding's ``channel`` — ``channel == pin.function`` OR
+       ``channel == pin.name`` — compared CASE-INSENSITIVELY.
+    3. Exactly one candidate -> return that candidate's ``net``.
+    4. More than one candidate (e.g. a component declaring two pins that share a
+       GPIO function token, bound with a generic channel) -> disambiguate using the
+       binding's own declared ``<net>``: if exactly one candidate has
+       ``net == binding.net`` return that candidate's ``net``; otherwise ``None``.
+    5. Zero candidates -> ``None``.
+
+    The op's target net is always a REAL channel-matched GPIO pin's ``net``, never
+    the binding's self-declared ``<net>`` taken on faith: ``<net>`` is used ONLY as
+    a disambiguator among legitimately channel-matched pins. A binding naming the
+    wrong pin resolves to the wrong net (rejected by the caller's net comparison),
+    an ambiguous binding whose ``<net>`` fails to single out one candidate is
+    rejected outright, and a binding with no matching declared GPIO pin resolves to
+    ``None`` — so the widening never degenerates into "accept any op that has a
+    binding attribute".
+    """
+    if binding is None or not binding.channel:
+        return None
+    component = design.ir.components.get(binding.component)
+    if component is None:
+        return None
+    channel = binding.channel.strip().lower()
+    candidates = [
+        pin
+        for pin in component.pins.values()
+        if pin.function in GPIO_FUNC_TOKENS
+        and ((pin.function or "").lower() == channel or (pin.name or "").lower() == channel)
+    ]
+    if not candidates:
+        return None
+    if len(candidates) == 1:
+        return candidates[0].net
+    # Ambiguous channel: disambiguate ONLY by the binding's declared <net>, and
+    # only when it uniquely identifies one channel-matched candidate. A <net> that
+    # matches zero or multiple candidates leaves the binding ambiguous -> reject
+    # (NEVER fall back to first-match, NEVER trust <net> as blind acceptance).
+    net_matched = [pin for pin in candidates if pin.net == binding.net]
+    if len(net_matched) == 1:
+        return net_matched[0].net
+    return None
+
+
 def check_firmware_intent(design: Design, intents: list[str], u: Unifier) -> tuple[bool, str]:
     """Assert the declarative firmware ops exist, bound to the resolved nets.
 
@@ -482,6 +545,10 @@ def check_firmware_intent(design: Design, intents: list[str], u: Unifier) -> tup
     write_gpio(net=<N>) / pwm(net=<N>) / read_gpio(net=<N>)
                        -> a firmware op / binding touching resolved(<N>) (a GPIO
                           pin on that net exists; the declarative op references it).
+                          The GPIO op may name its pin EITHER directly
+                          (``pin="GPIO8"``) OR via a ``binding="..."`` that resolves
+                          to a real GPIO pin on the referenced component (both are
+                          legal AIR for the same intent).
     'log'              -> some task carries a <log>.
     """
     ir = design.ir
@@ -498,15 +565,31 @@ def check_firmware_intent(design: Design, intents: list[str], u: Unifier) -> tup
     # collect firmware facts
     adc_binding_nets = {b.net for b in ir.firmware_bindings.values()}
     gpio_op_pins: set[str] = set()
+    # Nets a write_gpio op reaches via a binding= (resolved against the referenced
+    # component's DECLARED pins — see _resolve_gpio_binding_net). A write_gpio op
+    # may express its target as EITHER pin="GPIO8" OR binding="ind_led"; both are
+    # legal AIR for the same intent, so both count.
+    gpio_op_binding_nets: set[str] = set()
     has_log = False
     for task in ir.firmware_tasks.values():
         for op in task.operations:
-            if op.get("op") == "write_gpio" and op.get("pin"):
-                gpio_op_pins.add(op["pin"])
+            if op.get("op") == "write_gpio":
+                # A write_gpio op may carry pin=, binding=, or BOTH. Each present
+                # form contributes its resolved net; the op's reachable nets are the
+                # UNION (pin-name nets via the MCU below + binding-resolved nets
+                # here), so a design that names the pin both ways is not penalized.
+                if op.get("pin"):
+                    gpio_op_pins.add(op["pin"])
+                binding_id = op.get("binding")
+                if binding_id:
+                    net = _resolve_gpio_binding_net(design, ir.firmware_bindings.get(binding_id))
+                    if net is not None:
+                        gpio_op_binding_nets.add(net)
             if op.get("op") == "log":
                 has_log = True
-    # map GPIO pin names used in ops -> nets via the MCU
-    gpio_op_nets: set[str] = set()
+    # map GPIO pin names used in ops -> nets via the MCU, plus the binding-resolved
+    # nets collected above.
+    gpio_op_nets: set[str] = set(gpio_op_binding_nets)
     for c in design.by_type("mcu"):
         for pin in c.pins.values():
             if pin.name in gpio_op_pins:

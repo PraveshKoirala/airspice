@@ -107,11 +107,21 @@ const TEXT_KEY = "#text";
 export function parseXml(xmlText: string): XmlElement {
   enforceSecurity(xmlText);
 
+  // PARITY (#76): apply expat's PARSE-TIME whitespace normalization to the raw
+  // source BEFORE well-formedness checking, reference gating, and parsing. expat
+  // normalizes LITERAL whitespace during tokenization (line endings across the
+  // whole document; TAB/LF inside attribute values -> space), and it does so
+  // BEFORE expanding any character/entity reference. Because we transform the raw
+  // source here -- where "&#13;" is still five literal characters, not a CR --
+  // char-ref-introduced whitespace passes through unchanged, exactly as expat
+  // preserves it. See normalizeXmlWhitespace for the verified transforms.
+  const src = normalizeXmlWhitespace(xmlText);
+
   // Well-formedness gate. FXP's parser is lenient (it happily accepts unclosed
   // tags); the validator enforces matched tags the way expat does. It does NOT
   // catch every expat rejection (undefined named entities, multiple roots),
-  // which we handle separately below / accept as a documented pre-#43 gap.
-  const validation = XMLValidator.validate(xmlText, {
+  // which we handle separately below.
+  const validation = XMLValidator.validate(src, {
     allowBooleanAttributes: false,
   });
   if (validation !== true) {
@@ -125,7 +135,23 @@ export function parseXml(xmlText: string): XmlElement {
   // char ref whose code point fails the XML 1.0 Char production ("reference to
   // invalid character number"), while fast-xml-parser resolves-and-drops it.
   // Enforce the oracle's accept/reject decision before handing FXP the input.
-  rejectInvalidCharRefs(xmlText);
+  rejectInvalidCharRefs(src);
+
+  // PARITY (#75): reject undefined named entities (&nbsp; &foo; &copy; ...) and
+  // malformed reference syntax (bare &, &#X42; uppercase-X hex, &#; empty ref)
+  // that fast-xml-parser tolerates but expat rejects. Runs AFTER the numeric
+  // gate so an invalid-code-point ref keeps its SEC-008 code (the oracle reports
+  // SEC-008 too) rather than the plain codes=[] reject this gate raises.
+  rejectBadReferences(src);
+
+  // Literal-control-char gate (issue #36 cross-engine seam / the literal sub-case
+  // of tracked #78): expat REJECTS a LITERAL XML-1.0-invalid control char anywhere
+  // in the document as "not well-formed (invalid token)", while fast-xml-parser
+  // preserves the byte and builds a model. Enforce expat's decision here, AFTER
+  // the numeric-char-ref gate (matching the oracle's order: SEC-008 char refs are
+  // checked before the structural pass that rejects the literal char) so a
+  // control-char design is refused identically by both engines.
+  rejectInvalidControlChars(xmlText);
 
   const parser = new XMLParser({
     // Ordered array-of-nodes representation: each node is a single-key object,
@@ -146,12 +172,13 @@ export function parseXml(xmlText: string): XmlElement {
     // which expat also resolves for valid XML. Numeric refs to XML-invalid
     // code points are REJECTED before this parser runs (rejectInvalidCharRefs
     // above), matching expat's "reference to invalid character number".
-    // PARITY (pre-#43 gap, issue #75): htmlEntities also resolves named HTML
-    // entities such as &nbsp; that expat REJECTS as undefined, and FXP accepts
-    // malformed reference syntax (&#X42; resolved, &#; left literal, bare &)
-    // that expat rejects as not-well-formed. The corpus uses none of these, so
-    // corpus parity is unaffected; #43's fuzzer contract will formalize entity
-    // handling in docs/xml_security.md.
+    // PARITY (#75, FIXED): htmlEntities would also resolve named HTML entities
+    // such as &nbsp; -- which expat REJECTS as undefined -- and would tolerate
+    // malformed reference syntax (&#X42;, &#;, bare &) that expat rejects as
+    // not-well-formed. rejectBadReferences above now REJECTS every such input
+    // before FXP runs, so by the time htmlEntities acts the only references left
+    // are the 5 predefined entities and valid numeric refs, exactly the set
+    // expat resolves. htmlEntities therefore never diverges from expat here.
     processEntities: true,
     htmlEntities: true,
     ignorePiTags: true,
@@ -160,7 +187,7 @@ export function parseXml(xmlText: string): XmlElement {
 
   let parsed: unknown;
   try {
-    parsed = parser.parse(xmlText);
+    parsed = parser.parse(src);
   } catch (err) {
     throw new XmlParseError(
       `XML parse failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -363,8 +390,9 @@ export function parseXmlBytes(bytes: Uint8Array): XmlElement {
  * cannot contain `--`, character data cannot contain `]]>`).
  *
  * Malformed reference SYNTAX (&#X42;, &#;, bare &) is a different expat error
- * class ("not well-formed") and stays in the #75 accept-vs-reject family --
- * FXP resolves or keeps those literally; see the parser-options PARITY note.
+ * class ("not well-formed") and is rejected by rejectBadReferences (#75), which
+ * runs immediately after this gate. This gate owns ONLY the invalid-code-point
+ * case, which carries the distinct SEC-008 code.
  */
 function rejectInvalidCharRefs(xmlText: string): void {
   // Spans in which expat does not process character references.
@@ -394,6 +422,60 @@ function rejectInvalidCharRefs(xmlText: string): void {
 }
 
 /**
+ * Reject a LITERAL XML-1.0-invalid character anywhere in the document, exactly as
+ * expat does ("not well-formed (invalid token)").
+ *
+ * The decision is driven off `isXmlChar` -- the WHOLE XML 1.0 `Char` production
+ * (defined just below) -- scanned by CODE POINT, so the gate rejects EXACTLY
+ * expat's literal-invalid set and can never miss a code point. That set is
+ * #x0-#x8, #xB, #xC, #xE-#x1F (the C0 controls other than tab/LF/CR) AND the BMP
+ * upper exclusions #xFFFE / #xFFFF.
+ *
+ * PROVENANCE (oracle, `xml.etree.ElementTree.fromstring` / `parse_string`, probed
+ * at fix time across the whole Char production):
+ *   REJECT (literal): #x0-#x8, #xB, #xC, #xE-#x1F, #xFFFE, #xFFFF -- in EVERY
+ *     context (element text, attribute value, comment, CDATA section, processing
+ *     instruction, and inter-tag whitespace); the Char production governs every
+ *     character in the document, not just element content.
+ *   ACCEPT (literal): #x9/#xA/#xD, #x7F (DEL), the C1 range (#x84/#x85), #x2028,
+ *     the FDD0-FDEF and per-plane Unicode NONcharacters ABOVE the BMP (#x1FFFE,
+ *     #x1FFFF, ... #x10FFFF), and every valid astral char (e.g. an emoji,
+ *     U+1F600). XML 1.0 excludes ONLY the BMP #xFFFE/#xFFFF, NOT the Unicode
+ *     noncharacters, so those stay accepted; air-ts preserves all of these and we
+ *     keep that parity.
+ *
+ * Iterating by CODE POINT (`for...of` combines surrogate pairs) is what keeps a
+ * valid astral char accepted: it is checked once as its scalar value, never via
+ * its surrogate code units -- so an emoji (D83D DE00) is one U+1F600 check, not
+ * two surrogate checks. Lone surrogates (D800-DFFF) are the ENCODING gate's
+ * domain -- SEC-007 refuses the invalid UTF-8 (e.g. ED A0 80) at the byte level in
+ * both engines -- so we SKIP that range here and leave that path untouched.
+ *
+ * Sibling gate to `rejectInvalidCharRefs`, which handles the numeric-char-REF form
+ * (`&#65534;`, already rejected via `isXmlChar` + SEC-008); this one handles the
+ * LITERAL byte (preserved verbatim by fast-xml-parser). We scan the WHOLE input
+ * (not the char-ref "scannable" subset) because expat rejects the literal char in
+ * every span kind, including comments/CDATA/PIs. Raised as a code-less
+ * `XmlParseError` (not a SEC- code), matching the oracle's `XmlParseRejection` ->
+ * reject with `codes: []` (fuzz_eval.py): a plain not-well-formed rejection, so
+ * the differential harness sees both engines refuse with the same (empty) class.
+ */
+function rejectInvalidControlChars(xmlText: string): void {
+  for (const ch of xmlText) {
+    const cp = ch.codePointAt(0) as number;
+    // Lone surrogate -> the encoding gate's (SEC-007) job; leave it untouched.
+    if (cp >= 0xd800 && cp <= 0xdfff) continue;
+    if (!isXmlChar(cp)) {
+      const hex = cp.toString(16).toUpperCase().padStart(4, "0");
+      throw new XmlParseError(
+        `not well-formed (invalid token): literal character U+${hex} ` +
+          `is not a legal XML 1.0 character`,
+      );
+    }
+  }
+}
+
+/**
  * XML 1.0 `Char` production:
  * #x9 | #xA | #xD | [#x20-#xD7FF] | [#xE000-#xFFFD] | [#x10000-#x10FFFF].
  */
@@ -406,6 +488,188 @@ function isXmlChar(cp: number): boolean {
     (cp >= 0xe000 && cp <= 0xfffd) ||
     (cp >= 0x10000 && cp <= 0x10ffff)
   );
+}
+
+// --- Undefined / malformed reference gate (issue #75) ----------------------- #
+
+/**
+ * A syntactically- AND semantically-valid XML reference, anchored at an `&`:
+ * one of the 5 predefined entities, a decimal char ref, or a lowercase-x hex
+ * char ref. This is EXACTLY the set expat accepts in a document with no DTD
+ * (DOCTYPE is rejected outright, SEC-001, so no other named entity can be
+ * defined). Code-point validity of numeric refs is enforced separately by
+ * rejectInvalidCharRefs (SEC-008); here the numeric alternatives are syntactic.
+ */
+const VALID_REF_RE = /&(?:amp|lt|gt|quot|apos|#[0-9]+|#x[0-9a-fA-F]+);/y;
+
+/**
+ * Reject undefined named entities and malformed reference syntax, matching
+ * expat's decision (issue #75).
+ *
+ * PARITY (oracle, `xml.etree.ElementTree.fromstring`, verified at build time):
+ *   REJECT (expat "undefined entity"): any named reference other than the five
+ *     predefined -- &nbsp; &foo; &copy; ... -- in TEXT and in ATTRIBUTE VALUES.
+ *   REJECT (expat "not well-formed"): malformed reference syntax -- a bare `&`,
+ *     an uppercase-X hex ref &#X42;, an empty ref &#;, a named ref with no `;`.
+ *   ACCEPT: the five predefined entities and valid numeric refs (&#65; &#x42;).
+ *   CONTEXT: references are NOT processed inside comments, CDATA sections, or
+ *     processing instructions, so a `&` there is literal and MUST NOT be flagged
+ *     (verified: <a><!-- &nbsp; --></a> and <a><![CDATA[&foo;]]></a> both ACCEPT).
+ *
+ * fast-xml-parser diverges: with htmlEntities it RESOLVES &nbsp;/&copy; to a
+ * character and keeps &foo; literal, and in attribute values it even resolves
+ * &#X42; and tolerates a bare `&` -- all inputs expat rejects. This gate makes
+ * air-ts reach expat's accept/reject decision instead. Every rejection here is a
+ * plain XmlParseError with NO code, which maps to the oracle's `reject` with an
+ * empty `codes` set (expat surfaces these as an ordinary ParseError, not a
+ * security-contract violation), so the differential harness sees the same
+ * rejection class.
+ *
+ * The scan mirrors rejectInvalidCharRefs: strip the three unprocessed span kinds
+ * first, then walk every remaining `&`. In well-formed XML a `&` can only appear
+ * in text or an attribute value, and after stripping comment/CDATA/PI spans any
+ * `&` left that does not open a VALID_REF_RE reference is one expat rejects.
+ */
+function rejectBadReferences(xmlText: string): void {
+  const scannable = xmlText.replace(
+    /<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<\?[\s\S]*?\?>/g,
+    // Replace with same-length blanks would be ideal, but position is not
+    // reported to the user; a plain removal is enough since we only test whether
+    // a valid reference begins at each surviving `&`.
+    "",
+  );
+  let i = 0;
+  const n = scannable.length;
+  while (i < n) {
+    const amp = scannable.indexOf("&", i);
+    if (amp === -1) break;
+    VALID_REF_RE.lastIndex = amp;
+    if (!VALID_REF_RE.test(scannable)) {
+      throw new XmlParseError(
+        `undefined or malformed entity reference: ${scannable.slice(amp, amp + 16)}`,
+      );
+    }
+    // Continue AFTER the matched reference so an inner `&` (there is none in a
+    // valid ref) is never rescanned; lastIndex is the char past the ';'.
+    i = VALID_REF_RE.lastIndex;
+  }
+}
+
+// --- Parse-time whitespace normalization (issue #76) ------------------------ #
+
+/**
+ * Apply expat's PARSE-TIME whitespace normalization to raw XML source,
+ * reproducing the two transforms expat performs on LITERAL characters during
+ * tokenization -- BEFORE any character/entity reference is expanded.
+ *
+ * PARITY (#76, verified against CPython xml.etree.ElementTree / expat):
+ *   1. XML 1.0 s2.11 line-ending normalization, over the WHOLE document (text,
+ *      CDATA, and attribute values alike): a CRLF ("\r\n") or a lone CR ("\r")
+ *      becomes a single LF ("\n"). Verified: <a>p\rq</a> -> text "p\nq";
+ *      <![CDATA[p\rq]]> -> "p\nq".
+ *   2. XML 1.0 s3.3.3 attribute-value whitespace normalization: within a start-
+ *      or empty-element tag, each remaining literal TAB ("\t") or LF ("\n")
+ *      inside a quoted attribute value becomes a single SPACE -- each character
+ *      maps to one space; runs are NOT collapsed. Verified: <a x="p\tq"/> ->
+ *      x="p q"; <a x="p\r\rq"/> -> x="p  q" (two spaces, from two CR->LF->space).
+ *
+ * CRUCIAL: expat applies these to LITERAL source characters only. A TAB/LF/CR
+ * introduced via a character reference (&#9; / &#10; / &#13;) is NOT literal at
+ * this stage and passes through UNCHANGED -- verified: <a x="p&#13;q"/> keeps
+ * x="p\rq"; <a>p&#13;q</a> keeps text "p\rq". Because this runs on the RAW source
+ * (where "&#13;" is the five characters &,#,1,3,;) BEFORE fast-xml-parser expands
+ * references, char-ref-introduced whitespace is preserved exactly as expat
+ * preserves it, while literal whitespace is normalized exactly as expat does.
+ *
+ * fast-xml-parser performs NEITHER transform (it keeps literal tabs/newlines/CR
+ * verbatim in both text and attribute values), so without this pre-pass the
+ * parsed model and the canonical serialization diverge from the oracle for such
+ * inputs (#76). Line-ending normalization is a global string replace; the
+ * attribute-value pass uses a quote-aware scanner so a literal TAB/LF is touched
+ * ONLY inside a real element tag's quoted value -- never in text content, a
+ * comment, CDATA, or a PI (where expat leaves them alone).
+ */
+function normalizeXmlWhitespace(src: string): string {
+  // Step 1: line-ending normalization across the whole document.
+  const s = src.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  // Fast path: nothing left to normalize if there is no TAB or LF at all (the
+  // only literals step 2 acts on). Keeps the common corpus/test inputs an exact
+  // identity transform with no scanning cost.
+  if (s.indexOf("\t") === -1 && s.indexOf("\n") === -1) return s;
+
+  // Step 2: attribute-value whitespace normalization inside element tags only.
+  let out = "";
+  let i = 0;
+  const n = s.length;
+  while (i < n) {
+    if (s[i] !== "<") {
+      // Text content: expat keeps literal TAB/LF here; copy verbatim.
+      const lt = s.indexOf("<", i);
+      const stop = lt === -1 ? n : lt;
+      out += s.slice(i, stop);
+      i = stop;
+      continue;
+    }
+    if (s.startsWith("<!--", i)) {
+      const end = s.indexOf("-->", i + 4);
+      const stop = end === -1 ? n : end + 3;
+      out += s.slice(i, stop); // comment: no attribute values; copy verbatim
+      i = stop;
+      continue;
+    }
+    if (s.startsWith("<![CDATA[", i)) {
+      const end = s.indexOf("]]>", i + 9);
+      const stop = end === -1 ? n : end + 3;
+      out += s.slice(i, stop); // CDATA: character data; copy verbatim
+      i = stop;
+      continue;
+    }
+    if (s.startsWith("<?", i)) {
+      const end = s.indexOf("?>", i + 2);
+      const stop = end === -1 ? n : end + 2;
+      out += s.slice(i, stop); // PI: copy verbatim
+      i = stop;
+      continue;
+    }
+    if (s.startsWith("<!", i)) {
+      // A declaration (e.g. DOCTYPE, rejected elsewhere): no quoted attribute
+      // values to normalize; copy up to the terminating '>'.
+      const end = s.indexOf(">", i + 2);
+      const stop = end === -1 ? n : end + 1;
+      out += s.slice(i, stop);
+      i = stop;
+      continue;
+    }
+    // An element tag: <tag ...>, </tag>, or <tag .../>. Walk quote-aware to the
+    // closing '>', normalizing TAB/LF -> space only inside a quoted value ('>'
+    // is legal inside an attribute value, so a naive indexOf(">") would be wrong).
+    let j = i + 1;
+    let tag = "<";
+    while (j < n && s[j] !== ">") {
+      const ch = s[j] as string;
+      if (ch === '"' || ch === "'") {
+        let k = j + 1;
+        while (k < n && s[k] !== ch) k += 1;
+        tag += ch + s.slice(j + 1, k).replace(/[\t\n]/g, " ");
+        if (k < n) {
+          tag += ch; // closing quote
+          j = k + 1;
+        } else {
+          j = k; // unterminated quote; well-formedness gate will reject
+        }
+      } else {
+        tag += ch;
+        j += 1;
+      }
+    }
+    if (j < n) {
+      tag += ">";
+      j += 1;
+    }
+    out += tag;
+    i = j;
+  }
+  return out;
 }
 
 /**

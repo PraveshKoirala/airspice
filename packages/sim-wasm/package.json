@@ -14,6 +14,10 @@
     },
     "./worker": {
       "import": "./src/engine.worker.ts"
+    },
+    "./node": {
+      "types": "./dist/node/index.d.ts",
+      "import": "./dist/node/index.js"
     }
   },
   "files": [
