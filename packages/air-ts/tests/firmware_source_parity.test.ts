@@ -35,7 +35,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { canonicalize, validate } from "../src/index.js";
+import { parse, canonicalize, validate } from "../src/index.js";
 import { parseXml, find, elementText } from "../src/xml.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -166,4 +166,42 @@ describe("existing declarative firmware is unchanged (air-ts)", () => {
   it("its canonical form has no CDATA section (source-only new emit path)", () => {
     expect(canonicalize(existing)).not.toContain("<![CDATA[");
   });
+});
+
+// ================== control-char rejection parity (#36 seam) ==================
+// XML 1.0's Char production forbids most C0 controls. A LITERAL one inside the
+// <source> CDATA must be REJECTED at parse by BOTH engines (expat rejects; the
+// Python oracle raises). air-ts ACCEPTS it today (builds a model, 0 errors) -
+// that is the seam. The valid whitespace controls (#x9/#xA/#xD) and #x7F DEL
+// are legal and must STILL be accepted byte-exact. We assert accept/reject
+// PARITY only, not the rejection message.
+describe("firmware <source> control-char rejection parity (air-ts)", () => {
+  const CLEAN = FIXTURES.clean_plant_waterer;
+  const withChar = (ch: string): string => CLEAN.replace("import time", "import time" + ch);
+
+  const INVALID_C0: Record<string, string> = { "form-feed \\x0c": "\x0c", "unit-sep \\x1f": "\x1f" };
+  const VALID_CONTROL: Record<string, string> = { "tab \\x09": "\x09", "DEL \\x7f": "\x7f" };
+
+  it("uses a unique injection anchor inside the source body", () => {
+    expect(CLEAN.split("import time").length - 1).toBe(1);
+  });
+
+  // RED today: air-ts currently accepts these and builds a model; GREEN once the
+  // builder rejects literal invalid C0 controls at parse (matching expat).
+  for (const [name, ch] of Object.entries(INVALID_C0)) {
+    it(`rejects a literal invalid C0 control char at parse (${name})`, () => {
+      expect(() => parse(withChar(ch))).toThrow();
+    });
+  }
+
+  // Positive control: legal control chars are accepted AND round-trip byte-exact.
+  // GREEN before and after the fix; guards against over-rejecting.
+  for (const [name, ch] of Object.entries(VALID_CONTROL)) {
+    it(`accepts a legal control char byte-exact (${name})`, () => {
+      const xml = withChar(ch);
+      const expected = sourceText(xml);
+      expect(expected).toContain(ch);
+      expect(sourceText(canonicalize(xml))).toBe(expected);
+    });
+  }
 });

@@ -213,5 +213,44 @@ def test_existing_design_canonical_has_no_cdata() -> None:
     assert "<![CDATA[" not in canon
 
 
+# ===================== control-char rejection parity (#36 seam) =====================
+# XML 1.0's Char production forbids most C0 control characters. A LITERAL one
+# inside the <source> CDATA must be REJECTED at parse by BOTH engines (expat
+# rejects it as not-well-formed; air-ts must match, per the #36 byte-parity
+# promise). The valid whitespace controls (#x9 tab, #xA LF, #xD CR) and #x7F DEL
+# ARE legal and must STILL be accepted byte-exact -- the positive control guards
+# the builder against over-rejecting. We assert accept/reject PARITY only, not
+# the specific rejection message.
+INVALID_C0_CHARS = {"form_feed_x0c": "\x0c", "unit_sep_x1f": "\x1f"}
+VALID_CONTROL_CHARS = {"tab_x09": "\x09", "del_x7f": "\x7f"}
+
+_CLEAN = FIXTURES["clean_plant_waterer"]
+assert _CLEAN.count("import time") == 1, "anchor for source-char injection must be unique"
+
+
+def _source_with_char(ch: str) -> str:
+    """clean_plant_waterer with ``ch`` injected INSIDE the <source> CDATA body."""
+    return _CLEAN.replace("import time", "import time" + ch)
+
+
+@pytest.mark.parametrize("ch", list(INVALID_C0_CHARS.values()), ids=list(INVALID_C0_CHARS))
+def test_invalid_c0_control_char_rejected_at_parse(ch: str) -> None:
+    # Python (expat) already rejects; the assertion locks the CONTRACT that both
+    # engines refuse rather than silently building a model.
+    with pytest.raises(Exception):
+        parse_string(_source_with_char(ch))
+
+
+@pytest.mark.parametrize("ch", list(VALID_CONTROL_CHARS.values()), ids=list(VALID_CONTROL_CHARS))
+def test_valid_control_char_accepted_and_byte_exact(ch: str) -> None:
+    # Positive control: a legal control char (tab / DEL) must be accepted AND
+    # survive parse -> canonical -> parse byte-for-byte. GREEN before and after
+    # the fix; guards against over-rejecting the whole C0-ish range.
+    xml = _source_with_char(ch)
+    expected = _source_text(xml)
+    assert ch in expected
+    assert _source_text(_canonicalize(xml)) == expected
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))
