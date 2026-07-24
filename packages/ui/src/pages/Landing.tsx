@@ -1,8 +1,11 @@
 import React from "react";
-import { Plus, FolderOpen, CircuitBoard, Clock, ChevronRight } from "lucide-react";
+import { Plus, FolderOpen, CircuitBoard, Clock, ChevronRight, Compass } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useProjectStore } from "../storage/projectStore";
 import { openFromDisk } from "../storage/fileIo";
+import GalleryGrid from "../gallery/GalleryGrid";
+import type { GalleryEntry } from "../gallery/gallery";
+import { setWorkspaceIntent } from "../onboarding/workspaceIntent";
 
 const BLANK_TEMPLATE = `<?xml version="1.0" encoding="UTF-8"?>
 <system name="blank_design" ir_version="0.1">
@@ -59,6 +62,28 @@ const Landing: React.FC = () => {
     navigate("/project");
   };
 
+  // Open a gallery example as a NEW project (instant, backend-off, keyless). A
+  // "Fix me" card additionally routes the workspace onto the Repair tab, primed
+  // for the autonomous loop over the failing design.
+  const handleOpenExample = async (entry: GalleryEntry, xml: string) => {
+    try {
+      await createProject(entry.title, xml);
+      if (entry.kind === "fixme") {
+        setWorkspaceIntent({ tab: "repair" });
+      }
+      navigate("/project");
+    } catch (e) {
+      alert("Failed to open example: " + (e as Error).message);
+    }
+  };
+
+  // Re-launch the first-run tour from the front door: arm it and enter the
+  // workspace (the auto-migration guarantees a project to show it against).
+  const handleTakeTour = () => {
+    setWorkspaceIntent({ tour: true });
+    navigate("/project");
+  };
+
   const formatRelativeTime = (timestamp: number) => {
     const diff = now - timestamp;
     const mins = Math.floor(diff / 60000);
@@ -74,7 +99,10 @@ const Landing: React.FC = () => {
       <div className="landing-hero">
         <CircuitBoard size={64} className="hero-logo" />
         <h1>AirSpice</h1>
-        <p>The first electronics design platform powered by dynamic AI reasoning.</p>
+        <p>Capture a schematic, simulate it in your browser, and let the agent repair it.</p>
+        <button className="hero-tour-btn" onClick={handleTakeTour} data-testid="take-tour">
+          <Compass size={15} /> New here? Take the 30-second tour
+        </button>
       </div>
 
       <div className="landing-actions">
@@ -97,6 +125,14 @@ const Landing: React.FC = () => {
             <p>Browse your local files for .air.xml projects.</p>
           </div>
         </button>
+      </div>
+
+      <div className="landing-gallery">
+        <div className="section-header">
+          <CircuitBoard size={18} />
+          <span>Start from an example</span>
+        </div>
+        <GalleryGrid onOpen={handleOpenExample} />
       </div>
 
       {projectsList.length > 0 && (

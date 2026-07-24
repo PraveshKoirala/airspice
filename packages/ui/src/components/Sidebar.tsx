@@ -17,6 +17,7 @@ import {
   Trash2,
   Undo2,
   Upload,
+  HelpCircle,
 } from "lucide-react";
 import { useProjectStore } from "../storage/projectStore";
 import { openFromDisk } from "../storage/fileIo";
@@ -27,6 +28,8 @@ interface SidebarProps {
   setActiveTab: (tab: string) => void;
   theme: "dark" | "light";
   toggleTheme: () => void;
+  /** Re-launch the first-run tour (the Help affordance, issue #28 D4). */
+  onStartTour?: () => void;
 }
 
 const BLANK_TEMPLATE = `<?xml version="1.0" encoding="UTF-8"?>
@@ -137,7 +140,7 @@ const ESP32_TEMPLATE = `<?xml version="1.0" encoding="UTF-8"?>
   </simulation_profiles>
 </system>`;
 
-const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, theme, toggleTheme }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, theme, toggleTheme, onStartTour }) => {
   const projectsList = useProjectStore((s) => s.projectsList);
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
   const selectProject = useProjectStore((s) => s.selectProject);
@@ -393,6 +396,17 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, theme, toggl
         ))}
       </div>
       <div className="sidebar-footer">
+        {onStartTour && (
+          <button
+            className="theme-toggle"
+            onClick={onStartTour}
+            title="Replay the first-run tour"
+            data-testid="help-tour"
+          >
+            <HelpCircle size={20} />
+            <span className="tab-label">Help &amp; tour</span>
+          </button>
+        )}
         <button
           className="theme-toggle"
           onClick={toggleTheme}

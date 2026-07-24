@@ -28,9 +28,11 @@ import {
   XCircle,
   StopCircle,
   CircleSlash,
+  KeyRound,
 } from "lucide-react";
 import type { MockFixture, NetworkProviderId, RepairStopReason } from "agent";
 import { useRepairSession, type RepairOutcome, type RepairTimelineRow } from "../agent/useRepairSession";
+import { hasUserProviderKey } from "../agent/providerReadiness";
 
 interface RepairPanelProps {
   provider: NetworkProviderId | "mock";
@@ -39,6 +41,8 @@ interface RepairPanelProps {
   maxIterations?: number;
   mockFixture?: MockFixture;
   theme?: "dark" | "light";
+  /** Jump to the Settings tab (the BYOK key entry). */
+  onOpenSettings?: () => void;
 }
 
 const RepairPanel: React.FC<RepairPanelProps> = ({
@@ -48,8 +52,14 @@ const RepairPanel: React.FC<RepairPanelProps> = ({
   maxIterations,
   mockFixture,
   theme = "dark",
+  onOpenSettings,
 }) => {
   const { timeline, outcome, running, status, start, stop, reset } = useRepairSession();
+  // The repair loop is the one feature that needs an AI provider. When the user
+  // has no key of their own (only the seeded shared demo proxy, or nothing), show
+  // an honest BYOK pointer instead of hard-failing — the run still works against
+  // the demo proxy when it is reachable.
+  const needsKey = !hasUserProviderKey(provider);
 
   const onRun = () => {
     void start({
@@ -88,6 +98,22 @@ const RepairPanel: React.FC<RepairPanelProps> = ({
           )}
         </div>
       </div>
+
+      {needsKey && (
+        <div className="repair-byok-pointer" data-testid="repair-byok-pointer">
+          <KeyRound size={15} />
+          <div>
+            <strong>Add a provider key to run this repair.</strong>
+            <p>
+              The autonomous loop calls an AI provider to diagnose and patch the design. Add your own
+              key in Settings — it stays in this browser and is never sent to a server.
+            </p>
+          </div>
+          <button type="button" onClick={onOpenSettings} data-testid="repair-byok-settings">
+            Open Settings
+          </button>
+        </div>
+      )}
 
       {running && (
         <div className="repair-status" data-testid="repair-status">

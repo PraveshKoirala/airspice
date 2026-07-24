@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<system name="voltage_divider_pwm" ir_version="0.1">
+  <metadata>
+    <title>Arduino Voltage Divider and PWM LED controller</title>
+    <description>Resistive divider halves the 5V input voltage on A0 pin. The firmware reads A0 and scales it to adjust the PWM output on D3 driving an LED.</description>
+    <author>AI</author>
+    <created_at>2026-07-06T00:00:00Z</created_at>
+  </metadata>
+  <requirements>
+    <requirement id="req_adc" type="measurement">
+      <signal name="halved_voltage"/>
+      <range min="0.0V" max="2.5V"/>
+    </requirement>
+  </requirements>
+  <nets>
+    <net id="gnd" role="ground"/>
+    <net id="vcc" role="power" nominal_voltage="5V"/>
+    <net id="sense" role="analog_signal"/>
+    <net id="pwm" role="digital_signal"/>
+    <net id="led_anode" role="analog_signal"/>
+  </nets>
+  <components>
+    <component id="V_5V" type="voltage_source">
+      <value>5V</value>
+      <pin name="p" net="vcc"/>
+      <pin name="n" net="gnd"/>
+    </component>
+    <component id="R_TOP" type="resistor">
+      <value>10k</value>
+      <pin name="1" net="vcc"/>
+      <pin name="2" net="sense"/>
+    </component>
+    <component id="R_BOTTOM" type="resistor">
+      <value>10k</value>
+      <pin name="1" net="sense"/>
+      <pin name="2" net="gnd"/>
+    </component>
+    <component id="R_LED" type="resistor">
+      <value>220</value>
+      <pin name="1" net="pwm"/>
+      <pin name="2" net="led_anode"/>
+    </component>
+    <component id="D_LED" type="diode" part="1N4148">
+      <pin name="a" net="led_anode"/>
+      <pin name="c" net="gnd"/>
+    </component>
+    <component id="U_MCU" type="mcu" part="ATmega328P">
+      <pin name="VCC" net="vcc"/>
+      <pin name="GND" net="gnd"/>
+      <pin name="A0" net="sense" function="ADC1_CH0"/>
+      <pin name="D3" net="pwm" function="PWM"/>
+    </component>
+  </components>
+  <analog>
+    <subsystem id="main_subsystem">
+      <uses component="V_5V"/>
+      <uses component="R_TOP"/>
+      <uses component="R_BOTTOM"/>
+      <uses component="R_LED"/>
+      <uses component="D_LED"/>
+      <probe id="probe_sense" net="sense" quantity="voltage"/>
+      <probe id="probe_pwm" net="pwm" quantity="voltage"/>
+    </subsystem>
+  </analog>
+  <firmware>
+    <project id="fw_main" target="U_MCU" framework="platformio" language="cpp">
+      <board>uno</board>
+      <source_tree path="firmware/"/>
+    </project>
+    <binding id="a0_adc_binding">
+      <signal name="a0_voltage"/>
+      <component ref="U_MCU"/>
+      <peripheral>ADC1</peripheral>
+      <channel>ADC1_CH0</channel>
+      <net>sense</net>
+    </binding>
+  </firmware>
+  <tests>
+    <test id="divider_ratio">
+      <setup>
+        <set_voltage net="vcc" value="5V"/>
+      </setup>
+      <run duration="1ms"/>
+      <assert_voltage net="sense" min="2.45V" max="2.55V"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="analog_only" default="true">
+      <backend type="ngspice"/>
+      <include subsystem="main_subsystem"/>
+      <run test="divider_ratio"/>
+    </profile>
+  </simulation_profiles>
+  <exports>
+    <export target="spice" enabled="true"/>
+    <export target="firmware" enabled="true"/>
+  </exports>
+</system>

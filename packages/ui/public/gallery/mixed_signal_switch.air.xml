@@ -1,0 +1,77 @@
+<system name="mixed_signal_switch" ir_version="0.1">
+  <metadata>
+    <title>Mixed Signal Switch</title>
+    <description>ESP32-C3 toggles a MOSFET to drive a load and senses voltage.</description>
+    <author>AI</author>
+  </metadata>
+  <nets>
+    <net id="gnd" role="ground"/>
+    <net id="3v3" role="power" nominal_voltage="3.3V"/>
+    <net id="v_bat" role="power" nominal_voltage="3.7V"/>
+    <net id="gate_drive" role="digital_signal"/>
+    <net id="load_low" role="analog_signal"/>
+  </nets>
+  <components>
+    <component id="V_BAT" type="voltage_source">
+      <value>3.7V</value>
+      <pin name="p" net="v_bat"/>
+      <pin name="n" net="gnd"/>
+    </component>
+    <component id="V_3V3" type="voltage_source">
+      <value>3.3V</value>
+      <pin name="p" net="3v3"/>
+      <pin name="n" net="gnd"/>
+    </component>
+    <component id="U_MCU" type="mcu" part="ESP32-C3">
+      <pin name="3V3" net="3v3"/>
+      <pin name="GND" net="gnd"/>
+      <pin name="GPIO2" net="gate_drive" function="GPIO_OUT"/>
+      <pin name="GPIO0" net="load_low" function="ADC1_CH0"/>
+    </component>
+    <component id="Q_SWITCH" type="mosfet">
+      <pin name="G" net="gate_drive"/>
+      <pin name="D" net="load_low"/>
+      <pin name="S" net="gnd"/>
+    </component>
+    <component id="L_LOAD" type="generic_load">
+      <value>100mA</value>
+      <pin name="p" net="v_bat"/>
+      <pin name="n" net="load_low"/>
+    </component>
+  </components>
+  <firmware>
+    <project id="fw_main" target="U_MCU" framework="platformio" language="cpp">
+      <board>esp32-c3-devkitm-1</board>
+      <source_tree path="firmware/"/>
+    </project>
+    <task id="toggle_load" target="fw_main">
+      <period>10ms</period>
+      <write_gpio pin="GPIO2" value="high"/>
+      <delay duration="5ms"/>
+      <write_gpio pin="GPIO2" value="low"/>
+    </task>
+  </firmware>
+  <bridges>
+    <bridge id="load_sense" type="adc">
+      <analog_source net="load_low"/>
+      <digital_target component="U_MCU" peripheral="ADC1" channel="ADC1_CH0"/>
+      <conversion bits="12" reference_voltage="3.3V"/>
+    </bridge>
+  </bridges>
+  <tests>
+    <test id="switch_test">
+      <setup>
+        <set_voltage net="load_low" value="3.7V"/>
+      </setup>
+      <run duration="20ms"/>
+      <assert_voltage net="load_low" min="0V" max="3.8V"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="mixed_signal" default="true">
+      <backend type="ngspice"/>
+      <backend type="renode"/>
+      <run test="switch_test"/>
+    </profile>
+  </simulation_profiles>
+</system>

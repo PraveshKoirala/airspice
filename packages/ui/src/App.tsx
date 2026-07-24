@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import type { Node, Edge } from 'reactflow';
-import { Activity, FileCode, FolderTree } from 'lucide-react';
+import { Activity, FileCode, FolderTree, Play, MessageSquare, LayoutGrid, CircuitBoard } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Toolbar from './components/Toolbar';
 import XmlEditor from './components/Editor';
@@ -43,6 +43,9 @@ import RepairPanel from './components/RepairPanel';
 import SettingsPanel from './components/SettingsPanel';
 import FirmwarePanel from './components/FirmwarePanel';
 import Landing from './pages/Landing';
+import OnboardingTour from './onboarding/OnboardingTour';
+import { shouldAutoShowTour, markTourSeen } from './onboarding/tourState';
+import { takeWorkspaceIntent } from './onboarding/workspaceIntent';
 import type { ApiError, Diagnostic, ValidationResult } from './types/api';
 import { getEngine, ENGINE_MODE, getRun } from './engine';
 import type { SimulationReport as OracleReport, SystemIR } from 'air-ts';
@@ -215,8 +218,27 @@ const DEFAULT_XML = `<?xml version="1.0" encoding="UTF-8"?>
 </system>`;
 
 function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', toggleTheme: () => void }) {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('schematic');
   const [designPath, setDesignPath] = useState(DEFAULT_DESIGN);
+  // First-run tour (issue #28 D4). Shown once per fresh profile, re-launchable
+  // from the Sidebar Help affordance and the Landing "Take the tour" button.
+  const [showTour, setShowTour] = useState(false);
+  const intentConsumedRef = useRef(false);
+  useEffect(() => {
+    // Consume the one-shot entry intent from Landing (open the Repair tab for a
+    // Fix-me card, and/or force-show the tour) exactly once, then decide whether
+    // the tour auto-shows for a fresh profile. Runs once per workspace mount.
+    if (intentConsumedRef.current) return;
+    intentConsumedRef.current = true;
+    const intent = takeWorkspaceIntent();
+    if (intent.tab) setActiveTab(intent.tab);
+    if (intent.tour || shouldAutoShowTour()) setShowTour(true);
+  }, []);
+  const closeTour = () => {
+    markTourSeen();
+    setShowTour(false);
+  };
   const xml = useDesignStore((s) => s.xml);
   const projectsList = useProjectStore((s) => s.projectsList);
   const projectStoreInitialized = useProjectStore((s) => s.initialized);
@@ -717,6 +739,26 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
     }
   }, [xml]);
 
+  // Blank-design detection for the empty-state-with-verbs (issue #28 D5). A count
+  // of exactly 0 components means a fresh/empty design; a parse failure mid-edit
+  // yields -1 (keep the last schematic rather than flashing the empty state).
+  const componentCount = useMemo<number>(() => {
+    if (!xml.trim()) return 0;
+    try {
+      return parseAir(xml).components.size;
+    } catch {
+      return -1;
+    }
+  }, [xml]);
+  const isBlankDesign = componentCount === 0;
+
+  // "Ask the agent" affordance: focus the chat composer (it lives in the always-
+  // mounted ChatRepl side panel).
+  const focusAgentChat = () => {
+    const el = document.getElementById('agent-chat-input');
+    if (el) (el as HTMLTextAreaElement).focus();
+  };
+
   // Issue #23 drag/nudge write path. Threaded through the ONE COMMIT PATH
   // (schematic/gate.ts) so the mutation shows up in the undo/redo stack
   // (issue #24 D5) alongside every other edit source.
@@ -907,17 +949,25 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
             onPlaced={(id, entry) => addLog(`Placed ${entry.displayName} as ${id}`, 'success')}
             onError={(msg) => addLog(msg, 'error')}
           />
-          <Graph
-            nodes={nodes}
-            edges={edges}
-            hints={hints}
-            interactive
-            onLayout={setSchematicIR}
-            onCommitMove={commitMove}
-            onCommitWire={commitWire}
-            onCommitDelete={commitDelete}
-            onCursor={onCursor}
-          />
+          {isBlankDesign ? (
+            <BlankSchematicState
+              onPasteXml={() => setActiveTab('editor')}
+              onAskAgent={focusAgentChat}
+              onBrowseExamples={() => navigate('/')}
+            />
+          ) : (
+            <Graph
+              nodes={nodes}
+              edges={edges}
+              hints={hints}
+              interactive
+              onLayout={setSchematicIR}
+              onCommitMove={commitMove}
+              onCommitWire={commitWire}
+              onCommitDelete={commitDelete}
+              onCursor={onCursor}
+            />
+          )}
           <Inspector ir={schematicIR} />
         </div>
       );
@@ -930,7 +980,7 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
       return <XmlEditor xml={xml} onChange={(value) => coalesceUserXml(value || '')} theme={theme} />;
     }
     if (activeTab === 'simulation') {
-      return <SimulationPanel simulation={simulation} waveforms={waveforms} designXml={xml} theme={theme} />;
+      return <SimulationPanel simulation={simulation} waveforms={waveforms} designXml={xml} theme={theme} onRun={handleSimulate} />;
     }
     if (activeTab === 'validation') {
       return <DiagnosticsPanel validation={validation} />;
@@ -948,6 +998,7 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
           {...(agentModel ? { model: agentModel } : {})}
           maxTokensPerTurn={tokenBudget}
           theme={theme}
+          onOpenSettings={() => setActiveTab('settings')}
         />
       );
     }
@@ -963,7 +1014,8 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
 
   return (
     <div className="app-container">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} theme={theme} toggleTheme={toggleTheme} />
+      {showTour && <OnboardingTour onClose={closeTour} />}
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} theme={theme} toggleTheme={toggleTheme} onStartTour={() => setShowTour(true)} />
       <main className="main-content">
         {conflictError && (
           <div className="conflict-banner" role="alert">
@@ -1009,12 +1061,13 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
         {...(agentModel ? { model: agentModel } : {})}
         maxTokensPerTurn={tokenBudget}
         theme={theme}
+        onOpenSettings={() => setActiveTab('settings')}
       />
     </div>
   );
 }
 
-function SimulationPanel({ simulation, waveforms, designXml, theme }: { simulation: SimulationReport | null; waveforms: WaveformData[]; designXml: string; theme: 'dark' | 'light' }) {
+function SimulationPanel({ simulation, waveforms, designXml, theme, onRun }: { simulation: SimulationReport | null; waveforms: WaveformData[]; designXml: string; theme: 'dark' | 'light'; onRun?: () => void }) {
   // Parse the design once for assertion-band extraction. A malformed mid-edit
   // XML yields no bands; the viewer still renders the traces.
   const design = useMemo<SystemIR | null>(() => {
@@ -1069,7 +1122,21 @@ function SimulationPanel({ simulation, waveforms, designXml, theme }: { simulati
   }, [waveforms]);
 
   if (!simulation) {
-    return <EmptyState icon={<Activity size={20} />} title="No simulation run yet" text="Run simulation to inspect assertions, measurements, and generated artifacts." />;
+    return (
+      <div className="empty-state sim-empty" data-testid="sim-pre-run">
+        <Activity size={20} />
+        <h2>No simulation run yet</h2>
+        <p>
+          Press Run to compile this design and simulate it right here in your browser — no backend,
+          no API key. You&apos;ll get waveforms for every probe plus a pass/fail for each assertion.
+        </p>
+        {onRun && (
+          <button className="empty-primary" onClick={onRun} data-testid="sim-run">
+            <Play size={16} /> Run simulation
+          </button>
+        )}
+      </div>
+    );
   }
   return (
     <div className="detail-panel">
@@ -1175,6 +1242,38 @@ function EmptyState({ icon, title, text }: { icon: React.ReactNode; title: strin
       {icon}
       <h2>{title}</h2>
       <p>{text}</p>
+    </div>
+  );
+}
+
+// Empty-state-with-verbs for a blank design (issue #28 D5): instead of a void
+// canvas, offer the three real next actions. The component palette stays mounted
+// to the left, so "place a part" is literally one click away.
+function BlankSchematicState({
+  onPasteXml,
+  onAskAgent,
+  onBrowseExamples,
+}: {
+  onPasteXml: () => void;
+  onAskAgent: () => void;
+  onBrowseExamples: () => void;
+}) {
+  return (
+    <div className="blank-schematic" data-testid="blank-schematic">
+      <CircuitBoard size={28} />
+      <h2>This design is empty</h2>
+      <p>Drag a part from the palette on the left to start wiring — or pick a faster path:</p>
+      <div className="blank-verbs">
+        <button onClick={onPasteXml} data-testid="blank-paste-xml">
+          <FileCode size={16} /> Paste or edit AIR XML
+        </button>
+        <button onClick={onAskAgent} data-testid="blank-ask-agent">
+          <MessageSquare size={16} /> Ask the agent to build it
+        </button>
+        <button onClick={onBrowseExamples} data-testid="blank-browse-examples">
+          <LayoutGrid size={16} /> Browse examples
+        </button>
+      </div>
     </div>
   );
 }

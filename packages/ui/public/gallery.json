@@ -1,0 +1,132 @@
+[
+  {
+    "id": "voltage_divider_pwm",
+    "title": "Voltage Divider + PWM LED",
+    "description": "A resistive divider halves 5V onto A0; firmware reads it and dims an LED with PWM.",
+    "tags": ["analog", "arduino", "firmware"],
+    "difficulty": "beginner",
+    "sourcePath": "gallery/voltage_divider_pwm.air.xml",
+    "kind": "working",
+    "firmware": true
+  },
+  {
+    "id": "analog_primitives",
+    "title": "Analog Primitives",
+    "description": "An explicit voltage source and current load with a current assertion — the smallest analog test.",
+    "tags": ["analog", "sources", "assertions"],
+    "difficulty": "beginner",
+    "sourcePath": "gallery/analog_primitives.air.xml",
+    "kind": "working",
+    "firmware": false
+  },
+  {
+    "id": "esp32_battery_sensor",
+    "title": "ESP32 Battery Sensor",
+    "description": "Battery-powered ESP32-C3 node with an LDO rail and an ADC battery-voltage divider.",
+    "tags": ["esp32", "power", "adc", "firmware"],
+    "difficulty": "intermediate",
+    "sourcePath": "gallery/esp32_battery_sensor.air.xml",
+    "kind": "working",
+    "firmware": true
+  },
+  {
+    "id": "mixed_signal_switch",
+    "title": "Mixed-Signal Switch",
+    "description": "An ESP32-C3 toggles a MOSFET to drive a load and senses the switched voltage back.",
+    "tags": ["mosfet", "mixed-signal", "firmware"],
+    "difficulty": "intermediate",
+    "sourcePath": "gallery/mixed_signal_switch.air.xml",
+    "kind": "working",
+    "firmware": true
+  },
+  {
+    "id": "advanced_components",
+    "title": "Advanced Components Demo",
+    "description": "Exercises diodes, a custom MOSFET model, and a reusable subcircuit block.",
+    "tags": ["diode", "mosfet", "subcircuit"],
+    "difficulty": "advanced",
+    "sourcePath": "gallery/advanced_components.air.xml",
+    "kind": "working",
+    "firmware": false
+  },
+  {
+    "id": "solar_charger",
+    "title": "Solar Sensor Node",
+    "description": "A solar panel charges a battery while the MCU switches the load and senses two rails.",
+    "tags": ["power", "solar", "mcu"],
+    "difficulty": "advanced",
+    "sourcePath": "gallery/solar_charger.air.xml",
+    "kind": "working",
+    "firmware": true
+  },
+  {
+    "id": "iot_gateway",
+    "title": "Battery-Backed IoT Gateway",
+    "description": "A mixed-signal gateway with nested power domains and high-current load switching.",
+    "tags": ["power-domains", "mixed-signal", "load-switch"],
+    "difficulty": "advanced",
+    "sourcePath": "gallery/iot_gateway.air.xml",
+    "kind": "working",
+    "firmware": true
+  },
+  {
+    "id": "feedback_loop",
+    "title": "High-Speed Feedback Loop",
+    "description": "A fast regulator/motor-controller loop that stresses the co-simulation timing path.",
+    "tags": ["feedback", "co-simulation", "control"],
+    "difficulty": "advanced",
+    "sourcePath": "gallery/feedback_loop.air.xml",
+    "kind": "working",
+    "firmware": true
+  },
+  {
+    "id": "missing_ground",
+    "title": "Missing Ground",
+    "description": "The MCU has no ground net, so current has no return path. Repair should add one.",
+    "tags": ["validation", "ground"],
+    "difficulty": "beginner",
+    "sourcePath": "gallery/missing_ground.air.xml",
+    "kind": "fixme",
+    "firmware": false
+  },
+  {
+    "id": "i2c_without_pullups",
+    "title": "I2C Without Pull-ups",
+    "description": "SDA and SCL float — the bus needs pull-up resistors to the 3V3 rail.",
+    "tags": ["i2c", "pull-ups"],
+    "difficulty": "beginner",
+    "sourcePath": "gallery/i2c_without_pullups.air.xml",
+    "kind": "fixme",
+    "firmware": false
+  },
+  {
+    "id": "invalid_pin_function",
+    "title": "Invalid Pin Function",
+    "description": "A GPIO is assigned an I2C function it cannot provide on that pin.",
+    "tags": ["pins", "validation"],
+    "difficulty": "beginner",
+    "sourcePath": "gallery/invalid_pin_function.air.xml",
+    "kind": "fixme",
+    "firmware": false
+  },
+  {
+    "id": "bad_adc_divider",
+    "title": "Bad ADC Divider",
+    "description": "The divider ratio drives the ADC node outside the asserted 1.02-1.06V band.",
+    "tags": ["adc", "divider", "assertion"],
+    "difficulty": "intermediate",
+    "sourcePath": "gallery/bad_adc_divider.air.xml",
+    "kind": "fixme",
+    "firmware": true
+  },
+  {
+    "id": "overloaded_3v3_rail",
+    "title": "Overloaded 3V3 Rail",
+    "description": "A 700mA load exceeds the LDO's 250mA limit, so the 3V3 rail sags out of spec.",
+    "tags": ["power", "ldo", "current"],
+    "difficulty": "intermediate",
+    "sourcePath": "gallery/overloaded_3v3_rail.air.xml",
+    "kind": "fixme",
+    "firmware": false
+  }
+]
