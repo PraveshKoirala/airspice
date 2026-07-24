@@ -1,0 +1,16 @@
+{
+  "short_name": "AirSpice",
+  "name": "AirSpice — In-Browser AI Circuit Workbench",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "display": "standalone",
+  "description": "AI-native circuit design, real SPICE simulation, and firmware co-simulation entirely in your browser."
+}
