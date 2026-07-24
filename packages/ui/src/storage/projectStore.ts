@@ -3,6 +3,7 @@ import {
   listProjects,
   getProject,
   saveProject,
+  saveProjectXmlGuarded,
   deleteProject,
   generateId,
   initDatabase,
@@ -222,27 +223,25 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     if (!activeProjectId) return;
 
     try {
-      const project = await getProject(activeProjectId);
-      if (!project) return;
+      // Monotonic write-guard, made ATOMIC: the get + staleness check + put run
+      // inside a SINGLE readwrite transaction (saveProjectXmlGuarded), so a
+      // competing tab cannot commit in the window between our read and our
+      // write. A stale writer (our loaded base older than what is now on disk)
+      // is refused WITHOUT clobbering the newer record.
+      const result = await saveProjectXmlGuarded(activeProjectId, xml, localLoadedUpdatedAt);
 
-      // Monotonic write-guard: a stale writer (our loaded base is older than
-      // what is now on disk — e.g. another tab saved) must NOT clobber the
-      // newer record. Surface the conflict and bail instead of overwriting.
-      if (project.updatedAt > localLoadedUpdatedAt) {
+      if (result.status === "missing") {
+        // The project was deleted out from under us; nothing to persist.
+        return;
+      }
+      if (result.status === "conflict") {
         set({ conflictError: "Conflict detected! This project has been updated in another tab. Reload to see the changes." });
         return;
       }
 
-      const now = Date.now();
-      const updated: ProjectRecord = {
-        ...project,
-        xml,
-        updatedAt: now,
-      };
-
-      await saveProject(updated);
-      // A successful write clears any prior autosave-failure banner.
-      set({ localLoadedUpdatedAt: now, autosaveError: null });
+      // status === "saved": adopt the committed updatedAt as our new base and
+      // clear any prior autosave-failure banner.
+      set({ localLoadedUpdatedAt: result.updatedAt, autosaveError: null });
       await get().loadProjects();
     } catch (e) {
       // Autosave failures (quota exceeded, private-mode storage denied, a

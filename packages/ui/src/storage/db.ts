@@ -266,6 +266,80 @@ export function saveProject(project: ProjectRecord): Promise<void> {
   });
 }
 
+/** Outcome of an atomic guarded XML write (see `saveProjectXmlGuarded`). */
+export type GuardedWriteResult =
+  | { status: "saved"; updatedAt: number }
+  | { status: "conflict"; storedUpdatedAt: number }
+  | { status: "missing" };
+
+/**
+ * Atomically update a project's design XML behind the monotonic write-guard.
+ *
+ * The get, the staleness check, AND the put all execute inside ONE readwrite
+ * transaction on the `projects` store. IndexedDB holds the store lock for the
+ * life of that transaction and runs its requests serially, so no other writer
+ * (another tab) can commit in the window between this tab's read and its write
+ * — closing the cross-tab TOCTOU that a separate readonly-get + readwrite-put
+ * left open. The put is issued from inside the get's `onsuccess`, which keeps
+ * the single transaction alive across the read-modify-write.
+ *
+ * If the stored record's `updatedAt` is newer than `baseUpdatedAt`, the write is
+ * a stale write: it is REFUSED (no `put` is issued) and a `conflict` result is
+ * returned, leaving the newer on-disk record untouched. A `saved` result
+ * carries the new `updatedAt` the record was written with.
+ */
+export function saveProjectXmlGuarded(
+  id: string,
+  xml: string,
+  baseUpdatedAt: number,
+): Promise<GuardedWriteResult> {
+  return new Promise((resolve, reject) => {
+    try {
+      const db = getDb();
+      const transaction = db.transaction("projects", "readwrite");
+      const store = transaction.objectStore("projects");
+      let result: GuardedWriteResult | null = null;
+
+      const getRequest = store.get(id);
+      getRequest.onsuccess = () => {
+        const project = getRequest.result as ProjectRecord | undefined;
+        if (!project) {
+          // Project vanished (e.g. deleted in another tab): nothing to write.
+          result = { status: "missing" };
+          return;
+        }
+        // Monotonic write-guard, evaluated on the record READ INSIDE this same
+        // transaction — an interleaving commit is impossible, so this check
+        // cannot go stale before the put below.
+        if (project.updatedAt > baseUpdatedAt) {
+          result = { status: "conflict", storedUpdatedAt: project.updatedAt };
+          return; // refuse: issue NO put, leaving the newer record intact
+        }
+        const now = Date.now();
+        const updated: ProjectRecord = {
+          ...project,
+          xml,
+          updatedAt: now,
+          schemaVersion: CURRENT_VERSION,
+        };
+        const putRequest = store.put(updated);
+        putRequest.onsuccess = () => {
+          result = { status: "saved", updatedAt: now };
+        };
+        putRequest.onerror = () => reject(putRequest.error);
+      };
+      getRequest.onerror = () => reject(getRequest.error);
+
+      transaction.oncomplete = () => resolve(result ?? { status: "missing" });
+      transaction.onabort = () =>
+        reject(transaction.error ?? new Error("write-guard transaction aborted"));
+      transaction.onerror = () => reject(transaction.error);
+    } catch (e) {
+      reject(e);
+    }
+  });
+}
+
 /**
  * List all project records.
  */
