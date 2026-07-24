@@ -80,6 +80,25 @@ export function useRepairSession() {
     setStatus("");
   }, []);
 
+  /**
+   * Keyless short-circuit (issue #28): when NO provider is configured at all, the
+   * repair panel calls this instead of `start`. It produces a graceful
+   * provider_error OUTCOME immediately — no provider is constructed, no network
+   * call is made, nothing throws — so the user can always click Run and get an
+   * actionable "add a key" pointer rather than a dead/disabled button.
+   */
+  const signalNoProvider = useCallback((message: string) => {
+    setTimeline([]);
+    setStatus("");
+    setOutcome({
+      reason: "provider_error",
+      message,
+      fixed: false,
+      iterations: 0,
+      totalTokens: 0,
+    });
+  }, []);
+
   const start = useCallback(
     async (config: RepairSessionConfig) => {
       if (running) return;
@@ -200,7 +219,7 @@ export function useRepairSession() {
     [running, reset, applyValidated],
   );
 
-  return { timeline, outcome, running, status, start, stop, reset };
+  return { timeline, outcome, running, status, start, stop, reset, signalNoProvider };
 }
 
 export type { RepairIteration };

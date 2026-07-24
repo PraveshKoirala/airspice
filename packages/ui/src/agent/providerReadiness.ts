@@ -36,3 +36,15 @@ export function hasUserProviderKey(provider: NetworkProviderId | "mock"): boolea
   }
   return true;
 }
+
+/**
+ * True when SOME key is configured for this provider — the seeded shared-proxy
+ * default OR a real BYOK key. This is the gate for whether the repair loop can
+ * actually run: with any key it runs (against the proxy or the user's provider);
+ * with NO key at all it must short-circuit to an actionable "add a key" outcome
+ * rather than construct/call a provider. `mock` needs no key.
+ */
+export function hasAnyProviderKey(provider: NetworkProviderId | "mock"): boolean {
+  if (provider === "mock") return true;
+  return new KeyVault().has(provider);
+}

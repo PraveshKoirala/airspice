@@ -32,7 +32,7 @@ import {
 } from "lucide-react";
 import type { MockFixture, NetworkProviderId, RepairStopReason } from "agent";
 import { useRepairSession, type RepairOutcome, type RepairTimelineRow } from "../agent/useRepairSession";
-import { hasUserProviderKey } from "../agent/providerReadiness";
+import { hasUserProviderKey, hasAnyProviderKey } from "../agent/providerReadiness";
 
 interface RepairPanelProps {
   provider: NetworkProviderId | "mock";
@@ -54,14 +54,24 @@ const RepairPanel: React.FC<RepairPanelProps> = ({
   theme = "dark",
   onOpenSettings,
 }) => {
-  const { timeline, outcome, running, status, start, stop, reset } = useRepairSession();
+  const { timeline, outcome, running, status, start, stop, reset, signalNoProvider } = useRepairSession();
   // The repair loop is the one feature that needs an AI provider. When the user
   // has no key of their own (only the seeded shared demo proxy, or nothing), show
   // an honest BYOK pointer instead of hard-failing — the run still works against
   // the demo proxy when it is reachable.
   const needsKey = !hasUserProviderKey(provider);
 
+  // Run is ALWAYS clickable (never a disabled/dead button — that would be a soft
+  // hard-fail). Readiness is re-checked AT CLICK TIME (a fresh vault read), so a
+  // key cleared after this panel mounted is honored. With no provider configured
+  // at all, clicking short-circuits to a graceful provider_error outcome pointing
+  // at Settings — no provider is built and no network call is made. Otherwise the
+  // loop runs normally (against the seeded demo proxy or the user's own key).
   const onRun = () => {
+    if (!hasAnyProviderKey(provider)) {
+      signalNoProvider("No AI provider is configured. Add one in Settings.");
+      return;
+    }
     void start({
       provider,
       ...(model ? { model } : {}),
