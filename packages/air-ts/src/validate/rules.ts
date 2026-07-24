@@ -590,11 +590,17 @@ function isDict(value: unknown): value is Record<string, string> {
  * Port of validation._validate_firmware_source. Three static, declared-only
  * checks over the inline firmware source; the program text is NEVER analyzed.
  *
- * PARITY: same codes, domain ("firmware"), messages, related_elements, and
- * emission order as the oracle. Runs a single builder shared with validateIr, so
- * the diagnostic ids continue the validate_ir sequence exactly as in Python. The
- * pin set is the union of the MCU registry's `pins` and `power_pins` keys; the
- * pin check is skipped for an unknown `part` (UNKNOWN_MCU_PART already fired).
+ * PARITY: same namespaced codes (VAL-001 / VAL-002 / VAL-003, docs/
+ * diagnostics_spec.md), domain ("firmware"), messages, severity, related_elements,
+ * and emission order as the oracle. The Python side reads the message + severity
+ * from registry/diagnostics.json via the loader; air-ts reproduces the SAME strings
+ * inline -- exactly how the existing namespaced codes (SEC-00x in xml.ts) achieve
+ * parity, since the registry is data with no per-engine message variants. The
+ * message text below is byte-identical to each code's registry `message_template`
+ * rendered with these params. Runs a single builder shared with validateIr, so the
+ * diagnostic ids continue the validate_ir sequence exactly as in Python. The pin
+ * set is the union of the MCU registry's `pins` and `power_pins` keys; the pin
+ * check is skipped for an unknown `part` (UNKNOWN_MCU_PART already fired).
  */
 function validateFirmwareSource(ir: SystemIR, builder: DiagnosticBuilder): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
@@ -607,7 +613,7 @@ function validateFirmwareSource(ir: SystemIR, builder: DiagnosticBuilder): Diagn
       builder.make(
         "error",
         "firmware",
-        "FIRMWARE_MCU_UNDEFINED",
+        "VAL-001",
         `Firmware source references unknown MCU component ${fw.mcu}.`,
         { relatedElements: [fw.mcu] },
       ),
@@ -619,7 +625,7 @@ function validateFirmwareSource(ir: SystemIR, builder: DiagnosticBuilder): Diagn
       builder.make(
         "error",
         "firmware",
-        "FIRMWARE_MCU_NOT_MCU",
+        "VAL-002",
         `Firmware source mcu ${fw.mcu} is not an MCU component.`,
         { relatedElements: [fw.mcu] },
       ),
@@ -640,7 +646,7 @@ function validateFirmwareSource(ir: SystemIR, builder: DiagnosticBuilder): Diagn
         builder.make(
           "error",
           "firmware",
-          "FIRMWARE_PIN_NOT_ON_MCU",
+          "VAL-003",
           `Firmware source declares pin ${pin} that is not on MCU ${fw.mcu}.`,
           { relatedElements: [fw.mcu, pin] },
         ),

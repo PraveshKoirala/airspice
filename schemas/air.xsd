@@ -51,13 +51,13 @@
     CONTRACT (both engines; see packages/core/src/air/parser.py,
     canonicalizer.py, validation.py and their air-ts mirrors):
       * mcu      : id of a component whose registry type is an MCU. Validated as
-                   FIRMWARE_MCU_UNDEFINED (no such component) or
-                   FIRMWARE_MCU_NOT_MCU (component is not MCU-typed).
+                   VAL-001 (no such component) or VAL-002 (component is not
+                   MCU-typed). See docs/diagnostics_spec.md + registry/diagnostics.json.
       * language : runtime language tag ("micropython" today).
       * entry    : entry-point symbol the runtime invokes.
       * pins     : an explicit DECLARED-PINS manifest, a comma-separated list of
                    the MCU pin ids the firmware uses (e.g. "GPIO4,GPIO5"). Each is
-                   checked against the MCU registry pin set (FIRMWARE_PIN_NOT_ON_MCU).
+                   checked against the MCU registry pin set (VAL-003).
                    The source text is NEVER statically analyzed to discover pins;
                    this manifest is the sole input to that check.
       * source   : the raw program text, carried in a CDATA section and preserved

@@ -3,6 +3,7 @@ from __future__ import annotations
 from xml.etree import ElementTree as ET
 
 from .diagnostics import Diagnostic, DiagnosticBuilder
+from .diagnostics_registry import render_message, severity_for
 from .model import SystemIR
 from .registry import COMPONENT_SPECS, MCUS, PASSIVE_TYPES, SPICE_MODELS, SUPPORTED_SPICE_TYPES
 from .spice import BUILTIN_SPICE_MODELS, BUILTIN_SPICE_SUBCKTS
@@ -237,10 +238,19 @@ def _validate_firmware_source(ir: SystemIR, builder: DiagnosticBuilder) -> list[
     """Validate an inline firmware source block (issue #36).
 
     Three static, declared-only checks -- the source text is NEVER analyzed:
-      * ``FIRMWARE_MCU_UNDEFINED``  -- the ``mcu`` ref names no component;
-      * ``FIRMWARE_MCU_NOT_MCU``    -- the ``mcu`` ref exists but is not MCU-typed;
-      * ``FIRMWARE_PIN_NOT_ON_MCU`` -- a DECLARED ``pins`` id is absent from the
-        MCU registry's pin set (its GPIO/function pins plus its power pins).
+      * ``VAL-001`` -- the ``mcu`` ref names no component;
+      * ``VAL-002`` -- the ``mcu`` ref exists but is not MCU-typed;
+      * ``VAL-003`` -- a DECLARED ``pins`` id is absent from the MCU registry's
+        pin set (its GPIO/function pins plus its power pins).
+
+    These are namespaced NEW codes (docs/diagnostics_spec.md): the ``VAL-`` prefix
+    is the numbering bucket for validation/semantic/electrical checks, and each is
+    registered in registry/diagnostics.json. Following the SIM-010 precedent, the
+    severity and message are read from the registry via ``severity_for`` /
+    ``render_message`` so the emitted diagnostic and the registry can never drift;
+    the emitted ``domain`` stays ``"firmware"`` (coherent with the existing
+    firmware family). Codes are passed as string literals so the registry checker's
+    AST scan (check 3) sees every emit site.
 
     Pin checks run only for an MCU-typed component whose ``part`` is in the
     registry; an unknown part is already reported as ``UNKNOWN_MCU_PART`` by the
@@ -254,10 +264,10 @@ def _validate_firmware_source(ir: SystemIR, builder: DiagnosticBuilder) -> list[
     if component is None:
         diagnostics.append(
             builder.make(
-                "error",
+                severity_for("VAL-001"),
                 "firmware",
-                "FIRMWARE_MCU_UNDEFINED",
-                f"Firmware source references unknown MCU component {fw.mcu}.",
+                "VAL-001",
+                render_message("VAL-001", mcu=fw.mcu),
                 [fw.mcu],
             )
         )
@@ -265,10 +275,10 @@ def _validate_firmware_source(ir: SystemIR, builder: DiagnosticBuilder) -> list[
     if component.type != "mcu":
         diagnostics.append(
             builder.make(
-                "error",
+                severity_for("VAL-002"),
                 "firmware",
-                "FIRMWARE_MCU_NOT_MCU",
-                f"Firmware source mcu {fw.mcu} is not an MCU component.",
+                "VAL-002",
+                render_message("VAL-002", mcu=fw.mcu),
                 [fw.mcu],
             )
         )
@@ -283,10 +293,10 @@ def _validate_firmware_source(ir: SystemIR, builder: DiagnosticBuilder) -> list[
         if pin not in known_pins:
             diagnostics.append(
                 builder.make(
-                    "error",
+                    severity_for("VAL-003"),
                     "firmware",
-                    "FIRMWARE_PIN_NOT_ON_MCU",
-                    f"Firmware source declares pin {pin} that is not on MCU {fw.mcu}.",
+                    "VAL-003",
+                    render_message("VAL-003", pin=pin, mcu=fw.mcu),
                     [fw.mcu, pin],
                 )
             )

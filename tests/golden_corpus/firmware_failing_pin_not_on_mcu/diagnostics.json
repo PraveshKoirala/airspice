@@ -1,7 +1,7 @@
 {
   "diagnostics": [
     {
-      "code": "FIRMWARE_PIN_NOT_ON_MCU",
+      "code": "VAL-003",
       "domain": "firmware",
       "expected": {},
       "id": "diag_00001",

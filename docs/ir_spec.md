@@ -95,11 +95,18 @@ tokens dropped). `source` holds the raw program text.
 
 ### Validation (declared-only; the source is never analyzed)
 
-| code                     | when                                                          |
-|--------------------------|--------------------------------------------------------------|
-| `FIRMWARE_MCU_UNDEFINED` | `mcu` names no component                                     |
-| `FIRMWARE_MCU_NOT_MCU`   | `mcu` names a component that is not MCU-typed                 |
-| `FIRMWARE_PIN_NOT_ON_MCU`| a DECLARED `pins` id is not on that MCU's registry pin set    |
+| code      | when                                                          |
+|-----------|---------------------------------------------------------------|
+| `VAL-001` | `mcu` names no component                                      |
+| `VAL-002` | `mcu` names a component that is not MCU-typed                 |
+| `VAL-003` | a DECLARED `pins` id is not on that MCU's registry pin set    |
+
+These are namespaced NEW codes under the `VAL-` (validation) prefix per
+`docs/diagnostics_spec.md`; each is registered in `registry/diagnostics.json`
+(`grandfathered: false`, namespace/domain `firmware`) and emitted loader-driven
+(message + severity read from the registry via `air.diagnostics_registry`) so the
+emitted diagnostic and the registry can never drift. The emitted `domain` stays
+`firmware`.
 
 The pin check compares each declared pin against the union of the MCU registry's
 `pins` and `power_pins` keys. It runs only when `mcu` resolves to an MCU-typed
