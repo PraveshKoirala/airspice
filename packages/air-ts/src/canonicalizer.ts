@@ -309,10 +309,15 @@ function escapeText(s: string): string {
  * normalize (it serializes the in-memory tree directly, no expat re-parse), so
  * serialize.ts stays as is and matches ITS oracle stage.
  *
- * (Literal tabs/newlines in the ORIGINAL input's attributes are normalized to
- * spaces by expat at parse time; FXP does not reproduce that -- the pre-#43
- * parse-time edge, out of corpus scope. This function handles the chars that
- * reach the tree via char refs, which both parsers preserve into the tree.)
+ * PARITY (#76): a LITERAL tab/newline/CR in the ORIGINAL input's attributes is
+ * normalized to a space by expat at parse time -- and air-ts now reproduces that
+ * BEFORE this function runs, via xml.ts's normalizeXmlWhitespace (issue #76). So
+ * by the time an attribute value reaches escapeAttr, any literal whitespace is
+ * already normalized. This function therefore handles only the chars that reach
+ * the tree via CHARACTER REFERENCES (&#9;/&#10;/&#13;), which expat -- and thus
+ * both parsers -- preserve verbatim into the tree; the line-ending normalization
+ * below matches the minidom re-parse that the oracle canonicalizer performs on
+ * those char-ref-injected CRs.
  */
 function escapeAttr(s: string): string {
   return s

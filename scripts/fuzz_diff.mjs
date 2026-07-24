@@ -389,118 +389,30 @@ function mutate(baseXml, rng, maxOps = 3) {
 // KNOWN-divergence classifier. NARROW and CAUSALLY GATED by construction: a
 // divergence is KNOWN only when (a) its mismatch KIND matches the family's
 // phenomenology AND (b) the input carries the family's specific structural
-// fingerprint (and, for #76, a causal confirmation). It never suppresses on the
-// basis of "the outcomes differ" alone, and -- the verifier's round-1 finding --
-// it never suppresses on a DOCUMENT-GLOBAL property (e.g. "a CR appears
-// anywhere"): a CR that is causally irrelevant to the divergence cannot flip a
-// verdict to KNOWN, because a CR fingerprint only participates in a HASH
-// mismatch that the whitespace re-normalization then has to CONFIRM.
+// fingerprint. It never suppresses on the basis of "the outcomes differ" alone,
+// and -- the verifier's round-1 finding -- it never suppresses on a
+// DOCUMENT-GLOBAL property.
 //
-//   #75  entity / char-ref handling (DECISION mismatch): undefined named
-//        entities (&nbsp;, &foo;) and malformed reference syntax (&#X42;, &#;, a
-//        bare &). expat rejects; fast-xml-parser resolves/keeps-literal.
-//        Fingerprint: an ampersand-reference OUTSIDE comment/CDATA/PI spans that
-//        is neither a predefined entity nor a well-formed numeric ref.
-//   #76  attribute-value whitespace normalization (HASH mismatch): a raw
-//        TAB/newline/CR inside an ATTRIBUTE value (or a CR in element text) that
-//        expat normalizes at parse time and fast-xml-parser keeps verbatim.
-//        CAUSALLY CONFIRMED: re-normalizing the whitespace must make air-ts's
-//        model hash equal the oracle's -- otherwise the cause is something else
-//        and it is NEW.
 //   #78  well-formedness gaps (DECISION mismatch): fast-xml-parser accepts
 //        constructs expat rejects as "not well-formed" -- a comment whose
 //        content contains "--" (or ends "--->"), a '<' literal inside an
 //        attribute value, and the reserved 'xml' PI target. FOUND BY THIS FUZZER
 //        (seed 1), FILED as #78, shrunk fixtures under tests/fuzz_regressions/.
 //
-// #80 (multiple <setup> blocks) was FIXED upstream (PR #79 / issue #8: air-ts
-// parser.ts now iterates findAll(test,"setup") like the oracle), so it no longer
-// diverges and is NOT a KNOWN-suppression family -- were it to reappear (a
-// reverted fix) it would correctly classify NEW. Its regression fixture is kept
-// as an AGREEMENT guard (agree_80_multiple_setup).
+// #75 (undefined named entities / malformed reference syntax) and #76
+// (attribute-value + CR whitespace normalization) were FIXED in air-ts's XML
+// layer (packages/air-ts/src/xml.ts: rejectBadReferences + normalizeXmlWhitespace
+// reproduce expat's decisions), so they NO LONGER diverge and their suppression
+// families were REMOVED here -- were either to reappear (a reverted fix) it would
+// correctly classify NEW and FAIL the campaign, instead of being masked. Their
+// regression fixtures flipped from `diverge-known` to agreement guards
+// (diff_75_* -> reject-agree, diff_76_* -> accept-agree), like agree_80.
+//
+// #80 (multiple <setup> blocks) was likewise FIXED upstream (PR #79 / issue #8:
+// air-ts parser.ts now iterates findAll(test,"setup") like the oracle), so it no
+// longer diverges and is NOT a KNOWN-suppression family. Its regression fixture
+// is kept as an AGREEMENT guard (agree_80_multiple_setup).
 // --------------------------------------------------------------------------- //
-
-// Spans in which an ampersand is NOT a reference (comment/CDATA/PI): a `&` here
-// is literal, not a malformed reference, so it must not count toward #75.
-const UNPROCESSED_SPANS_RE =
-  /<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<\?[\s\S]*?\?>/g;
-// Predefined XML entities + well-formed numeric refs are NOT #75 divergences.
-const PREDEFINED_ENTITY_RE = /&(?:amp|lt|gt|quot|apos);/g;
-const NUMERIC_REF_RE = /&#(?:[0-9]+|x[0-9a-fA-F]+);/g;
-
-function has75Fingerprint(xml) {
-  // First remove spans where `&` is not a reference (comments/CDATA/PIs), THEN
-  // the benign refs; what remains is a genuine bad reference expat rejects. This
-  // keeps a `&` sitting inside a comment from being mis-counted as #75 (the
-  // document-global concern the verifier flagged for the bare-& clause).
-  const stripped = xml
-    .replace(UNPROCESSED_SPANS_RE, "")
-    .replace(PREDEFINED_ENTITY_RE, "")
-    .replace(NUMERIC_REF_RE, "");
-  // After removing every WELL-FORMED reference (the 5 predefined entities and
-  // valid numeric refs) and the spans where `&` is literal, ANY remaining `&`
-  // is a reference expat rejects: an undefined named entity (&nbsp; &foo;), a
-  // malformed numeric ref (&#X42; &#;), a named ref with no `;` (&b), or a bare
-  // ampersand. All are the #75 "entity / malformed reference" family, and all
-  // produce the decision mismatch (expat rejects, fast-xml-parser tolerates)
-  // this branch is gated to. A remaining `&` outside comment/CDATA/PI cannot be
-  // benign, so this is causally tied, not document-global.
-  return /&/.test(stripped);
-}
-
-/**
- * The STRUCTURAL trigger for the #76 whitespace family: a raw tab/newline/CR
- * inside an ATTRIBUTE value (which expat normalizes to a space at parse time and
- * fast-xml-parser keeps verbatim), or a CR inside element TEXT content
- * (tokenized -- comment/CDATA/PI content excluded). This is a fast PRE-FILTER,
- * NOT the whole test: a hash divergence is only classified #76 after the causal
- * confirmation below proves the divergence is EXACTLY the whitespace difference.
- *
- * There is NO document-global "CR anywhere" clause -- that was the verifier's
- * finding (a trailing/incidental CR flipping an unrelated divergence to #76).
- */
-function has76Structural(xml) {
-  for (const m of xml.matchAll(/=\s*(["'])([\s\S]*?)\1/g)) {
-    if (/[\t\n\r]/.test(m[2])) return true; // whitespace in an attribute value
-  }
-  for (const tok of tokenize(xml)) {
-    if (tok.kind === "text" && tok.raw.includes("\r")) return true; // CR in text
-  }
-  return false;
-}
-
-/**
- * Apply expat's parse-time whitespace normalization to the input: line-ending
- * normalization across the whole document (CRLF/CR -> LF), then attribute-value
- * normalization (tab/LF -> a single space) inside quoted attribute values. This
- * is exactly the transform whose ABSENCE in fast-xml-parser is the #76 family.
- */
-function applyExpatWhitespaceNorm(xml) {
-  let out = xml.replace(/\r\n?/g, "\n");
-  out = out.replace(
-    /=(\s*)(["'])([\s\S]*?)\2/g,
-    (_m, sp, q, val) => "=" + sp + q + val.replace(/[\t\n]/g, " ") + q,
-  );
-  return out;
-}
-
-/**
- * CAUSAL confirmation that a HASH divergence is EXACTLY the #76 whitespace
- * phenomenon: re-parse a whitespace-normalized copy of the input with air-ts and
- * check the resulting model now hashes identically to the ORACLE's model of the
- * original. If normalizing the whitespace makes air-ts agree with the oracle,
- * the divergence was wholly caused by the normalization difference -> #76. If a
- * residual divergence remains, the cause is something else -> NOT #76 (NEW).
- *
- * `reparse(xmlString) -> outcome` is injected (the real air-ts parseOutcome in a
- * campaign; a mock in the self-test) so this stays deterministic and testable.
- */
-function is76Confirmed(xml, py, reparse) {
-  if (!py || py.status !== "accept") return false; // #76 is an accept/accept diff
-  const normalized = applyExpatWhitespaceNorm(xml);
-  const r = reparse(normalized);
-  return r.status === "accept" && r.modelHash === py.modelHash;
-}
 
 function has78Fingerprint(xml) {
   // (a) a comment whose CONTENT contains "--" (illegal per XML 1.0) or ends
@@ -537,33 +449,25 @@ function has78Fingerprint(xml) {
  *
  *   - a CRASH is never KNOWN.
  *   - a DECISION mismatch (one engine accepts, the other rejects) is the
- *     fast-xml-parser-leniency phenomenon: only #75 (bad entity/ref) or #78
- *     (well-formedness gap) apply. A whitespace fingerprint can NOT reach here,
- *     which is exactly why the verifier's form-feed-in-attr + trailing-CR case
- *     (a DECISION mismatch) now classifies NEW regardless of the incidental CR.
- *   - a HASH mismatch (both accept, models differ) is the output-difference
- *     phenomenon: only #76 applies, and only when the causal whitespace
- *     re-normalization CONFIRMS the divergence is exactly the normalization diff.
+ *     fast-xml-parser-leniency phenomenon: only #78 (well-formedness gap) now
+ *     applies. (#75 -- bad entity/ref -- was FIXED in air-ts, so it no longer
+ *     diverges; a bad-reference decision mismatch would now be NEW.)
+ *   - a HASH mismatch (both accept, models differ) has NO remaining KNOWN
+ *     family: #76 whitespace normalization was FIXED in air-ts, so a residual
+ *     hash divergence is genuinely NEW and must fail the campaign.
  *   - a "codes" mismatch (both reject, different SEC codes) matches no family.
  *
- * `py` is the oracle outcome and `reparse` the air-ts parseOutcome (for the #76
- * causal check); both are optional so the structural layer is testable alone.
+ * Extra positional args from legacy call sites (the oracle outcome / a reparse
+ * fn, once used by the removed #76 causal check) are ignored.
  */
-function classifyKnown(xml, cmp, py, reparse) {
+function classifyKnown(xml, cmp) {
   if (!cmp || cmp.kind === "crash") return null;
   if (cmp.kind === "decision") {
-    if (has75Fingerprint(xml)) return "#75";
     if (has78Fingerprint(xml)) return "#78";
     return null;
   }
-  if (cmp.kind === "hash") {
-    if (!has76Structural(xml)) return null;
-    // With a reparse fn (campaign), require the causal confirmation; without one
-    // (pure structural self-test) the structural pre-filter alone stands in.
-    if (reparse && !is76Confirmed(xml, py, reparse)) return null;
-    return "#76";
-  }
-  return null; // "codes" mismatch or anything unexpected -> NEW
+  // HASH / codes mismatch or anything unexpected -> NEW (no KNOWN family remains).
+  return null;
 }
 
 // --------------------------------------------------------------------------- //
@@ -745,7 +649,7 @@ async function runCampaign({ seed, cases, emitRegressions, maxNewToShrink }) {
   const rng = mulberry32(seed);
   const oracle = new OracleClient();
 
-  const knownByFamily = { "#75": 0, "#76": 0, "#78": 0 };
+  const knownByFamily = { "#78": 0 };
   const newDivergences = [];
   let matched = 0;
 
@@ -840,20 +744,23 @@ const REGRESSION_CASES = [
   {
     name: "diff_75_named_entity",
     issue: "#75",
-    note: "undefined named entity: expat rejects, fast-xml-parser resolves/keeps-literal",
+    note: "undefined named entity &nbsp;: expat rejects. FIXED (PR #75) -- air-ts's rejectBadReferences now REJECTS it too (both engines reject with codes=[]), so they AGREE. Kept as a guard: if the reject gate is reverted, fast-xml-parser resolves &nbsp;->space and this re-diverges, failing CI.",
     xml: '<system name="t" ir_version="0.1"><metadata><title>&nbsp;</title></metadata></system>',
+    expect: "reject-agree",
   },
   {
     name: "diff_75_undefined_entity_foo",
     issue: "#75",
-    note: "undefined named entity &foo;: expat rejects (undefined entity), fast-xml-parser keeps it literal and accepts -> a DECISION divergence. (NB: bare '&' in text and &#X42; are both REJECTED by air-ts's XMLValidator too, so they do NOT diverge -- only named-entity resolution is lenient in fast-xml-parser.)",
+    note: "undefined named entity &foo;: expat rejects. FIXED (PR #75) -- air-ts's rejectBadReferences now REJECTS it too (both engines reject with codes=[]), so they AGREE. Guard against a reverted reject gate.",
     xml: '<system name="t" ir_version="0.1"><metadata><title>&foo;</title></metadata></system>',
+    expect: "reject-agree",
   },
   {
     name: "diff_76_tab_in_attr",
     issue: "#76",
-    note: "literal tab in attribute value: expat normalizes to space at parse time",
+    note: "literal tab in attribute value: expat normalizes it to a space at parse time. FIXED (PR #76) -- air-ts's normalizeXmlWhitespace now applies the same parse-time normalization, so both engines ACCEPT with an identical model. Guard against a reverted normalizer.",
     xml: '<system name="a\tb" ir_version="0.1"></system>',
+    expect: "accept-agree",
   },
   {
     name: "diff_78_comment_double_hyphen",
@@ -1007,41 +914,26 @@ function selfTest() {
   const CRASH = { match: false, kind: "crash" };
   const CODES = { match: false, kind: "codes" };
   const pyReject = { status: "reject", codes: [] };
-  const pyAccept = (h) => ({ status: "accept", modelHash: h });
-  // A mock reparse fn: pretend the whitespace-normalized input hashes to `h`.
-  const reparseTo = (h) => () => ({ status: "accept", modelHash: h });
 
-  // #75 (DECISION mismatch): undefined/malformed references.
-  check("#75: undefined named entity", classifyKnown('<system><t>&nbsp;</t></system>', DECISION, pyReject) === "#75");
-  check("#75: &foo; undefined", classifyKnown('<system><t>&foo;</t></system>', DECISION, pyReject) === "#75");
-  check("#75: uppercase-X hex ref", classifyKnown('<system><t>&#X42;</t></system>', DECISION, pyReject) === "#75");
-  check("#75: empty numeric ref &#;", classifyKnown('<system><t>&#;</t></system>', DECISION, pyReject) === "#75");
-  check("#75: bare ampersand", classifyKnown('<system><t>a & b</t></system>', DECISION, pyReject) === "#75");
-  check("#75: &b (named ref, no semicolon) [verifier row 3]", classifyKnown('<system name="a&b"/>', DECISION, pyReject) === "#75");
-  // NARROWNESS: predefined/numeric refs and a `&` that is only inside a comment
-  // are NOT #75 (the comment-& is the document-global concern for the bare-&).
-  check("#75 narrow: &amp;", classifyKnown('<system><t>&amp;</t></system>', DECISION, pyReject) === null);
-  check("#75 narrow: &#65;", classifyKnown('<system><t>&#65;</t></system>', DECISION, pyReject) === null);
-  check("#75 narrow: &#x42;", classifyKnown('<system><t>&#x42;</t></system>', DECISION, pyReject) === null);
-  check("#75 narrow: & only inside a comment is NOT #75", classifyKnown('<system><!-- a & b --></system>', DECISION, pyReject) === null);
-
-  // #76 (HASH mismatch), CAUSALLY CONFIRMED via whitespace re-normalization.
+  // #75 (undefined/malformed references) and #76 (attribute-value + CR whitespace
+  // normalization) were FIXED in air-ts's XML layer (rejectBadReferences /
+  // normalizeXmlWhitespace in packages/air-ts/src/xml.ts), so they NO LONGER
+  // diverge and their suppression families were REMOVED. A bad-reference DECISION
+  // mismatch or a whitespace HASH mismatch must now classify NEW (null) -- exactly
+  // so a reverted fix FAILS the campaign instead of being masked as KNOWN.
   const tabAttr = '<system name="a\tb" ir_version="0.1"></system>';
-  check("#76: tab-in-attr, hash mismatch, causally confirmed",
-    classifyKnown(tabAttr, HASH, pyAccept("H1"), reparseTo("H1")) === "#76");
-  check("#76: newline-in-attr, causally confirmed",
-    classifyKnown('<system name="a\nb"/>', HASH, pyAccept("H1"), reparseTo("H1")) === "#76");
-  check("#76: CR-in-attr, causally confirmed",
-    classifyKnown('<system name="a\rb"/>', HASH, pyAccept("H1"), reparseTo("H1")) === "#76");
-  // CAUSAL NARROWNESS: a hash divergence that whitespace-normalization does NOT
-  // reconcile (residual difference) is NOT #76 -- it is NEW.
-  check("#76 causal: hash divergence NOT reconciled by normalization is NEW",
-    classifyKnown(tabAttr, HASH, pyAccept("H1"), reparseTo("H2")) === null);
-  // STRUCTURAL NARROWNESS: no whitespace-in-attr -> not even a #76 candidate.
-  check("#76 narrow: plain-space attribute is NOT #76", classifyKnown('<system name="a b"/>', HASH, pyAccept("H1"), reparseTo("H1")) === null);
-  check("#76 narrow: clean doc is NOT #76", classifyKnown(base, HASH, pyAccept("H1"), reparseTo("H1")) === null);
+  check("#75 removed: undefined named entity is NOT auto-KNOWN (would be NEW)",
+    classifyKnown('<system><t>&nbsp;</t></system>', DECISION, pyReject) === null);
+  check("#75 removed: &foo; is NOT auto-KNOWN",
+    classifyKnown('<system><t>&foo;</t></system>', DECISION, pyReject) === null);
+  check("#75 removed: bare ampersand is NOT auto-KNOWN",
+    classifyKnown('<system><t>a & b</t></system>', DECISION, pyReject) === null);
+  check("#76 removed: tab-in-attr hash divergence is NOT auto-KNOWN (would be NEW)",
+    classifyKnown(tabAttr, HASH) === null);
+  check("#76 removed: CR-in-attr hash divergence is NOT auto-KNOWN",
+    classifyKnown('<system name="a\rb"/>', HASH) === null);
 
-  // #78 (DECISION mismatch): well-formedness gaps.
+  // #78 (DECISION mismatch): well-formedness gaps -- the ONLY remaining family.
   check("#78: comment containing --", classifyKnown('<system><!-- a--b --></system>', DECISION, pyReject) === "#78");
   check("#78: comment ending in hyphen", classifyKnown('<system><!-- a---></system>', DECISION, pyReject) === "#78");
   check("#78: unterminated comment", classifyKnown('<system><!-- a', DECISION, pyReject) === "#78");
@@ -1054,11 +946,10 @@ function selfTest() {
   // ---- THE VERIFIER'S FLIP EXPERIMENT (round-1 finding) ------------------ //
   // A form-feed in an attribute value is a genuinely NEW divergence (expat
   // rejects the invalid char -> a DECISION mismatch). It must classify NEW, and
-  // -- the whole point -- adding a trailing CR (or a CR anywhere) must NOT flip
-  // it to KNOWN #76, because #76 is unreachable on a decision mismatch and the
-  // CR is causally irrelevant.
+  // adding a CR anywhere must NOT flip it to KNOWN -- with #76 removed this is
+  // even clearer (a CR fingerprint now reaches no family at all).
   const ffAttr = '<system name="a\fb" ir_version="0.1"></system>';
-  check("FLIP: form-feed-in-attr divergence classifies NEW (decision, not #76)",
+  check("FLIP: form-feed-in-attr divergence classifies NEW (decision)",
     classifyKnown(ffAttr, DECISION, pyReject) === null);
   check("FLIP: form-feed-in-attr + trailing CR STILL NEW (CR causally irrelevant)",
     classifyKnown(ffAttr + "\r", DECISION, pyReject) === null);
@@ -1080,36 +971,28 @@ function selfTest() {
     classifyKnown(' <?xml v?><system/>', DECISION, pyReject) === "#78");
 
   // ---- MISMATCH-KIND GATE (the causal core of the fix) ------------------- //
-  check("gate: a whitespace-in-attr fingerprint on a DECISION mismatch is NOT #76",
+  check("gate: a whitespace-in-attr fingerprint on a DECISION mismatch is not KNOWN",
     classifyKnown(tabAttr, DECISION, pyReject) === null);
-  check("gate: a #75 entity fingerprint on a HASH mismatch is NOT #75",
-    classifyKnown('<system><t>&nbsp;</t></system>', HASH, pyAccept("H1"), reparseTo("H1")) === null);
   check("gate: a #78 fingerprint on a HASH mismatch is NOT #78",
-    classifyKnown('<system name="a<b"/>', HASH, pyAccept("H1"), reparseTo("H1")) === null);
+    classifyKnown('<system name="a<b"/>', HASH) === null);
   check("gate: a CRASH is never KNOWN", classifyKnown(tabAttr, CRASH, pyReject) === null);
   check("gate: a CODES mismatch (both reject, diff SEC codes) is never KNOWN",
     classifyKnown(tabAttr, CODES, pyReject) === null);
   check("gate: no cmp -> null (never KNOWN)", classifyKnown(tabAttr, null) === null);
 
-  // #80 is FIXED upstream: it must NOT be a KNOWN family anymore. A two-<setup>
-  // input that (hypothetically) still produced a hash divergence would classify
-  // NEW unless it were also a genuine #76 -- confirming #80 is no longer eaten.
+  // #80 is FIXED upstream: it must NOT be a KNOWN family. A two-<setup> input
+  // that (hypothetically) still produced a hash divergence classifies NEW.
   const twoSetups =
     '<system name="t"><tests><test id="x">' +
     '<setup><set_voltage net="a" value="1V"/></setup>' +
     '<setup><set_voltage net="b" value="2V"/></setup>' +
     '</test></tests></system>';
   check("#80 removed: a two-<setup> hash divergence is NOT auto-KNOWN (would be NEW)",
-    classifyKnown(twoSetups, HASH, pyAccept("H1"), reparseTo("H2")) === null);
-
-  // applyExpatWhitespaceNorm: the transform underpinning the #76 causal check.
-  check("norm: tab in attr -> space", applyExpatWhitespaceNorm('<a name="x\ty"/>') === '<a name="x y"/>');
-  check("norm: CR/CRLF -> LF (line endings)", applyExpatWhitespaceNorm('<a>x\r\ny\rz</a>') === '<a>x\ny\nz</a>');
-  check("norm: newline in attr -> space", applyExpatWhitespaceNorm('<a name="x\ny"/>') === '<a name="x y"/>');
+    classifyKnown(twoSetups, HASH) === null);
 
   // A fully benign mutation-free doc is not a divergence family (any kind).
   check("classifier: benign base -> null (decision)", classifyKnown(base, DECISION, pyReject) === null);
-  check("classifier: benign base -> null (hash)", classifyKnown(base, HASH, pyAccept("H1"), reparseTo("H1")) === null);
+  check("classifier: benign base -> null (hash)", classifyKnown(base, HASH) === null);
 
   // compareOutcomes: crash is always a mismatch; accept-hash mismatch flagged.
   check("compare: crash in either engine mismatches", compareOutcomes({ status: "crash" }, { status: "accept", modelHash: "x" }).kind === "crash");
@@ -1167,10 +1050,7 @@ async function main() {
   console.log(`Differential fuzz campaign  seed=${result.seed}  cases=${result.cases}`);
   console.log("=".repeat(72));
   console.log(`matched (identical outcome): ${result.matched}`);
-  console.log(
-    `KNOWN divergences: #75=${result.knownByFamily["#75"]}  ` +
-      `#76=${result.knownByFamily["#76"]}  #78=${result.knownByFamily["#78"]}`,
-  );
+  console.log(`KNOWN divergences: #78=${result.knownByFamily["#78"]}`);
   console.log(`NEW divergences: ${result.newCount}`);
   console.log(`elapsed: ${elapsedMs.toFixed(0)} ms`);
   if (result.shrunk.length) {

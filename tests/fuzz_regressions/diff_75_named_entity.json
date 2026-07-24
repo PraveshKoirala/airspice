@@ -1,13 +1,14 @@
 {
   "issue": "#75",
-  "note": "undefined named entity: expat rejects, fast-xml-parser resolves/keeps-literal",
-  "expect": "diverge-known",
-  "classifiedKnown": "#75",
-  "diverges": true,
-  "mismatchKind": "decision",
+  "note": "undefined named entity &nbsp;: expat rejects. FIXED (PR #75) -- air-ts's rejectBadReferences now REJECTS it too (both engines reject with codes=[]), so they AGREE. Kept as a guard: if the reject gate is reverted, fast-xml-parser resolves &nbsp;->space and this re-diverges, failing CI.",
+  "expect": "reject-agree",
+  "classifiedKnown": null,
+  "diverges": false,
+  "mismatchKind": null,
   "ts": {
-    "status": "accept",
-    "modelHash": "62ad40900bece78a"
+    "status": "reject",
+    "codes": [],
+    "reason": "XmlParseError: undefined or malformed entity reference: &nbsp;</title></"
   },
   "py": {
     "codes": [],
