@@ -7,7 +7,8 @@
     "packages/air-ts",
     "packages/agent",
     "packages/sim-wasm",
-    "packages/ui"
+    "packages/ui",
+    "packages/mcp-server"
   ],
   "scripts": {
     "dev": "concurrently -n api,ui -c blue,green \"npm run dev:api\" \"npm run dev:ui\"",

@@ -16,7 +16,7 @@
  * given stderr blob always maps to the same code across runs and platforms.
  */
 
-import type { SimDiagnostic } from "./protocol";
+import type { SimDiagnostic } from "./protocol.js";
 
 interface Rule {
   code: string;

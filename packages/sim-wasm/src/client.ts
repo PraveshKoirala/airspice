@@ -25,7 +25,7 @@ import type {
   SimRequest,
   WorkerInbound,
   WorkerOutbound,
-} from "./protocol";
+} from "./protocol.js";
 
 /** Factory for the worker. Injectable so tests can supply a stub worker. */
 export type WorkerFactory = () => Worker;

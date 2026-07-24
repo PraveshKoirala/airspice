@@ -11,7 +11,7 @@
  * We map `type` -> our SignalUnit and `values` -> Float64Array.
  */
 
-import type { ProbeSpec, SignalUnit, WaveTable } from "./protocol";
+import type { ProbeSpec, SignalUnit, WaveTable } from "./protocol.js";
 
 /** Minimal structural view of eecircuit's result -- NOT an import of its types. */
 interface RawVector {
