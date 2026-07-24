@@ -47,3 +47,9 @@ export function markTourSeen(): void {
 export function resetTour(): void {
   storage()?.removeItem(TOUR_SEEN_KEY);
 }
+
+// Test-surface aliases (issue #28 interface contract). Same behavior as the
+// canonical names above — provided so consumers/tests can import either spelling.
+export const shouldShowTour = shouldAutoShowTour;
+export const rearmTour = resetTour;
+export const TOUR_STORAGE_KEY = TOUR_SEEN_KEY;

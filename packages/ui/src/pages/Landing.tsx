@@ -100,7 +100,7 @@ const Landing: React.FC = () => {
         <CircuitBoard size={64} className="hero-logo" />
         <h1>AirSpice</h1>
         <p>Capture a schematic, simulate it in your browser, and let the agent repair it.</p>
-        <button className="hero-tour-btn" onClick={handleTakeTour} data-testid="take-tour">
+        <button className="hero-tour-btn" onClick={handleTakeTour} data-testid="tour-help">
           <Compass size={15} /> New here? Take the 30-second tour
         </button>
       </div>

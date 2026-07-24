@@ -401,7 +401,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, theme, toggl
             className="theme-toggle"
             onClick={onStartTour}
             title="Replay the first-run tour"
-            data-testid="help-tour"
+            data-testid="tour-help"
           >
             <HelpCircle size={20} />
             <span className="tab-label">Help &amp; tour</span>

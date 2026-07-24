@@ -64,9 +64,9 @@ const OnboardingTour: React.FC<OnboardingTourProps> = ({ onClose }) => {
   }, [onClose]);
 
   return (
-    <div className="tour-overlay" role="dialog" aria-modal="true" aria-label="First-run tour" data-testid="onboarding-tour">
+    <div className="tour-overlay" role="dialog" aria-modal="true" aria-label="First-run tour" data-testid="tour-overlay">
       <div className="tour-card">
-        <button className="tour-close" onClick={onClose} aria-label="Close tour" data-testid="tour-close">
+        <button className="tour-close" onClick={onClose} aria-label="Close tour" data-testid="tour-dismiss">
           <X size={16} />
         </button>
 

@@ -60,7 +60,7 @@ const GalleryGrid: React.FC<GalleryGridProps> = ({ onOpen }) => {
   const fixme = entries.filter((e) => e.kind === "fixme");
 
   return (
-    <div className="gallery" data-testid="gallery">
+    <div className="gallery" data-testid="example-gallery">
       <GalleryRow
         title="Working designs"
         subtitle="Open one and press Simulate — no account, no key, no backend."
@@ -162,8 +162,10 @@ function GalleryCard({
       className="gallery-card"
       onClick={handleOpen}
       disabled={busy}
-      data-testid={`gallery-card-${entry.id}`}
+      data-testid="gallery-card"
+      data-design-id={entry.id}
       data-kind={entry.kind}
+      data-difficulty={entry.difficulty}
       aria-label={`Open ${entry.title}`}
     >
       <div className="gallery-thumb" data-testid={`gallery-thumb-${entry.id}`}>
