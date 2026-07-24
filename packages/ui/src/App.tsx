@@ -1300,8 +1300,13 @@ function gateSharedDesign(
 function ShareLoader({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const createProject = useProjectStore((s) => s.createProject);
+  // Detect an ACTUAL `d` fragment parameter (mirrors how decodeHashToDesign
+  // parses it), not a bare "d=" substring — otherwise hashes like `#id=…`,
+  // `#end=…`, or `#feed=…` would spuriously trigger an import and strip the
+  // user's fragment.
   const hasSharePayload =
-    typeof window !== 'undefined' && window.location.hash.includes('d=');
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.hash.replace(/^#/, '')).has('d');
   const [importing, setImporting] = useState(hasSharePayload);
   const [notice, setNotice] = useState<string | null>(null);
   const ranRef = useRef(false);

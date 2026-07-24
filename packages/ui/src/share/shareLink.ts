@@ -98,6 +98,10 @@ function base64UrlToBytes(text: string): Uint8Array | null {
       out[outIndex++] = (accumulator >>> bits) & 0xff;
     }
   }
+  // Canonical check: a valid unpadded base64url leaves 0/2/4 residual bits that
+  // MUST all be zero (they are the low bits of the final input byte that no
+  // output byte consumed). Reject non-canonical encodings.
+  if (bits > 0 && (accumulator & ((1 << bits) - 1)) !== 0) return null;
   return out;
 }
 
@@ -115,12 +119,25 @@ type InflateOutcome =
   | { kind: "corrupt" }
   | { kind: "too-large" };
 
+/** Compressed bytes fed per `push`, small enough to bound one push's output. */
+const INFLATE_INPUT_CHUNK_BYTES = 4 * 1024;
+
 /**
- * Raw-inflate `data` with a hard output cap. Uses fflate's STREAMING `Inflate`
- * so a decompression bomb is rejected as soon as the cumulative output crosses
- * `MAX_DECODED_BYTES` — we stop collecting chunks instead of allocating the
- * whole (potentially enormous) output first. A malformed / truncated stream
- * makes `push` throw, which we map to `corrupt`.
+ * Raw-inflate `data` with a hard output cap that bounds PEAK allocation, not
+ * just the returned size.
+ *
+ * fflate's streaming `Inflate` inflates every complete DEFLATE block present in
+ * its buffered input on each `push` and fires `ondata` once with that push's
+ * output. So we feed the compressed input in small `INFLATE_INPUT_CHUNK_BYTES`
+ * slices (final flag only on the last slice): each push produces at most one
+ * chunk's worth of output, `ondata` runs after it, and the moment cumulative
+ * output crosses `MAX_DECODED_BYTES` we set `overflow` and STOP pushing further
+ * input — so the inflater never processes the rest of the stream and the full
+ * (potentially enormous) output is never materialized. Peak allocation stays
+ * bounded to roughly the cap plus one chunk's expansion plus fflate's 32 KiB
+ * window, never the whole decompressed size. A malformed / truncated stream
+ * makes `push` throw (fflate errors on an incomplete final block), which we map
+ * to `corrupt`; the function never throws.
  */
 function inflateRawCapped(data: Uint8Array): InflateOutcome {
   const chunks: Uint8Array[] = [];
@@ -131,17 +148,24 @@ function inflateRawCapped(data: Uint8Array): InflateOutcome {
     if (overflow) return;
     total += chunk.length;
     if (total > MAX_DECODED_BYTES) {
+      // Cap crossed: drop this over-the-line chunk and signal the feed loop to
+      // stop. We do NOT keep it, and no more input is pushed after this.
       overflow = true;
       return;
     }
     chunks.push(chunk);
   };
   try {
-    inflater.push(data, true);
+    for (let offset = 0; offset < data.length; offset += INFLATE_INPUT_CHUNK_BYTES) {
+      if (overflow) break; // cap already crossed — feed no more input
+      const end = Math.min(offset + INFLATE_INPUT_CHUNK_BYTES, data.length);
+      inflater.push(data.subarray(offset, end), end === data.length);
+    }
   } catch {
     return { kind: "corrupt" };
   }
   if (overflow) return { kind: "too-large" };
+  if (chunks.length === 0) return { kind: "ok", bytes: new Uint8Array(0) };
   if (chunks.length === 1) return { kind: "ok", bytes: chunks[0] };
   const merged = new Uint8Array(total);
   let offset = 0;
