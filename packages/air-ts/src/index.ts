@@ -241,3 +241,15 @@ export {
   PatchError,
 } from "./patch/index.js";
 export type { PatchOperation } from "./patch/index.js";
+
+// KiCad 8 Schematic Exporter & SPICE Netlist Importer (Milestone M7)
+export { emitKicadSchematic, exportKicad } from "./emit/kicad.js";
+export type { KicadExportResult } from "./emit/kicad.js";
+export { importSpiceNetlist, parseSpiceNetlistToAirXml } from "./import/spice.js";
+export type {
+  SpiceImportResult,
+  SpiceImportOptions,
+  ParsedSpiceComponent,
+  DroppedLine,
+} from "./import/spice.js";
+
