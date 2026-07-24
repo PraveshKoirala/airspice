@@ -144,6 +144,15 @@ export function parseXml(xmlText: string): XmlElement {
   // SEC-008 too) rather than the plain codes=[] reject this gate raises.
   rejectBadReferences(src);
 
+  // Literal-control-char gate (issue #36 cross-engine seam / the literal sub-case
+  // of tracked #78): expat REJECTS a LITERAL XML-1.0-invalid control char anywhere
+  // in the document as "not well-formed (invalid token)", while fast-xml-parser
+  // preserves the byte and builds a model. Enforce expat's decision here, AFTER
+  // the numeric-char-ref gate (matching the oracle's order: SEC-008 char refs are
+  // checked before the structural pass that rejects the literal char) so a
+  // control-char design is refused identically by both engines.
+  rejectInvalidControlChars(xmlText);
+
   const parser = new XMLParser({
     // Ordered array-of-nodes representation: each node is a single-key object,
     // e.g. { system: [ ...children ], ":@": { "@_name": "x" } }.
@@ -409,6 +418,54 @@ function rejectInvalidCharRefs(xmlText: string): void {
         "SEC-008",
       );
     }
+  }
+}
+
+/**
+ * A LITERAL character that is NOT in the XML 1.0 `Char` production. The valid
+ * chars are #x9 (tab), #xA (LF), #xD (CR), #x20-#xD7FF, #xE000-#xFFFD,
+ * #x10000-#x10FFFF; so the invalid C0 range is #x0-#x8, #xB, #xC, #xE-#x1F.
+ * DEL (#x7F) is a VALID XML char and is NOT matched here.
+ */
+const INVALID_LITERAL_CONTROL_CHAR =
+  /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/;
+
+/**
+ * Reject a LITERAL XML-1.0-invalid control character anywhere in the document,
+ * exactly as expat does ("not well-formed (invalid token)").
+ *
+ * PROVENANCE (oracle, `xml.etree.ElementTree.fromstring`, probed at fix time):
+ *   REJECT (literal): #x0-#x8, #xB, #xC, #xE-#x1F -- in EVERY context (element
+ *     text, attribute value, comment, CDATA section, processing instruction, and
+ *     the whitespace between tags); the XML 1.0 Char production governs every
+ *     character in the document, not just element content.
+ *   ACCEPT (literal): #x9 (tab), #xA (LF), #xD (CR), and #x7F (DEL) -- expat
+ *     accepts these and air-ts preserves them; we keep that parity and do NOT
+ *     reject them.
+ *
+ * Sibling gate to `rejectInvalidCharRefs`: that one handles the numeric-char-REF
+ * form (`&#8;`, resolved+dropped by fast-xml-parser); this one handles the
+ * LITERAL byte (preserved verbatim by fast-xml-parser). Without this gate, a
+ * control-char-bearing firmware `<source>` (or any text) parses in air-ts but is
+ * rejected by the Python oracle -- the literal-control-char sub-case of the
+ * FXP-vs-expat well-formedness family (#78). We scan the WHOLE input (not the
+ * char-ref "scannable" subset) because expat rejects the literal char in every
+ * span kind, including comments/CDATA/PIs.
+ *
+ * Raised as a code-less `XmlParseError` (not a SEC- code), matching the oracle's
+ * `XmlParseRejection` -> reject with `codes: []` (fuzz_eval.py): a plain
+ * not-well-formed rejection, so the differential harness sees both engines refuse
+ * with the same (empty) rejection class.
+ */
+function rejectInvalidControlChars(xmlText: string): void {
+  const match = INVALID_LITERAL_CONTROL_CHAR.exec(xmlText);
+  if (match !== null) {
+    const cp = xmlText.charCodeAt(match.index);
+    const hex = cp.toString(16).toUpperCase().padStart(4, "0");
+    throw new XmlParseError(
+      `not well-formed (invalid token): literal control character U+${hex} ` +
+        `is not a legal XML 1.0 character`,
+    );
   }
 }
 

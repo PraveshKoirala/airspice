@@ -299,6 +299,48 @@ function mutRandomUnicode(tokens, rng) {
   return copy;
 }
 
+// Literal XML-1.0-invalid control chars (the C0 range minus tab/LF/CR): #x0-#x8,
+// #xB, #xC, #xE-#x1F. expat rejects any of these ANYWHERE in the document as "not
+// well-formed"; fast-xml-parser preserved them until the literal-control-char gate
+// in xml.ts. Built via fromCharCode so this source file carries no literal control
+// bytes. DEL (#x7F) is a VALID XML char (expat accepts, air-ts preserves) and is
+// deliberately NOT in this set, so the mutator never asserts a false divergence.
+const INVALID_CONTROL_CHARS = [0x00, 0x01, 0x08, 0x0b, 0x0c, 0x0e, 0x1f].map((c) =>
+  String.fromCharCode(c),
+);
+
+/**
+ * Inject a literal XML-invalid control char into element TEXT or a CDATA payload.
+ * Exercises the FXP-vs-expat literal-control-char family (the issue #36 cross-engine
+ * seam / literal sub-case of #78): expat rejects the whole document, and after the
+ * xml.ts gate air-ts rejects it too -- so the campaign covers a family the mutators
+ * were previously blind to, and both engines REJECT with the same (empty) rejection
+ * class (a MATCH, not a divergence). For a CDATA token the char is placed INSIDE the
+ * payload (between the delimiters), not in the markup, so it lands in character data
+ * exactly where expat still rejects it.
+ */
+function mutControlCharInjection(tokens, rng) {
+  const idxs = indicesOf(tokens, (t) => t.kind === "text" || t.kind === "cdata");
+  if (!idxs.length) return tokens;
+  const idx = pick(rng, idxs);
+  const ch = pick(rng, INVALID_CONTROL_CHARS);
+  const copy = tokens.slice();
+  const s = tokens[idx].raw;
+  if (tokens[idx].kind === "cdata") {
+    const m = /^(<!\[CDATA\[)([\s\S]*?)(\]\]>)$/.exec(s);
+    if (m) {
+      const at = randInt(rng, m[2].length + 1);
+      copy[idx] = { ...tokens[idx], raw: m[1] + m[2].slice(0, at) + ch + m[2].slice(at) + m[3] };
+      return copy;
+    }
+    copy[idx] = { ...tokens[idx], raw: s + ch };
+    return copy;
+  }
+  const at = randInt(rng, s.length + 1);
+  copy[idx] = { ...tokens[idx], raw: s.slice(0, at) + ch + s.slice(at) };
+  return copy;
+}
+
 // Integer-like id/name values that expose JS integer-key iteration order (an
 // object with keys "1","2","10" iterates NUMERICALLY-first in JS but preserves
 // insertion order in a Python dict). #79 showed this is a divergence-rich input
@@ -360,6 +402,7 @@ const MUTATORS = [
   ["comment-injection", mutCommentInjection],
   ["cdata-injection", mutCdataInjection],
   ["random-unicode", mutRandomUnicode],
+  ["control-char-injection", mutControlCharInjection],
   ["truncation", mutTruncation],
 ];
 
