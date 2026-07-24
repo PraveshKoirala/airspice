@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import type { Node, Edge } from 'reactflow';
 import { Activity, FileCode, FolderTree } from 'lucide-react';
 import Sidebar from './components/Sidebar';
@@ -10,7 +10,13 @@ import Graph from './components/Graph';
 import Inspector from './schematic/Inspector';
 import Palette from './schematic/Palette';
 import type { GuiHint, SchematicIR } from './schematic/types';
-import { parse as parseAir } from 'air-ts';
+import { parse as parseAir, parseXmlBytes, normalize as airNormalize, validate as airValidate } from 'air-ts';
+import type { Diagnostic as AirDiagnostic } from 'air-ts';
+import {
+  buildShareUrl,
+  decodeHashToDesign,
+  SHARE_HARD_LIMIT_BYTES,
+} from './share/shareLink';
 import { saveHintsPatch } from './schematic/patches';
 import { commitPatch } from './schematic/gate';
 import type { WireSource, WireTarget } from './schematic/Renderer';
@@ -484,6 +490,49 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
     }
   };
 
+  // Share (issue #27): the design IS the URL. Compress the current XML into the
+  // URL FRAGMENT so sharing needs no server/account/storage and the payload
+  // never leaves the browser as a request. On click we copy the link and toast
+  // the payload size; a very long URL warns (it breaks in some apps), and a URL
+  // past the hard cap is NOT copied (it would be unusable) — we fall back to
+  // exporting the design file instead.
+  const handleShare = async () => {
+    const currentXml = useDesignStore.getState().xml;
+    if (!currentXml.trim()) {
+      addLog('Nothing to share yet — the design is empty.', 'warning');
+      return;
+    }
+    const info = buildShareUrl(currentXml, window.location.origin);
+    const kb = (info.payloadBytes / 1024).toFixed(1);
+    if (info.overHard) {
+      addLog(
+        `This design is too large to share as a link (${kb} KB, over the ${SHARE_HARD_LIMIT_BYTES / 1024} KB cap). Exporting the design file to share instead.`,
+        'warning',
+      );
+      try {
+        const handle = await saveAsToDisk(currentXml, activeProjectName);
+        addLog(
+          handle ? `Exported '${handle.name}' — share the file instead.` : 'Exported the design to your downloads — share the file instead.',
+          'success',
+        );
+      } catch (e) {
+        addLog(`Export failed: ${(e as Error).message}`, 'error');
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(info.url);
+      addLog(`Share link copied to clipboard (${kb} KB in the URL).`, 'success');
+    } catch {
+      // Clipboard can be blocked (permissions / insecure context). Surface the
+      // URL so the user can still copy it manually.
+      addLog(`Could not copy automatically — here is the share link: ${info.url}`, 'warning');
+    }
+    if (info.overSoft) {
+      addLog('Very long URLs break in some apps — consider exporting the file instead.', 'warning');
+    }
+  };
+
   const handleValidate = async () => {
     setIsBusy(true);
     // In local (zero-backend) mode, validate the live XML through the engine
@@ -921,7 +970,7 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
             </div>
           </div>
         )}
-        <Toolbar onValidate={handleValidate} onSimulate={handleSimulate} onRepair={handleRepair} onSave={handleSave} />
+        <Toolbar onValidate={handleValidate} onSimulate={handleSimulate} onRepair={handleRepair} onSave={handleSave} onShare={handleShare} />
         <div className={`workspace-shell${ENGINE_MODE === 'local' ? ' no-path-bar' : ''}`}>
           <div className="workspace-header">
             <div>
@@ -1187,6 +1236,139 @@ function DowngradeRefusalScreen() {
   );
 }
 
+// Friendly, non-technical copy for each decode failure kind (issue #27). Keyed
+// by the DecodeResult error union so it stays exhaustive as the codec evolves.
+const DECODE_ERROR_MESSAGES: Record<
+  'empty' | 'bad-version' | 'malformed' | 'corrupt' | 'too-large',
+  string
+> = {
+  empty: 'This share link has no design in it.',
+  'bad-version': 'This share link was created by a different version of AirSpice and cannot be opened.',
+  malformed: 'This share link is malformed and could not be read.',
+  corrupt: 'This share link is corrupted or incomplete.',
+  'too-large': 'The design in this share link is too large to open.',
+};
+
+/**
+ * Gate a design that arrived from an UNTRUSTED source (a share link). Mirrors
+ * the agent write path: the decoded XML is treated as untrusted BYTES and must
+ * clear the air-ts byte-security gate (SEC-* contract: DOCTYPE/entity refusal,
+ * size/depth/attr caps, UTF-8-only), then normalize + validate, before it may be
+ * loaded. Returns the CANONICAL normalized XML on success, or a friendly message
+ * on any failure. Never throws.
+ */
+function gateSharedDesign(
+  xml: string,
+): { ok: true; xml: string } | { ok: false; message: string } {
+  let normalized: string;
+  try {
+    // Byte-security gate: run the SAME SEC-* contract an imported file passes
+    // (fileIo.openFromDisk), then coerce near-miss shape to strict canonical AIR.
+    parseXmlBytes(new TextEncoder().encode(xml));
+    normalized = airNormalize(xml);
+  } catch (e) {
+    return {
+      ok: false,
+      message: `The shared design was rejected by the security gate: ${(e as Error).message}`,
+    };
+  }
+  let diagnostics: AirDiagnostic[];
+  try {
+    diagnostics = airValidate(normalized);
+  } catch (e) {
+    return { ok: false, message: `The shared design could not be validated: ${(e as Error).message}` };
+  }
+  const firstError = diagnostics.find((d) => d.severity === 'error');
+  if (firstError) {
+    return {
+      ok: false,
+      message: `The shared design is not valid: ${firstError.code} — ${firstError.message}`,
+    };
+  }
+  return { ok: true, xml: normalized };
+}
+
+/**
+ * Share-link boot (issue #27). If the URL fragment carries a `d=` share payload,
+ * decode it, run it through the untrusted-input gate, and OPEN IT AS A NEW design
+ * (createProject — which mints a fresh project id and never overwrites the user's
+ * existing work). The fragment is stripped with `history.replaceState` so a
+ * reload never re-imports and the payload leaves the address bar. Any failure
+ * lands on the normal start screen with a friendly, dismissible, non-blocking
+ * notice — never an uncaught exception.
+ */
+function ShareLoader({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate();
+  const createProject = useProjectStore((s) => s.createProject);
+  const hasSharePayload =
+    typeof window !== 'undefined' && window.location.hash.includes('d=');
+  const [importing, setImporting] = useState(hasSharePayload);
+  const [notice, setNotice] = useState<string | null>(null);
+  const ranRef = useRef(false);
+
+  useEffect(() => {
+    if (ranRef.current) return;
+    ranRef.current = true;
+    if (!hasSharePayload) return;
+
+    const hash = window.location.hash;
+    // Strip the fragment: a reload must not re-import, and the (potentially
+    // large) payload should not linger in the address bar. Keep path + search.
+    const stripFragment = () =>
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+
+    const finishOnStart = (message: string) => {
+      setNotice(message);
+      stripFragment();
+      setImporting(false);
+      navigate('/', { replace: true });
+    };
+
+    const run = async () => {
+      const decoded = decodeHashToDesign(hash);
+      if (!decoded.ok) {
+        finishOnStart(DECODE_ERROR_MESSAGES[decoded.error]);
+        return;
+      }
+      const gated = gateSharedDesign(decoded.xml);
+      if (!gated.ok) {
+        finishOnStart(gated.message);
+        return;
+      }
+      try {
+        await createProject('Shared design', gated.xml);
+        stripFragment();
+        setImporting(false);
+        navigate('/project', { replace: true });
+      } catch (e) {
+        finishOnStart(`Could not open the shared design: ${(e as Error).message}`);
+      }
+    };
+    void run();
+  }, [hasSharePayload, navigate, createProject]);
+
+  if (importing) {
+    return (
+      <div className="boot-status" role="status">
+        Opening shared design…
+      </div>
+    );
+  }
+  return (
+    <>
+      {notice && (
+        <div className="share-notice" role="alert">
+          <span>{notice}</span>
+          <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss">
+            Dismiss
+          </button>
+        </div>
+      )}
+      {children}
+    </>
+  );
+}
+
 function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const initProjectStore = useProjectStore((s) => s.init);
@@ -1222,20 +1404,22 @@ function App() {
 
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<LandingWrapper />} />
-        <Route path="/project" element={<ProjectWorkspace theme={theme} toggleTheme={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')} />} />
-        {SimLab && (
-          <Route
-            path="/sim-lab"
-            element={
-              <Suspense fallback={<div style={{ padding: 24 }}>Loading sim-lab…</div>}>
-                <SimLab />
-              </Suspense>
-            }
-          />
-        )}
-      </Routes>
+      <ShareLoader>
+        <Routes>
+          <Route path="/" element={<LandingWrapper />} />
+          <Route path="/project" element={<ProjectWorkspace theme={theme} toggleTheme={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')} />} />
+          {SimLab && (
+            <Route
+              path="/sim-lab"
+              element={
+                <Suspense fallback={<div style={{ padding: 24 }}>Loading sim-lab…</div>}>
+                  <SimLab />
+                </Suspense>
+              }
+            />
+          )}
+        </Routes>
+      </ShareLoader>
     </BrowserRouter>
   );
 }

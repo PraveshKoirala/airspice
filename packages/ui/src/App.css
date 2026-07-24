@@ -72,6 +72,41 @@ body {
   color: var(--error);
 }
 
+/* Share-link import notice (issue #27): a non-blocking, dismissible banner that
+   appears on the start screen when a share link fails to open. */
+.share-notice {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  max-width: min(680px, calc(100vw - 24px));
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: var(--bg-secondary, #1f2937);
+  color: var(--text-primary, #f8fafc);
+  border: 1px solid var(--error, #ef4444);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  font-size: 14px;
+}
+
+.share-notice span {
+  flex: 1;
+}
+
+.share-notice button {
+  flex: none;
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border, #374151);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
 .app-container {
   display: grid;
   grid-template-columns: 236px minmax(0, 1fr) 380px;
