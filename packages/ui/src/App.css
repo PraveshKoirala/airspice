@@ -107,6 +107,50 @@ body {
   cursor: pointer;
 }
 
+/* Persistent warning banners across the top of the workspace (issue #26).
+   `.conflict-banner` surfaces a two-tab monotonic write conflict; the design is
+   NOT clobbered, the user is asked to reload. `.autosave-banner` surfaces an
+   autosave WRITE failure (quota exceeded / private-mode storage denied) so a
+   silent data-loss risk becomes a visible, persistent warning. */
+.conflict-banner,
+.autosave-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 16px;
+  font-size: 14px;
+  color: var(--text-bright, #f8fafc);
+  border-bottom: 1px solid var(--border);
+}
+
+.conflict-banner {
+  background: color-mix(in srgb, var(--warning) 20%, var(--bg-secondary));
+  border-bottom-color: var(--warning);
+}
+
+.autosave-banner {
+  background: color-mix(in srgb, var(--error) 20%, var(--bg-secondary));
+  border-bottom-color: var(--error);
+}
+
+.conflict-banner span,
+.autosave-banner span {
+  flex: 1;
+}
+
+.conflict-banner button,
+.autosave-banner button {
+  flex: none;
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 .app-container {
   display: grid;
   grid-template-columns: 236px minmax(0, 1fr) 380px;

@@ -21,6 +21,13 @@ export interface ProjectState {
   db: IDBDatabase | null;
   deletedProjectBackup: ProjectRecord | null;
   conflictError: string | null;
+  /**
+   * Set when an autosave write FAILS (quota exceeded, private-mode storage
+   * denied, etc.). Surfaced as a persistent warning banner rather than swallowed
+   * — a silent autosave failure is the one way local-first loses work (PRD #26
+   * guardrail). Cleared automatically by the next successful save.
+   */
+  autosaveError: string | null;
 
   init: () => Promise<void>;
   loadProjects: () => Promise<void>;
@@ -32,6 +39,7 @@ export interface ProjectState {
   restoreDeletedProject: () => Promise<void>;
   clearDeletedBackup: () => void;
   setConflictError: (err: string | null) => void;
+  dismissAutosaveError: () => void;
   saveActiveProjectXml: (xml: string) => Promise<void>;
   setFileHandle: (id: string, fileHandle: FileSystemFileHandle | undefined) => Promise<void>;
 }
@@ -46,6 +54,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   storageError: null,
   deletedProjectBackup: null,
   conflictError: null,
+  autosaveError: null,
   db: null,
 
   init: async () => {
@@ -204,6 +213,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set({ conflictError: err });
   },
 
+  dismissAutosaveError: () => {
+    set({ autosaveError: null });
+  },
+
   saveActiveProjectXml: async (xml: string) => {
     const { activeProjectId, localLoadedUpdatedAt } = get();
     if (!activeProjectId) return;
@@ -212,7 +225,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const project = await getProject(activeProjectId);
       if (!project) return;
 
-      // Monotonic write-guard: check if updatedAt is newer on disk
+      // Monotonic write-guard: a stale writer (our loaded base is older than
+      // what is now on disk — e.g. another tab saved) must NOT clobber the
+      // newer record. Surface the conflict and bail instead of overwriting.
       if (project.updatedAt > localLoadedUpdatedAt) {
         set({ conflictError: "Conflict detected! This project has been updated in another tab. Reload to see the changes." });
         return;
@@ -226,10 +241,17 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       };
 
       await saveProject(updated);
-      set({ localLoadedUpdatedAt: now });
+      // A successful write clears any prior autosave-failure banner.
+      set({ localLoadedUpdatedAt: now, autosaveError: null });
       await get().loadProjects();
     } catch (e) {
+      // Autosave failures (quota exceeded, private-mode storage denied, a
+      // closing connection) must NOT be swallowed — surface a persistent
+      // warning banner so the user knows their edits are not being persisted.
       console.error("Failed to autosave project:", e);
+      set({
+        autosaveError: `Your changes could not be saved locally: ${(e as Error).message}. They are kept in this tab, but may be lost if you close or reload. Free up storage or leave private browsing, then edit again to retry.`,
+      });
     }
   },
 }));

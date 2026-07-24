@@ -1,0 +1,24 @@
+{
+  "_comment": "Committed snapshot of a v(N-1)=v1 AirSpice IndexedDB (PRD #26 criterion 2). A v1 database has a single object store 'projects' (keyPath 'id') with NO indexes and records that carry NO 'schemaVersion' field. The migration test seeds this into a fake-indexeddb at version 1, then opens with current (v2) code via initDatabase() and asserts every project's 'xml' survives the v1->v2 migration byte-for-byte while gaining schemaVersion===2. Seed it with seedV1Db.ts (same directory).",
+  "dbName": "AirSpiceDB",
+  "version": 1,
+  "storeName": "projects",
+  "keyPath": "id",
+  "projects": [
+    {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "name": "Voltage Divider",
+      "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<system name=\"voltage_divider\" ir_version=\"0.1\">\n  <metadata>\n    <title>Voltage Divider</title>\n    <description>9V source, R_top=20k, R_bottom=10k. Unloaded divider output is 3.000V.</description>\n  </metadata>\n  <nets>\n    <net id=\"gnd\" role=\"ground\"/>\n    <net id=\"vin\" role=\"power\" nominal_voltage=\"9V\"/>\n    <net id=\"vout\" role=\"analog_signal\"/>\n  </nets>\n  <components>\n    <component id=\"V_IN\" type=\"voltage_source\">\n      <value>9V</value>\n      <pin name=\"p\" net=\"vin\"/>\n      <pin name=\"n\" net=\"gnd\"/>\n    </component>\n    <component id=\"R_TOP\" type=\"resistor\">\n      <value>20k</value>\n      <pin name=\"1\" net=\"vin\"/>\n      <pin name=\"2\" net=\"vout\"/>\n    </component>\n    <component id=\"R_BOTTOM\" type=\"resistor\">\n      <value>10k</value>\n      <pin name=\"1\" net=\"vout\"/>\n      <pin name=\"2\" net=\"gnd\"/>\n    </component>\n  </components>\n  <simulation_profiles/>\n</system>",
+      "createdAt": 1700000000000,
+      "updatedAt": 1700000500000
+    },
+    {
+      "id": "22222222-2222-4222-8222-222222222222",
+      "name": "Blank Design",
+      "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<system name=\"blank_design\" ir_version=\"0.1\">\n  <metadata>\n    <title>Blank Design</title>\n    <description>A fresh, blank electronic design. Contains an ampersand &amp; a &lt;tag&gt;-like literal to prove byte-exact preservation.</description>\n  </metadata>\n  <nets>\n    <net id=\"gnd\" role=\"ground\"/>\n  </nets>\n  <components/>\n  <simulation_profiles/>\n</system>",
+      "createdAt": 1700001000000,
+      "updatedAt": 1700001000000,
+      "thumbnailSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"4\" height=\"4\"><rect width=\"4\" height=\"4\" fill=\"#000\"/></svg>"
+    }
+  ]
+}

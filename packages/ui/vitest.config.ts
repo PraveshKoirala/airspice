@@ -27,5 +27,11 @@ export default defineConfig({
     environment: "node",
     include: ["tests/unit/**/*.test.ts"],
     exclude: ["tests/e2e/**", "node_modules/**"],
+    // Shim the IndexedDB globals (indexedDB, IDBKeyRange, IDBDatabase, …) into
+    // the Node test process so the storage layer (packages/ui/src/storage/db.ts)
+    // runs UNCHANGED under vitest — the real `idb`-style API against an in-memory
+    // store, not a mock (issue #26). Applies to every unit test file; harmless
+    // for the ones that never touch IndexedDB.
+    setupFiles: ["fake-indexeddb/auto"],
   },
 });

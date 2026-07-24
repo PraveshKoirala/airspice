@@ -50,6 +50,7 @@ import { WaveformViewer, type WaveformTrace } from './waveform';
 import { useProjectStore } from './storage/projectStore';
 import { saveToDisk, saveAsToDisk } from './storage/fileIo';
 import { exportAllRawRecords } from './storage/db';
+import { createAutosaveController, type AutosaveController } from './storage/autosave';
 import { useDesignStore } from './agent/designStore';
 import { useAgentSettings } from './agent/agentSettings';
 import './App.css';
@@ -222,10 +223,11 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
   const selectProject = useProjectStore((s) => s.selectProject);
   const createProject = useProjectStore((s) => s.createProject);
-  const saveActiveProjectXml = useProjectStore((s) => s.saveActiveProjectXml);
   const setFileHandle = useProjectStore((s) => s.setFileHandle);
   const conflictError = useProjectStore((s) => s.conflictError);
   const setConflictError = useProjectStore((s) => s.setConflictError);
+  const autosaveError = useProjectStore((s) => s.autosaveError);
+  const dismissAutosaveError = useProjectStore((s) => s.dismissAutosaveError);
 
   const activeProject = useMemo(() => {
     return projectsList.find((p) => p.id === activeProjectId) || null;
@@ -249,40 +251,42 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
     runInit();
   }, [projectStoreInitialized, projectsList.length, selectProject, createProject]);
 
-  // Keep a ref to the latest XML so visibilitychange/pagehide can access it
-  const xmlRef = useRef(xml);
-  useEffect(() => {
-    xmlRef.current = xml;
-  }, [xml]);
+  // Autosave controller (issue #26): the debounce/flush policy lives in a plain
+  // testable unit (storage/autosave.ts). Its `save` closure reads the LATEST
+  // active project + design XML at run time (never a stale captured value), so a
+  // burst of edits collapses into one write of the freshest XML, and a flush on
+  // unload persists whatever is current. Created once and kept in a ref.
+  const autosaveRef = useRef<AutosaveController | null>(null);
+  if (autosaveRef.current === null) {
+    autosaveRef.current = createAutosaveController(() => {
+      const { activeProjectId: id, saveActiveProjectXml: save } = useProjectStore.getState();
+      const currentXml = useDesignStore.getState().xml;
+      if (id && currentXml) void save(currentXml);
+    }, 1000);
+  }
 
-  // Debounced autosave (1s)
+  // Debounced autosave: every design-XML change (re)arms the ~1s timer.
   useEffect(() => {
     if (!activeProjectId || !xml) return;
-    const timer = setTimeout(() => {
-      saveActiveProjectXml(xml);
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, [xml, activeProjectId, saveActiveProjectXml]);
+    autosaveRef.current!.schedule();
+  }, [xml, activeProjectId]);
 
-  // Flush on tab close/visibility change
+  // Crash-safety flush: persist any pending edit IMMEDIATELY when the tab is
+  // hidden (visibilitychange→hidden) or being unloaded (pagehide), so a mid-edit
+  // close or hard reload recovers the last edit rather than losing it.
   useEffect(() => {
-    const flushAutosave = () => {
-      if (activeProjectId && xmlRef.current) {
-        saveActiveProjectXml(xmlRef.current);
-      }
-    };
+    const controller = autosaveRef.current!;
+    const flush = () => controller.flush();
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        flushAutosave();
-      }
+      if (document.visibilityState === 'hidden') controller.flush();
     };
-    window.addEventListener('pagehide', flushAutosave);
+    window.addEventListener('pagehide', flush);
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
-      window.removeEventListener('pagehide', flushAutosave);
+      window.removeEventListener('pagehide', flush);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [activeProjectId, saveActiveProjectXml]);
+  }, []);
 
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
@@ -962,11 +966,19 @@ function ProjectWorkspace({ theme, toggleTheme }: { theme: 'dark' | 'light', tog
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} theme={theme} toggleTheme={toggleTheme} />
       <main className="main-content">
         {conflictError && (
-          <div className="conflict-banner">
+          <div className="conflict-banner" role="alert">
             <span>{conflictError}</span>
             <div>
               <button onClick={() => window.location.reload()} style={{ marginRight: 8 }}>Reload Page</button>
               <button onClick={() => setConflictError(null)}>Dismiss</button>
+            </div>
+          </div>
+        )}
+        {autosaveError && (
+          <div className="autosave-banner" role="alert">
+            <span>{autosaveError}</span>
+            <div>
+              <button onClick={dismissAutosaveError}>Dismiss</button>
             </div>
           </div>
         )}

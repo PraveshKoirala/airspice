@@ -6,6 +6,14 @@ export interface ProjectRecord {
   updatedAt: number;
   thumbnailSvg?: string;
   fileHandle?: FileSystemFileHandle;
+  /**
+   * The integer schema version the record was last written under (backfilled by
+   * the v2 migration, stamped by every subsequent write). It carries per-record
+   * provenance so a future migration can branch on the shape a record was
+   * created with, independent of the whole-database version. Optional so a
+   * pre-v2 (unmigrated) record is still a valid `ProjectRecord`.
+   */
+  schemaVersion?: number;
 }
 
 export interface Migration {
@@ -13,16 +21,45 @@ export interface Migration {
   run: (db: IDBDatabase, transaction: IDBTransaction) => void;
 }
 
-export const CURRENT_VERSION = 1;
+/**
+ * The database's integer schema version. Bumping this REQUIRES appending a
+ * matching `Migration` below; `openDbWithVersion` replays every migration whose
+ * `version` is newer than the on-disk version, in order, inside the single
+ * `versionchange` transaction. Never mutate the schema without bumping this and
+ * registering the migration (post-audit amendment, PRD #26 criterion 2).
+ */
+export const CURRENT_VERSION = 2;
 export const DB_NAME = "AirSpiceDB";
 
 const MIGRATIONS: Migration[] = [
   {
     version: 1,
+    // v1: the original single object store keyed by the project id.
     run: (db) => {
       if (!db.objectStoreNames.contains("projects")) {
         db.createObjectStore("projects", { keyPath: "id" });
       }
+    },
+  },
+  {
+    version: 2,
+    // v2: stamp an explicit integer `schemaVersion` onto every stored record.
+    // This is a genuine forward migration (not a no-op): it REWRITES every
+    // existing record in place via a cursor, inside the versionchange
+    // transaction, preserving all other fields — crucially the design `xml` —
+    // byte-for-byte. A record already at v2 is left untouched (idempotent).
+    run: (_db, transaction) => {
+      const store = transaction.objectStore("projects");
+      const cursorRequest = store.openCursor();
+      cursorRequest.onsuccess = () => {
+        const cursor = cursorRequest.result;
+        if (!cursor) return;
+        const record = cursor.value as ProjectRecord;
+        if (record.schemaVersion !== 2) {
+          cursor.update({ ...record, schemaVersion: 2 });
+        }
+        cursor.continue();
+      };
     },
   },
 ];
@@ -57,6 +94,19 @@ function openDbWithoutVersion(): Promise<IDBDatabase> {
 }
 
 /**
+ * Delete the database, resolving even if the delete is momentarily blocked by
+ * another open connection (we do not throw on `onblocked`; the delete completes
+ * once the blocker closes, firing `onsuccess`).
+ */
+function deleteDb(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(DB_NAME);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+/**
  * Open the database with a specific version, running migrations sequentially
  * during upgradeneeded.
  */
@@ -69,13 +119,23 @@ function openDbWithVersion(version: number): Promise<IDBDatabase> {
       if (!transaction) return;
       const oldVersion = event.oldVersion;
 
-      // Run migrations in sequence
+      // Replay every registered migration newer than the on-disk version, in
+      // ascending order, inside this single versionchange transaction.
       for (const m of MIGRATIONS) {
         if (m.version > oldVersion && m.version <= version) {
           m.run(db, transaction);
         }
       }
     };
+    // A concurrent open connection (e.g. another tab) blocks the upgrade. We
+    // surface it as an error rather than hanging forever; the caller reports it
+    // through the storage-error path instead of leaving the app on a spinner.
+    request.onblocked = () =>
+      reject(
+        new Error(
+          "Database upgrade is blocked by another open tab. Close other AirSpice tabs and reload.",
+        ),
+      );
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
@@ -86,6 +146,14 @@ function openDbWithVersion(version: number): Promise<IDBDatabase> {
  */
 async function initializeDatabase(): Promise<DatabaseInitResult> {
   try {
+    // Close any connection a prior init left open so it cannot block the
+    // version upgrade below (its own open handle would otherwise `onblocked`
+    // the deleteDatabase / version bump). Harmless on a genuine cold start.
+    if (activeDb) {
+      activeDb.close();
+      activeDb = null;
+    }
+
     const dbCheck = await openDbWithoutVersion();
     const diskVersion = dbCheck.version;
     const hasProjects = dbCheck.objectStoreNames.contains("projects");
@@ -102,11 +170,7 @@ async function initializeDatabase(): Promise<DatabaseInitResult> {
     if (diskVersion === 1 && !hasProjects) {
       // Newly created database by openDbWithoutVersion or empty database.
       // Delete it and reopen to force upgrade sequence.
-      await new Promise<void>((resolve, reject) => {
-        const req = indexedDB.deleteDatabase(DB_NAME);
-        req.onsuccess = () => resolve();
-        req.onerror = () => reject(req.error);
-      });
+      await deleteDb();
     }
 
     // Normal scenario or upgrade: Open with target code version.
@@ -151,6 +215,19 @@ function getDb(): IDBDatabase {
 }
 
 /**
+ * Close the active connection (if any) and drop the cached handle. Releases the
+ * IndexedDB lock so a subsequent version upgrade — from another tab, or a fresh
+ * `initDatabase()` after schema changes — is not blocked by this tab's open
+ * handle. Safe to call when nothing is open.
+ */
+export function closeDatabase(): void {
+  if (activeDb) {
+    activeDb.close();
+    activeDb = null;
+  }
+}
+
+/**
  * Retrieve a project record by ID.
  */
 export function getProject(id: string): Promise<ProjectRecord | null> {
@@ -177,7 +254,10 @@ export function saveProject(project: ProjectRecord): Promise<void> {
       const db = getDb();
       const transaction = db.transaction("projects", "readwrite");
       const store = transaction.objectStore("projects");
-      const request = store.put(project);
+      // Stamp the current schema version on every write so records minted after
+      // the v2 migration carry the same provenance marker the migration
+      // backfilled onto pre-existing records (keeps the whole store uniform).
+      const request = store.put({ ...project, schemaVersion: CURRENT_VERSION });
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
     } catch (e) {
