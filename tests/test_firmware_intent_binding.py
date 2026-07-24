@@ -87,6 +87,15 @@ PIN_FORM_GOLDEN = (
 BINDING_OK = FIXTURES / "led_esp32c3_binding_ok.air.xml"
 BINDING_WRONG = FIXTURES / "led_esp32c3_binding_wrong.air.xml"
 
+# Ambiguous-channel boundary (adversarial review): the referenced component declares
+# TWO GPIO pins sharing the SAME generic function token (both function="GPIO"), and the
+# binding uses a GENERIC channel="GPIO" that matches BOTH — so channel alone cannot
+# resolve. The deterministic contract is: >1 channel match -> disambiguate by the
+# binding's declared <net> (unique candidate with that net, else None); NEVER first-match.
+AMBIG_OK = FIXTURES / "led_esp32c3_ambiguous_ok.air.xml"          # <net> picks the right pin
+AMBIG_WRONG_NET = FIXTURES / "led_esp32c3_ambiguous_wrongnet.air.xml"  # <net> picks the wrong pin
+AMBIG_NO_NET = FIXTURES / "led_esp32c3_ambiguous_ambignet.air.xml"     # <net> disambiguates nothing
+
 # The REAL spec criteria the scorer runs for this device. Loading them (rather than
 # hand-copying) keeps the test faithful to what production scores; the important line
 # is ``firmware_intent: ["write_gpio(net=<led_drive>)"]``.
@@ -205,6 +214,103 @@ def test_wrong_binding_scores_not_built() -> None:
         "the wrong-binding design must fail specifically on firmware_intent "
         f"(it is ERC-clean and connectivity-valid), got {score.failed_criterion!r}: "
         f"{score.detail!r}"
+    )
+
+
+# --------------------------------------------------------------------------- #
+# AMBIGUOUS-CHANNEL BOUNDARY (adversarial review). When the component declares TWO
+# GPIO pins sharing the same function token and the binding's channel is generic, the
+# channel matches BOTH pins. The resolver must be DETERMINISTIC: disambiguate by the
+# binding's declared <net>, never take the first match. These tests lock that contract:
+#   (a) declared <net> picks the correct pin        -> firmware_intent SATISFIED;
+#   (b) declared <net> picks the wrong pin, OR does  -> firmware_intent REJECTED.
+#       not disambiguate any candidate
+# A first-match resolver order-dependently returns the FIRST matching pin (here the
+# intent net, since it is declared first), so it WRONGLY accepts both (b) cases —
+# which is exactly what the two rejection tests below fail a first-match impl on.
+# --------------------------------------------------------------------------- #
+
+def test_ambiguous_binding_disambiguated_by_net_satisfies() -> None:
+    """Two same-function GPIO pins + generic channel="GPIO"; the binding's declared
+    net=led_drive selects the correct unique candidate -> firmware_intent SATISFIED.
+
+    FAILS TODAY (binding op invisible to the pin=-only scorer); passes under the
+    disambiguating resolver.
+    """
+    design, u = _design_and_bound_unifier(AMBIG_OK)
+    ok, detail = check_firmware_intent(design, FIRMWARE_INTENT, u)
+    assert ok, (
+        "an ambiguous generic channel disambiguated by the declared net=led_drive must "
+        f"satisfy firmware_intent, but the scorer rejected it: {detail!r}"
+    )
+
+
+def test_ambiguous_binding_disambiguated_scores_built() -> None:
+    """End-to-end: the disambiguated-to-correct ambiguous design scores as built."""
+    score = score_build(AMBIG_OK.read_text(encoding="utf-8"), CRITERIA)
+    assert score.built, (
+        "score_build must accept the ambiguous design that its declared net "
+        f"disambiguates to the correct pin, but it failed {score.failed_criterion!r}: "
+        f"{score.detail!r}"
+    )
+    assert score.criteria.get("firmware_intent") is True
+
+
+def test_ambiguous_binding_wrong_net_is_rejected() -> None:
+    """Two same-function GPIO pins + generic channel="GPIO"; the binding's declared
+    net=aux_drive disambiguates to the WRONG pin (not the intent's led_drive) -> MUST be
+    REJECTED.
+
+    A first-match resolver ignores the declared net and returns the FIRST match
+    (GPIO2/led_drive), which equals the intent net and WRONGLY satisfies the intent —
+    so this assertion FAILS against a first-match implementation and passes only the
+    deterministic disambiguating one.
+    """
+    design, u = _design_and_bound_unifier(AMBIG_WRONG_NET)
+    ok, _detail = check_firmware_intent(design, FIRMWARE_INTENT, u)
+    assert not ok, (
+        "an ambiguous generic channel whose declared net (aux_drive) disambiguates to "
+        "the WRONG GPIO pin must NOT satisfy firmware_intent — accepting it means the "
+        "resolver took a first-match instead of honouring the declared net."
+    )
+
+
+def test_ambiguous_binding_wrong_net_scores_not_built() -> None:
+    """End-to-end companion: the wrong-net ambiguous design fails on firmware_intent."""
+    score = score_build(AMBIG_WRONG_NET.read_text(encoding="utf-8"), CRITERIA)
+    assert not score.built and score.failed_criterion == "firmware_intent", (
+        "the ambiguous design that disambiguates to the wrong pin must fail on "
+        f"firmware_intent specifically; got built={score.built} "
+        f"failed_criterion={score.failed_criterion!r} ({score.detail!r})"
+    )
+
+
+def test_ambiguous_binding_no_disambiguating_net_is_rejected() -> None:
+    """Two same-function GPIO pins + generic channel="GPIO"; the binding's declared
+    net=v3v3 matches NEITHER candidate GPIO net, so nothing disambiguates the >1 match
+    -> resolver returns None -> MUST be REJECTED (ambiguous).
+
+    A first-match resolver returns the FIRST matching pin (GPIO2/led_drive == the intent
+    net) and WRONGLY satisfies the intent — so this assertion FAILS against a first-match
+    implementation and passes only the deterministic disambiguating one.
+    """
+    design, u = _design_and_bound_unifier(AMBIG_NO_NET)
+    ok, _detail = check_firmware_intent(design, FIRMWARE_INTENT, u)
+    assert not ok, (
+        "an ambiguous generic channel with no disambiguating declared net must NOT "
+        "satisfy firmware_intent — the resolver must reject the ambiguity, never take "
+        "the first matching pin."
+    )
+
+
+def test_ambiguous_binding_no_disambiguating_net_scores_not_built() -> None:
+    """End-to-end companion: the non-disambiguating ambiguous design (kept ERC-clean via
+    net=v3v3) fails on firmware_intent specifically, not on erc_clean."""
+    score = score_build(AMBIG_NO_NET.read_text(encoding="utf-8"), CRITERIA)
+    assert not score.built and score.failed_criterion == "firmware_intent", (
+        "the ambiguous design with no disambiguating net must fail on firmware_intent "
+        f"specifically; got built={score.built} "
+        f"failed_criterion={score.failed_criterion!r} ({score.detail!r})"
     )
 
 
