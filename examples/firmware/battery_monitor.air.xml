@@ -1,0 +1,71 @@
+<system name="firmware_battery_monitor" ir_version="0.1">
+  <metadata>
+    <title>Battery Monitor</title>
+    <description>ESP32-C3 samples a battery divider on ADC and prints the millivolts. Firmware source deliberately contains a literal CDATA-end marker to lock byte-exact round-tripping (issue #36).</description>
+    <author>AI</author>
+    <created_at>2026-07-24T00:00:00Z</created_at>
+  </metadata>
+  <nets>
+    <net id="gnd" role="ground"/>
+    <net id="bat" role="power" nominal_voltage="3.7V"/>
+    <net id="3v3" role="power" nominal_voltage="3.3V"/>
+    <net id="bat_sense" role="analog_signal"/>
+  </nets>
+  <components>
+    <component id="R_BAT_TOP" type="resistor">
+      <value>1M</value>
+      <pin name="1" net="bat"/>
+      <pin name="2" net="bat_sense"/>
+    </component>
+    <component id="R_BAT_BOTTOM" type="resistor">
+      <value>330k</value>
+      <pin name="1" net="bat_sense"/>
+      <pin name="2" net="gnd"/>
+    </component>
+    <component id="C_BAT_SENSE" type="capacitor">
+      <value>100nF</value>
+      <pin name="1" net="bat_sense"/>
+      <pin name="2" net="gnd"/>
+    </component>
+    <component id="U_MCU" type="mcu" part="ESP32-C3">
+      <pin name="3V3" net="3v3"/>
+      <pin name="GND" net="gnd"/>
+      <pin name="GPIO4" net="bat_sense" function="ADC1_CH4"/>
+    </component>
+  </components>
+  <firmware mcu="U_MCU" language="micropython" entry="main" pins="GPIO4">
+    <source><![CDATA[
+from machine import ADC, Pin
+import time
+
+# guard: the CDATA-end marker ']]]]><![CDATA[>' must survive canonicalization verbatim
+adc = ADC(Pin(4))
+
+def main():
+    while True:
+        raw = adc.read_u16()
+        mv = raw * 3300 // 65535
+        print('battery_mv', mv)
+        time.sleep_ms(1000)
+]]></source>
+  </firmware>
+  <tests>
+    <test id="battery_divider_nominal">
+      <description>1M/330k divider from 3.7V lands near 0.92V.</description>
+      <setup>
+        <set_voltage net="bat" value="3.7V"/>
+      </setup>
+      <run duration="10ms"/>
+      <assert_voltage net="bat_sense" min="0.85V" max="1.0V"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="firmware_profile" default="true">
+      <backend type="renode"/>
+      <run test="battery_divider_nominal"/>
+    </profile>
+  </simulation_profiles>
+  <exports>
+    <export target="firmware" enabled="true"/>
+  </exports>
+</system>

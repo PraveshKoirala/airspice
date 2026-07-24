@@ -25,6 +25,12 @@ tests/spice_models/**  text eol=lf
 # PowerShell scripts run on Windows; keep CRLF for them.
 *.ps1   text eol=crlf
 
+# Firmware-source corpus designs (issue #36) carry inline program text inside a
+# <source> CDATA block that MUST round-trip BYTE-EXACT through both engines. A
+# Windows checkout that rewrote \n to \r\n would change the CDATA bytes and the
+# frozen goldens. Force LF so the source content is identical on every platform.
+examples/firmware/**       text eol=lf
+
 # The differential fuzzer (issue #43) archives byte-sensitive fixtures: shrunk
 # reproducers whose recorded model hashes / rejection codes depend on exact
 # bytes (a literal tab in an attribute value, a deep-nesting doc whose element

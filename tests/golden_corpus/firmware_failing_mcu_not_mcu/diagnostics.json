@@ -1,0 +1,18 @@
+{
+  "diagnostics": [
+    {
+      "code": "FIRMWARE_MCU_NOT_MCU",
+      "domain": "firmware",
+      "expected": {},
+      "id": "diag_00001",
+      "message": "Firmware source mcu R_SOIL_TOP is not an MCU component.",
+      "observed": {},
+      "related_elements": [
+        "R_SOIL_TOP"
+      ],
+      "severity": "error",
+      "suggested_actions": []
+    }
+  ],
+  "success": false
+}

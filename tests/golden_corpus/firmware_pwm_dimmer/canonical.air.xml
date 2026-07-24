@@ -1,0 +1,70 @@
+<?xml version="1.0" ?>
+<system ir_version="0.1" name="firmware_pwm_dimmer">
+  <metadata>
+    <title>PWM LED Dimmer</title>
+    <description>ESP32-C3 drives an LED through an RC low-pass filter using PWM. Carries inline MicroPython firmware source (issue #36).</description>
+    <author>AI</author>
+    <created_at>2026-07-24T00:00:00Z</created_at>
+  </metadata>
+  <nets>
+    <net id="3v3" nominal_voltage="3.3V" role="power"/>
+    <net id="gnd" role="ground"/>
+    <net id="led_dc" role="analog_signal"/>
+    <net id="pwm_raw" role="digital_signal"/>
+  </nets>
+  <components>
+    <component id="C_FILTER" type="capacitor">
+      <value>1uF</value>
+      <pin name="1" net="led_dc"/>
+      <pin name="2" net="gnd"/>
+    </component>
+    <component id="R_FILTER" type="resistor">
+      <value>1k</value>
+      <pin name="1" net="pwm_raw"/>
+      <pin name="2" net="led_dc"/>
+    </component>
+    <component id="U_MCU" part="ESP32-C3" type="mcu">
+      <pin name="3V3" net="3v3"/>
+      <pin name="GND" net="gnd"/>
+      <pin function="GPIO_OUT" name="GPIO5" net="pwm_raw"/>
+    </component>
+  </components>
+  <firmware entry="main" language="micropython" mcu="U_MCU" pins="GPIO5">
+    <source><![CDATA[
+from machine import Pin, PWM
+import time
+
+led = PWM(Pin(5))
+led.freq(1000)
+
+def main():
+    duty = 0
+    step = 512
+    while True:
+        led.duty_u16(duty)
+        duty += step
+        if duty >= 65535 or duty <= 0:
+            step = -step
+        time.sleep_ms(20)
+]]></source>
+  </firmware>
+  <tests>
+    <test id="filter_dc_level">
+      <description>RC filter settles toward the driven rail.</description>
+      <setup>
+        <set_voltage net="pwm_raw" value="3.3V"/>
+      </setup>
+      <run duration="10ms"/>
+      <assert_voltage max="3.3V" min="0.0V" net="led_dc"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile default="true" id="firmware_profile">
+      <backend type="renode"/>
+      <run test="filter_dc_level"/>
+    </profile>
+  </simulation_profiles>
+  <exports>
+    <export enabled="true" target="firmware"/>
+  </exports>
+</system>

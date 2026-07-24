@@ -105,6 +105,18 @@ CORPUS: list[tuple[str, str]] = [
     ("solar_charger", "samples/solar_charger/design.air.xml"),
     ("stm32_demo", "samples/stm32_demo/design.air.xml"),
     ("complex_bms", "tests/capability_suite/complex_bms.air.xml"),
+    # Inline firmware-source designs (issue #36). The three valid designs carry a
+    # <firmware><source> CDATA block and use a renode-only profile (no ngspice
+    # backend) so they produce deterministic artifacts only -- no float report --
+    # and regenerate identically on any platform. The three failing variants
+    # exercise the new FIRMWARE_* diagnostics. battery_monitor's source embeds a
+    # literal "]]>" to lock the CDATA split-escaping into the frozen goldens.
+    ("firmware_plant_waterer", "examples/firmware/plant_waterer.air.xml"),
+    ("firmware_pwm_dimmer", "examples/firmware/pwm_dimmer.air.xml"),
+    ("firmware_battery_monitor", "examples/firmware/battery_monitor.air.xml"),
+    ("firmware_failing_bad_mcu", "examples/firmware/failing/bad_mcu.air.xml"),
+    ("firmware_failing_pin_not_on_mcu", "examples/firmware/failing/pin_not_on_mcu.air.xml"),
+    ("firmware_failing_mcu_not_mcu", "examples/firmware/failing/mcu_not_mcu.air.xml"),
 ]
 
 
@@ -433,6 +445,52 @@ def generate(corpus_root: Path) -> list[dict[str, object]]:
     return inventory
 
 
+def generate_only(names: list[str]) -> int:
+    """Regenerate ONLY the named design(s) in place, leaving every other fixture
+    untouched (issue #36: add new designs without churning the frozen corpus).
+
+    The ngspice version gate is skipped when none of the targeted designs would
+    emit a float report (i.e. no ngspice-backend default profile): those designs
+    produce only deterministic, platform-independent artifacts, so no real
+    ngspice is required. If ANY targeted design DOES have an ngspice profile the
+    gate is enforced -- we refuse to silently fall back to simulator.py's DC
+    approximation and write a wrong report.
+    """
+    manifest = dict(CORPUS)
+    unknown = [n for n in names if n not in manifest]
+    if unknown:
+        print(f"ABORT: unknown design(s): {', '.join(unknown)}", file=sys.stderr)
+        print(f"       known designs: {', '.join(n for n, _ in CORPUS)}", file=sys.stderr)
+        return 2
+
+    needs_ngspice: list[str] = []
+    for name in names:
+        source = REPO_ROOT / manifest[name]
+        try:
+            ir, _ = parse_file(source)
+        except Exception:  # noqa: BLE001 -- parse-error fixtures emit no report
+            continue
+        if _default_ngspice_profile(ir) is not None:
+            needs_ngspice.append(name)
+
+    if needs_ngspice:
+        try:
+            enforce_version_gate(allow_pin_write=False)
+        except ExportError as exc:
+            print(
+                f"ABORT: --only cannot regenerate {', '.join(needs_ngspice)} without the "
+                f"pinned ngspice (they carry an ngspice default profile).\n{exc}",
+                file=sys.stderr,
+            )
+            return 2
+
+    CORPUS_DIR.mkdir(parents=True, exist_ok=True)
+    for name in names:
+        row = generate_design(name, manifest[name], CORPUS_DIR)
+        print(f"  {name:32s} status={row.get('status'):12s} artifacts={len(row['artifacts'])}")  # type: ignore[arg-type]
+    return 0
+
+
 # --------------------------------------------------------------------------- #
 # Checking                                                                     #
 # --------------------------------------------------------------------------- #
@@ -665,7 +723,21 @@ def main(argv: list[str] | None = None) -> int:
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--check", action="store_true", help="Verify the committed corpus reproduces exactly (within contract).")
     group.add_argument("--self-test", action="store_true", help="Prove --check detects a corrupted fixture (mutation test).")
+    group.add_argument(
+        "--only",
+        nargs="+",
+        metavar="NAME",
+        help=(
+            "Regenerate ONLY the named design(s) in place, leaving all other "
+            "fixtures untouched. The ngspice gate is skipped for designs without "
+            "an ngspice default profile (deterministic artifacts only)."
+        ),
+    )
     args = parser.parse_args(argv)
+
+    # --only handles its own (conditional) version gate; do not run the global one.
+    if args.only:
+        return generate_only(args.only)
 
     try:
         version = enforce_version_gate(allow_pin_write=not (args.check or args.self_test))

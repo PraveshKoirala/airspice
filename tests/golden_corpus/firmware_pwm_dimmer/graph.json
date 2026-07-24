@@ -1,0 +1,196 @@
+{
+  "edges": [
+    {
+      "data": {
+        "net": "led_dc",
+        "pin": "1"
+      },
+      "id": "C_FILTER:1->led_dc",
+      "label": "1",
+      "source": "C_FILTER",
+      "sourceHandle": "pin:1",
+      "target": "net:led_dc",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "2"
+      },
+      "id": "C_FILTER:2->gnd",
+      "label": "2",
+      "source": "C_FILTER",
+      "sourceHandle": "pin:2",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "pwm_raw",
+        "pin": "1"
+      },
+      "id": "R_FILTER:1->pwm_raw",
+      "label": "1",
+      "source": "R_FILTER",
+      "sourceHandle": "pin:1",
+      "target": "net:pwm_raw",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "led_dc",
+        "pin": "2"
+      },
+      "id": "R_FILTER:2->led_dc",
+      "label": "2",
+      "source": "R_FILTER",
+      "sourceHandle": "pin:2",
+      "target": "net:led_dc",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "3v3",
+        "pin": "3V3"
+      },
+      "id": "U_MCU:3V3->3v3",
+      "label": "3V3",
+      "source": "U_MCU",
+      "sourceHandle": "pin:3V3",
+      "target": "net:3v3",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "gnd",
+        "pin": "GND"
+      },
+      "id": "U_MCU:GND->gnd",
+      "label": "GND",
+      "source": "U_MCU",
+      "sourceHandle": "pin:GND",
+      "target": "net:gnd",
+      "targetHandle": "net"
+    },
+    {
+      "data": {
+        "net": "pwm_raw",
+        "pin": "GPIO5"
+      },
+      "id": "U_MCU:GPIO5->pwm_raw",
+      "label": "GPIO5",
+      "source": "U_MCU",
+      "sourceHandle": "pin:GPIO5",
+      "target": "net:pwm_raw",
+      "targetHandle": "net"
+    }
+  ],
+  "nodes": [
+    {
+      "data": {
+        "label": "C_FILTER",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "1",
+            "net": "led_dc"
+          },
+          {
+            "function": "",
+            "name": "2",
+            "net": "gnd"
+          }
+        ],
+        "spice_model": "",
+        "type": "capacitor",
+        "value": "1uF"
+      },
+      "id": "C_FILTER",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "R_FILTER",
+        "part": "",
+        "pins": [
+          {
+            "function": "",
+            "name": "1",
+            "net": "pwm_raw"
+          },
+          {
+            "function": "",
+            "name": "2",
+            "net": "led_dc"
+          }
+        ],
+        "spice_model": "",
+        "type": "resistor",
+        "value": "1k"
+      },
+      "id": "R_FILTER",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "U_MCU",
+        "part": "ESP32-C3",
+        "pins": [
+          {
+            "function": "",
+            "name": "3V3",
+            "net": "3v3"
+          },
+          {
+            "function": "",
+            "name": "GND",
+            "net": "gnd"
+          },
+          {
+            "function": "GPIO_OUT",
+            "name": "GPIO5",
+            "net": "pwm_raw"
+          }
+        ],
+        "spice_model": "",
+        "type": "mcu",
+        "value": ""
+      },
+      "id": "U_MCU",
+      "type": "component"
+    },
+    {
+      "data": {
+        "label": "3v3",
+        "role": "power"
+      },
+      "id": "net:3v3",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "gnd",
+        "role": "ground"
+      },
+      "id": "net:gnd",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "led_dc",
+        "role": "analog_signal"
+      },
+      "id": "net:led_dc",
+      "type": "net"
+    },
+    {
+      "data": {
+        "label": "pwm_raw",
+        "role": "digital_signal"
+      },
+      "id": "net:pwm_raw",
+      "type": "net"
+    }
+  ]
+}

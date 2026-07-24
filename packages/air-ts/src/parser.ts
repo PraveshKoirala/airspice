@@ -33,6 +33,7 @@ import type {
   FirmwareBinding,
   FirmwareOperation,
   FirmwareProject,
+  FirmwareSource,
   FirmwareTask,
   GuiHint,
   Interface,
@@ -209,6 +210,7 @@ export function parseTree(rawRoot: XmlElement): SystemIR {
   const firmwareProjects = new Map<string, FirmwareProject>();
   const firmwareBindings = new Map<string, FirmwareBinding>();
   const firmwareTasks = new Map<string, FirmwareTask>();
+  let firmwareSource: FirmwareSource | null = null;
   const firmwareEl = find(root, "firmware");
   if (firmwareEl !== null) {
     for (const project of findAll(firmwareEl, "project")) {
@@ -252,6 +254,28 @@ export function parseTree(rawRoot: XmlElement): SystemIR {
         period: childText(task, "period"),
         operations,
       });
+    }
+    // Inline firmware source block (issue #36). PARITY: parser.py builds
+    // firmware_source from the FIRST <source> child of <firmware>; the
+    // mcu/language/entry/pins attributes live on <firmware>. `pins` is the
+    // DECLARED-PINS manifest -- split the comma-separated attr, trim each token,
+    // drop empties, keep document order. `source` is the <source> element text
+    // (elementText concatenates the CDATA runs), captured BYTE-EXACT (no strip),
+    // matching `source_el.text if not None else ""`.
+    const sourceEl = find(firmwareEl, "source");
+    if (sourceEl !== null) {
+      const pinsAttr = attr(firmwareEl, "pins", "");
+      const declaredPins = pinsAttr
+        .split(",")
+        .map((p) => p.trim())
+        .filter((p) => p !== "");
+      firmwareSource = {
+        mcu: attr(firmwareEl, "mcu", ""),
+        language: attr(firmwareEl, "language", ""),
+        entry: attr(firmwareEl, "entry", ""),
+        pins: declaredPins,
+        source: elementText(sourceEl),
+      };
     }
   }
 
@@ -379,6 +403,7 @@ export function parseTree(rawRoot: XmlElement): SystemIR {
     firmware_projects: firmwareProjects,
     firmware_bindings: firmwareBindings,
     firmware_tasks: firmwareTasks,
+    firmware_source: firmwareSource,
     bridges,
     tests,
     simulation_profiles: profiles,

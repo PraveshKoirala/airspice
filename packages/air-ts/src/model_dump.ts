@@ -94,7 +94,7 @@ export function modelToObject(ir: SystemIR): JsonValue {
     .sort((a, b) => byCodePoint(a.target, b.target))
     .map((e) => ({ target: e.target, enabled: e.enabled }));
 
-  return {
+  const payload: Record<string, JsonValue> = {
     name: ir.name,
     ir_version: ir.ir_version,
     metadata: { ...ir.metadata },
@@ -112,6 +112,24 @@ export function modelToObject(ir: SystemIR): JsonValue {
     simulation_profiles: mapValues(ir.simulation_profiles),
     exports,
   };
+  // OMIT-WHEN-NULL for the optional inline firmware source (issue #36): every
+  // design without a <firmware><source> block has firmware_source=null, and
+  // dropping the key entirely (rather than emitting "firmware_source": null)
+  // preserves byte-parity with the frozen model.json fixtures -- the same
+  // pattern as Component.gui (#22) and Test.analysis (#62). `dumps` sorts keys,
+  // so the position in this object is irrelevant. `pins` is a string[] -> JSON
+  // array, mirroring the Python tuple rendered by model_dump._plain. The truthy
+  // check treats both null and undefined (an omitted optional) as "absent".
+  if (ir.firmware_source) {
+    payload["firmware_source"] = {
+      mcu: ir.firmware_source.mcu,
+      language: ir.firmware_source.language,
+      entry: ir.firmware_source.entry,
+      pins: [...ir.firmware_source.pins],
+      source: ir.firmware_source.source,
+    };
+  }
+  return payload;
 }
 
 /**

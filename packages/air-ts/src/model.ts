@@ -136,6 +136,26 @@ export interface FirmwareTask {
   operations: FirmwareOperation[];
 }
 
+/**
+ * Inline firmware source carried in a `<firmware>` block (issue #36).
+ *
+ * PARITY: mirror of the Python `FirmwareSource` dataclass
+ * (packages/core/src/air/model.py). `mcu`/`language`/`entry` come from the
+ * `<firmware>` element's attributes; `pins` is the DECLARED-PINS manifest parsed
+ * from the comma-separated `pins` attribute into an ordered list (each token
+ * trimmed, empties dropped); `source` is the raw `<source>` CDATA program text,
+ * preserved BYTE-EXACT. `SystemIR.firmware_source` is `null` for every design
+ * without a `<source>` child, and `model_dump` omits the key when null, so the
+ * frozen corpus bytes are unchanged.
+ */
+export interface FirmwareSource {
+  mcu: string;
+  language: string;
+  entry: string;
+  pins: string[];
+  source: string;
+}
+
 /** Bridge `data`: flat attribute strings mixed with nested child-tag maps. */
 export type BridgeDatum = string | Record<string, string>;
 
@@ -203,6 +223,16 @@ export interface SystemIR {
   firmware_projects: Map<string, FirmwareProject>;
   firmware_bindings: Map<string, FirmwareBinding>;
   firmware_tasks: Map<string, FirmwareTask>;
+  /**
+   * Optional inline firmware source block (issue #36). null == no <source>.
+   *
+   * The property itself is OPTIONAL (`?`) purely so that pre-#36 hand-built
+   * SystemIR literals (test fixtures that predate this field) keep type-checking;
+   * `parseTree` ALWAYS sets it (to null or an object), and `model_dump` omits the
+   * key whenever it is null/absent -- so at runtime this is the faithful mirror of
+   * the Python dataclass field `firmware_source: FirmwareSource | None = None`.
+   */
+  firmware_source?: FirmwareSource | null;
   bridges: Bridge[];
   tests: Map<string, Test>;
   simulation_profiles: Map<string, SimulationProfile>;

@@ -93,7 +93,7 @@ def model_to_dict(ir: SystemIR) -> dict[str, Any]:
         if isinstance(test_dict, dict) and test_dict.get("analysis") is None:
             test_dict.pop("analysis", None)
 
-    return {
+    payload = {
         "name": ir.name,
         "ir_version": ir.ir_version,
         "metadata": _plain(ir.metadata),
@@ -111,3 +111,12 @@ def model_to_dict(ir: SystemIR) -> dict[str, Any]:
         "simulation_profiles": _sorted_map(ir.simulation_profiles),
         "exports": _sorted_list(ir.exports, "target"),
     }
+    # OMIT-WHEN-NONE for the optional inline firmware source (issue #36): every
+    # design without a <firmware><source> block has firmware_source=None, and
+    # dropping the key entirely (rather than emitting "firmware_source": null)
+    # preserves byte-parity with the frozen model.json fixtures -- the same
+    # pattern applied to Component.gui (#22) and Test.analysis (#62). `pins` is a
+    # tuple; _plain renders it as a JSON list.
+    if ir.firmware_source is not None:
+        payload["firmware_source"] = _plain(ir.firmware_source)
+    return payload

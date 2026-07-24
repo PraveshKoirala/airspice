@@ -128,6 +128,7 @@ def validate_ir(ir: SystemIR) -> list[Diagnostic]:
     for task in ir.firmware_tasks.values():
         if task.target not in ir.firmware_projects:
             diagnostics.append(builder.make("error", "firmware", "UNKNOWN_TASK_TARGET", f"Firmware task {task.id} targets unknown project {task.target}.", [task.id, task.target]))
+    diagnostics.extend(_validate_firmware_source(ir, builder))
 
     for test in ir.tests.values():
         for net_id in test.setup:
@@ -229,6 +230,66 @@ def _validate_i2c(ir: SystemIR, iface, builder: DiagnosticBuilder) -> list[Diagn
         except ValueError:
             pass
 
+    return diagnostics
+
+
+def _validate_firmware_source(ir: SystemIR, builder: DiagnosticBuilder) -> list[Diagnostic]:
+    """Validate an inline firmware source block (issue #36).
+
+    Three static, declared-only checks -- the source text is NEVER analyzed:
+      * ``FIRMWARE_MCU_UNDEFINED``  -- the ``mcu`` ref names no component;
+      * ``FIRMWARE_MCU_NOT_MCU``    -- the ``mcu`` ref exists but is not MCU-typed;
+      * ``FIRMWARE_PIN_NOT_ON_MCU`` -- a DECLARED ``pins`` id is absent from the
+        MCU registry's pin set (its GPIO/function pins plus its power pins).
+
+    Pin checks run only for an MCU-typed component whose ``part`` is in the
+    registry; an unknown part is already reported as ``UNKNOWN_MCU_PART`` by the
+    component pass, so we do not double-report it here.
+    """
+    diagnostics: list[Diagnostic] = []
+    fw = ir.firmware_source
+    if fw is None:
+        return diagnostics
+    component = ir.components.get(fw.mcu)
+    if component is None:
+        diagnostics.append(
+            builder.make(
+                "error",
+                "firmware",
+                "FIRMWARE_MCU_UNDEFINED",
+                f"Firmware source references unknown MCU component {fw.mcu}.",
+                [fw.mcu],
+            )
+        )
+        return diagnostics
+    if component.type != "mcu":
+        diagnostics.append(
+            builder.make(
+                "error",
+                "firmware",
+                "FIRMWARE_MCU_NOT_MCU",
+                f"Firmware source mcu {fw.mcu} is not an MCU component.",
+                [fw.mcu],
+            )
+        )
+        return diagnostics
+    if not component.part or component.part not in MCUS:
+        # Part unknown -> UNKNOWN_MCU_PART already fired in the component pass; we
+        # cannot resolve the pin set, so skip the declared-pin check.
+        return diagnostics
+    registry = MCUS[component.part]
+    known_pins = set(registry["pins"]) | set(registry["power_pins"])
+    for pin in fw.pins:
+        if pin not in known_pins:
+            diagnostics.append(
+                builder.make(
+                    "error",
+                    "firmware",
+                    "FIRMWARE_PIN_NOT_ON_MCU",
+                    f"Firmware source declares pin {pin} that is not on MCU {fw.mcu}.",
+                    [fw.mcu, pin],
+                )
+            )
     return diagnostics
 
 

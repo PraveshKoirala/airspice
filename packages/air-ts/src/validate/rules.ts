@@ -326,6 +326,7 @@ export function validateIr(ir: SystemIR): Diagnostic[] {
       );
     }
   }
+  for (const d of validateFirmwareSource(ir, builder)) diagnostics.push(d);
 
   for (const test of ir.tests.values()) {
     for (const netId of test.setup.keys()) {
@@ -579,6 +580,74 @@ function validateI2c(ir: SystemIR, iface: Interface, builder: DiagnosticBuilder)
 /** True for a non-null, non-array object value in an interface data bag. */
 function isDict(value: unknown): value is Record<string, string> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+// --------------------------------------------------------------------------- //
+// _validate_firmware_source (issue #36)                                       //
+// --------------------------------------------------------------------------- //
+
+/**
+ * Port of validation._validate_firmware_source. Three static, declared-only
+ * checks over the inline firmware source; the program text is NEVER analyzed.
+ *
+ * PARITY: same codes, domain ("firmware"), messages, related_elements, and
+ * emission order as the oracle. Runs a single builder shared with validateIr, so
+ * the diagnostic ids continue the validate_ir sequence exactly as in Python. The
+ * pin set is the union of the MCU registry's `pins` and `power_pins` keys; the
+ * pin check is skipped for an unknown `part` (UNKNOWN_MCU_PART already fired).
+ */
+function validateFirmwareSource(ir: SystemIR, builder: DiagnosticBuilder): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  const fw = ir.firmware_source;
+  // null (no <source>) or undefined (omitted optional on a hand-built IR) -> skip.
+  if (!fw) return diagnostics;
+  const component = ir.components.get(fw.mcu);
+  if (component === undefined) {
+    diagnostics.push(
+      builder.make(
+        "error",
+        "firmware",
+        "FIRMWARE_MCU_UNDEFINED",
+        `Firmware source references unknown MCU component ${fw.mcu}.`,
+        { relatedElements: [fw.mcu] },
+      ),
+    );
+    return diagnostics;
+  }
+  if (component.type !== "mcu") {
+    diagnostics.push(
+      builder.make(
+        "error",
+        "firmware",
+        "FIRMWARE_MCU_NOT_MCU",
+        `Firmware source mcu ${fw.mcu} is not an MCU component.`,
+        { relatedElements: [fw.mcu] },
+      ),
+    );
+    return diagnostics;
+  }
+  if (!component.part || !(component.part in MCUS)) {
+    return diagnostics;
+  }
+  const registry = MCUS[component.part] as McuSpec;
+  const knownPins = new Set<string>([
+    ...Object.keys(registry.pins),
+    ...Object.keys(registry.power_pins),
+  ]);
+  for (const pin of fw.pins) {
+    if (!knownPins.has(pin)) {
+      diagnostics.push(
+        builder.make(
+          "error",
+          "firmware",
+          "FIRMWARE_PIN_NOT_ON_MCU",
+          `Firmware source declares pin ${pin} that is not on MCU ${fw.mcu}.`,
+          { relatedElements: [fw.mcu, pin] },
+        ),
+      );
+    }
+  }
+  return diagnostics;
 }
 
 // --------------------------------------------------------------------------- //
