@@ -263,4 +263,11 @@ export class SimClient {
       this.worker = null;
     }
   }
+
+  // NOTE: mid-transient control (halt/alter/resume) is intentionally NOT exposed
+  // here. eecircuit-engine is fire-and-forget (capabilities.control === false),
+  // so a control method would post a message the worker silently drops. The
+  // reserved SimControl shape (protocol.ts) documents the API a control-capable
+  // engine (issue #88) will add behind capabilities.control. Co-simulation
+  // couples domains by RE-SOLVING per firmware step instead (see cosim.ts).
 }

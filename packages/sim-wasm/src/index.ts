@@ -33,3 +33,17 @@ export {
   runConvergenceLadder,
 } from "./ladder";
 export type { LadderRung, LadderAttempt, LadderOutcome, RungOutcome } from "./ladder";
+
+export { CoSimOrchestrator, createSimClientAnalogEngine } from "./cosim.js";
+export type {
+  PinBinding,
+  CoSimStepState,
+  CoSimOptions,
+  AnalogEngine,
+  AnalogSolveInput,
+  AnalogSolveOutput,
+  FirmwareModel,
+  FirmwareStepInput,
+  FirmwareStepOutput,
+} from "./cosim.js";
+
