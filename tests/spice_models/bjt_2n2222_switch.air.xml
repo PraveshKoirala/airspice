@@ -1,0 +1,49 @@
+<system name="bjt_2n2222_switch" ir_version="0.1">
+  <metadata>
+    <title>2N2222 common-emitter switch (real Philips model from samples/standard.bjt)</title>
+  </metadata>
+  <nets>
+    <net id="vcc" role="power" nominal_voltage="5V"/>
+    <net id="coll" role="analog_signal"/>
+    <net id="base" role="analog_signal"/>
+    <net id="drive" role="digital_signal"/>
+    <net id="gnd" role="ground"/>
+  </nets>
+  <components>
+    <component id="V1" type="voltage_source">
+      <pin name="p" net="vcc"/>
+      <pin name="n" net="gnd"/>
+      <value>5V</value>
+    </component>
+    <component id="RC" type="resistor">
+      <pin name="1" net="vcc"/>
+      <pin name="2" net="coll"/>
+      <value>1k</value>
+    </component>
+    <component id="RB" type="resistor">
+      <pin name="1" net="drive"/>
+      <pin name="2" net="base"/>
+      <value>10k</value>
+    </component>
+    <component id="Q1" type="bjt" spice_model="2N2222">
+      <pin name="C" net="coll"/>
+      <pin name="B" net="base"/>
+      <pin name="E" net="gnd"/>
+    </component>
+  </components>
+  <tests>
+    <test id="switch_on">
+      <run duration="1ms"/>
+      <setup>
+        <set_voltage net="drive" value="5V"/>
+      </setup>
+      <assert_voltage net="coll" min="0V" max="5V"/>
+    </test>
+  </tests>
+  <simulation_profiles>
+    <profile id="analog" default="true">
+      <backend type="ngspice"/>
+      <run test="switch_on"/>
+    </profile>
+  </simulation_profiles>
+</system>
